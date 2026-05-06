@@ -5,6 +5,8 @@ import type { BoardIssue } from '~/server/jira'
 import { StatusPillSelect } from '~/features/status-pill'
 import { MrSection } from '~/features/mr-status'
 import type { Column } from '~/features/board/status-mapping'
+import { isDeemphasized } from '~/features/board/deemphasize'
+import { cn } from '~/lib/cn'
 import { TypeIcon } from './TypeIcon'
 import { colorForLabel } from './hash-color'
 
@@ -56,7 +58,10 @@ export function TicketCard({
       aria-label={`Open ${issue.key}`}
       data-animation={animationState === 'idle' ? undefined : animationState}
       aria-hidden={isLeaving || undefined}
-      className="ticket-card border-border bg-card hover:border-foreground/30 focus-visible:ring-ring group cursor-pointer rounded-md border px-3 py-2.5 text-left shadow-sm transition-colors focus-visible:ring-1 focus-visible:outline-none"
+      className={cn(
+        'ticket-card border-border bg-card hover:border-foreground/30 focus-visible:ring-ring group cursor-pointer rounded-md border px-3 py-2.5 text-left shadow-sm transition-colors focus-visible:ring-1 focus-visible:outline-none',
+        isDeemphasized(issue, column) && 'opacity-60',
+      )}
     >
       <div className="flex items-center gap-2">
         <TypeIcon type={issue.typeName} />

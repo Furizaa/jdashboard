@@ -3,6 +3,7 @@ import { useBoardIssues } from './use-board-issues'
 import { useChangeIndication, type LeavingIssue } from './use-change-indication'
 import { COLUMNS, columnForStatus, type Column } from './status-mapping'
 import { filterIssues } from './filter-issues'
+import { sortColumnIssues } from './sort-column'
 import type { BoardIssue } from '~/server/jira'
 import { TicketCard, type TicketCardAnimationState } from '~/features/ticket-card'
 import { usePolling } from '~/lib/use-polling'
@@ -43,6 +44,18 @@ export function Board({ searchQuery }: { searchQuery: string }) {
     }
     for (const leavingIssue of filterIssues([...leaving.values()], searchQuery)) {
       empty[leavingIssue.column].push({ issue: leavingIssue, state: 'leaving' })
+    }
+    for (const column of COLUMNS) {
+      const items = empty[column]
+      const stateByKey = new Map(items.map((item) => [item.issue.key, item.state]))
+      const sortedIssues = sortColumnIssues(
+        items.map((item) => item.issue),
+        column,
+      )
+      empty[column] = sortedIssues.map((issue) => ({
+        issue,
+        state: stateByKey.get(issue.key)!,
+      }))
     }
     return empty
   }, [liveIssues, enteringKeys, changedKeys, leaving, searchQuery])

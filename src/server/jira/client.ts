@@ -111,7 +111,20 @@ async function request<T>(path: string, init?: { method?: string; body?: unknown
     const body = await res.text()
     throw new JiraHttpError(`Jira request failed: ${res.status}`, res.status, body)
   }
+  if (res.status === 204) {
+    return undefined as T
+  }
   return (await res.json()) as T
+}
+
+export type JiraTransition = {
+  id: string
+  name: string
+  to: { id?: string; name: string; statusCategory?: { key: string; name: string } }
+}
+
+export type JiraTransitionsResponse = {
+  transitions: JiraTransition[]
 }
 
 export const jiraClient = {
@@ -131,5 +144,18 @@ export const jiraClient = {
     return await request<JiraDetailedIssue>(
       `/rest/api/3/issue/${encodeURIComponent(key)}?${params.toString()}`,
     )
+  },
+
+  async getTransitions(key: string): Promise<JiraTransitionsResponse> {
+    return await request<JiraTransitionsResponse>(
+      `/rest/api/3/issue/${encodeURIComponent(key)}/transitions`,
+    )
+  },
+
+  async transitionIssue(key: string, transitionId: string): Promise<void> {
+    await request<void>(`/rest/api/3/issue/${encodeURIComponent(key)}/transitions`, {
+      method: 'POST',
+      body: { transition: { id: transitionId } },
+    })
   },
 }

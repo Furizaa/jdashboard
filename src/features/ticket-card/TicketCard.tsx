@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from
 import { useNavigate } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import type { BoardIssue } from '~/server/jira'
-import { StatusPill } from '~/features/status-pill'
+import { StatusPillSelect } from '~/features/status-pill'
 import { TypeIcon } from './TypeIcon'
 import { colorForLabel } from './hash-color'
 
@@ -24,6 +24,7 @@ export function TicketCard({ issue, baseUrl }: { issue: BoardIssue; baseUrl: str
   }
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.target !== event.currentTarget) return
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
       openPanel()
@@ -43,7 +44,7 @@ export function TicketCard({ issue, baseUrl }: { issue: BoardIssue; baseUrl: str
         <TypeIcon type={issue.typeName} />
         <CardKey jiraKey={issue.key} jiraUrl={jiraUrl} />
         <span className="ml-auto" onClick={stopPropagation}>
-          <StatusPill status={issue.statusName} />
+          <StatusPillSelect issueKey={issue.key} status={issue.statusName} align="end" />
         </span>
       </div>
 

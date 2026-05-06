@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
-import { jiraClient, JiraAuthError } from './client'
+import { jiraClient, JiraAuthError, JiraHttpError } from './client'
 import { buildBoardJql } from './jql'
 import { getServerEnv } from '~/server/env'
 
@@ -204,6 +204,93 @@ export const getIssue = createServerFn({ method: 'GET' })
     } catch (err) {
       if (err instanceof JiraAuthError) {
         return { ok: false, reason: 'unauthorized' }
+      }
+      throw err
+    }
+  })
+
+export type AllowedTransition = {
+  id: string
+  name: string
+  toStatusName: string
+}
+
+export type GetTransitionsResult =
+  | { ok: true; transitions: AllowedTransition[] }
+  | { ok: false; reason: 'unauthorized' | 'not-found' }
+
+export const getTransitions = createServerFn({ method: 'GET' })
+  .inputValidator((data: { key: string }) => {
+    if (!data || typeof data.key !== 'string' || data.key.trim() === '') {
+      throw new Error('getTransitions: key is required')
+    }
+    return { key: data.key.trim() }
+  })
+  .handler(async ({ data }): Promise<GetTransitionsResult> => {
+    try {
+      const response = await jiraClient.getTransitions(data.key)
+      return {
+        ok: true,
+        transitions: response.transitions.map((t) => ({
+          id: t.id,
+          name: t.name,
+          toStatusName: t.to.name,
+        })),
+      }
+    } catch (err) {
+      if (err instanceof JiraAuthError) {
+        return { ok: false, reason: 'unauthorized' }
+      }
+      if (err instanceof JiraHttpError && err.status === 404) {
+        return { ok: false, reason: 'not-found' }
+      }
+      throw err
+    }
+  })
+
+export type TransitionIssueResult =
+  | { ok: true }
+  | { ok: false; reason: 'unauthorized' | 'rejected'; message: string }
+
+function parseJiraErrorMessage(body: string): string {
+  try {
+    const parsed = JSON.parse(body) as {
+      errorMessages?: string[]
+      errors?: Record<string, string>
+    }
+    if (Array.isArray(parsed.errorMessages) && parsed.errorMessages.length > 0) {
+      return parsed.errorMessages.join(' ')
+    }
+    if (parsed.errors && typeof parsed.errors === 'object') {
+      const values = Object.values(parsed.errors).filter((v): v is string => typeof v === 'string')
+      if (values.length > 0) return values.join(' ')
+    }
+  } catch {
+    // fall through
+  }
+  return body || 'Jira rejected the transition'
+}
+
+export const transitionIssue = createServerFn({ method: 'POST' })
+  .inputValidator((data: { key: string; transitionId: string }) => {
+    if (!data || typeof data.key !== 'string' || data.key.trim() === '') {
+      throw new Error('transitionIssue: key is required')
+    }
+    if (typeof data.transitionId !== 'string' || data.transitionId.trim() === '') {
+      throw new Error('transitionIssue: transitionId is required')
+    }
+    return { key: data.key.trim(), transitionId: data.transitionId.trim() }
+  })
+  .handler(async ({ data }): Promise<TransitionIssueResult> => {
+    try {
+      await jiraClient.transitionIssue(data.key, data.transitionId)
+      return { ok: true }
+    } catch (err) {
+      if (err instanceof JiraAuthError) {
+        return { ok: false, reason: 'unauthorized', message: 'Invalid Jira credentials' }
+      }
+      if (err instanceof JiraHttpError) {
+        return { ok: false, reason: 'rejected', message: parseJiraErrorMessage(err.body) }
       }
       throw err
     }

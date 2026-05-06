@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { ChevronDown, ChevronUp, ExternalLink, X } from 'lucide-react'
-import { StatusPill } from '~/features/status-pill'
+import { StatusPillSelect } from '~/features/status-pill'
 import { TypeIcon, colorForLabel } from '~/features/ticket-card'
 import { columnForStatus, useBoardIssues } from '~/features/board'
 import type { BoardIssue, DetailIssue } from '~/server/jira'
@@ -255,7 +255,7 @@ function PropertiesRail({ issue }: { issue: DetailIssue }) {
   return (
     <aside className="flex flex-col gap-4 text-xs">
       <Field label="Status">
-        <StatusPill status={issue.statusName} />
+        <StatusPillSelect issueKey={issue.key} status={issue.statusName} />
       </Field>
       <Field label="Type">
         <span className="inline-flex items-center gap-1.5">

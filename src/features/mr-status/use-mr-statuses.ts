@@ -1,4 +1,6 @@
+import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { getMrStatuses } from '~/server/gitlab'
 import type { MrSummary } from '~/server/gitlab'
 import { useBoardIssues } from '~/features/board/use-board-issues'
@@ -8,6 +10,14 @@ export const mrStatusesQueryKey = ['mr-statuses'] as const
 
 const POLL_INTERVAL_MS = 60_000
 const STALE_TIME_MS = 30_000
+
+let unauthorizedToastShown = false
+
+function notifyUnauthorizedOnce() {
+  if (unauthorizedToastShown) return
+  unauthorizedToastShown = true
+  toast.error('GitLab auth failed — check `GITLAB_TOKEN`')
+}
 
 export function useMrStatuses() {
   const board = useBoardIssues()
@@ -19,6 +29,11 @@ export function useMrStatuses() {
     retry: false,
     staleTime: STALE_TIME_MS,
   })
+  useEffect(() => {
+    if (query.data && query.data.ok === false && query.data.reason === 'unauthorized') {
+      notifyUnauthorizedOnce()
+    }
+  }, [query.data])
   usePolling(() => {
     if (jiraReady) query.refetch()
   }, POLL_INTERVAL_MS)

@@ -3,6 +3,7 @@ import { formatDistanceToNow } from 'date-fns'
 import { RefreshCw } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { boardIssuesQueryKey, useBoardIssues } from '~/features/board'
+import { mrStatusesQueryKey } from '~/features/mr-status'
 import { GitlabIndicator } from './GitlabIndicator'
 import { SearchInput } from './SearchInput'
 
@@ -28,6 +29,7 @@ export function Header({
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: boardIssuesQueryKey })
     queryClient.invalidateQueries({ queryKey: ISSUE_QUERY_PREFIX })
+    queryClient.invalidateQueries({ queryKey: mrStatusesQueryKey })
   }
 
   const errored = query.isError

@@ -6,6 +6,7 @@ import {
   type Column,
 } from './status-mapping'
 import type { BoardIssue } from '~/server/jira'
+import { TicketCard } from '~/features/ticket-card'
 
 export function Board() {
   const query = useBoardIssues()
@@ -60,19 +61,10 @@ function BoardColumn({ column, issues }: { column: Column; issues: BoardIssue[] 
         {issues.length === 0 ? (
           <p className="text-muted-foreground px-2 py-1 text-xs">No tickets</p>
         ) : (
-          issues.map((issue) => <IssueCard key={issue.key} issue={issue} />)
+          issues.map((issue) => <TicketCard key={issue.key} issue={issue} />)
         )}
       </div>
     </section>
-  )
-}
-
-function IssueCard({ issue }: { issue: BoardIssue }) {
-  return (
-    <article className="border-border bg-card rounded-md border px-3 py-2.5 shadow-sm">
-      <div className="text-muted-foreground font-mono text-xs">{issue.key}</div>
-      <div className="text-foreground mt-1 text-sm leading-snug">{issue.summary}</div>
-    </article>
   )
 }
 

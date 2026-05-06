@@ -31,6 +31,10 @@ export type JiraIssue = {
       name: string
       statusCategory?: { key: string; name: string }
     }
+    labels?: string[]
+    issuetype?: {
+      name: string
+    }
   }
 }
 

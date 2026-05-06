@@ -16,6 +16,7 @@ export type ServerEnv = {
   JIRA_PROJECT_KEY: string
   JIRA_LABEL_FILTER: string
   JIRA_DONE_WINDOW_DAYS: number
+  JIRA_HIDE_LABELS: readonly string[]
 }
 
 let cached: ServerEnv | null = null
@@ -52,6 +53,12 @@ function readAndValidate(): ServerEnv {
 
   const baseUrl = values.JIRA_BASE_URL!.replace(/\/+$/, '')
 
+  const hideLabelsRaw = process.env.JIRA_HIDE_LABELS ?? ''
+  const hideLabels = hideLabelsRaw
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0)
+
   return {
     JIRA_BASE_URL: baseUrl,
     JIRA_EMAIL: values.JIRA_EMAIL!,
@@ -59,6 +66,7 @@ function readAndValidate(): ServerEnv {
     JIRA_PROJECT_KEY: values.JIRA_PROJECT_KEY!,
     JIRA_LABEL_FILTER: values.JIRA_LABEL_FILTER!,
     JIRA_DONE_WINDOW_DAYS: doneWindow,
+    JIRA_HIDE_LABELS: hideLabels,
   }
 }
 

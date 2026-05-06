@@ -37,6 +37,8 @@ export type BoardIssue = {
   key: string
   summary: string
   statusName: string
+  typeName: string
+  labels: string[]
 }
 
 export type SearchIssuesResult =
@@ -51,12 +53,22 @@ export const searchIssues = createServerFn({ method: 'GET' }).handler(
       label: env.JIRA_LABEL_FILTER,
       doneWindowDays: env.JIRA_DONE_WINDOW_DAYS,
     })
+    const hideSet = new Set(env.JIRA_HIDE_LABELS.map((l) => l.toLowerCase()))
     try {
-      const response = await jiraClient.searchIssues(jql, ['summary', 'status'])
+      const response = await jiraClient.searchIssues(jql, [
+        'summary',
+        'status',
+        'labels',
+        'issuetype',
+      ])
       const issues: BoardIssue[] = response.issues.map((issue) => ({
         key: issue.key,
         summary: issue.fields.summary,
         statusName: issue.fields.status.name,
+        typeName: issue.fields.issuetype?.name ?? 'Task',
+        labels: (issue.fields.labels ?? []).filter(
+          (label) => !hideSet.has(label.toLowerCase()),
+        ),
       }))
       return { ok: true, issues }
     } catch (err) {

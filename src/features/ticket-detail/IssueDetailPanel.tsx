@@ -7,6 +7,7 @@ import { columnForStatus, useBoardIssues } from '~/features/board'
 import type { BoardIssue, DetailIssue } from '~/server/jira'
 import { useIssue } from './use-issue'
 import { RenderAdf } from './adf'
+import { Activity } from './Activity'
 import { extractPlainText } from './extract-plain-text'
 
 const PROJECT_KEY_RE = /^([A-Z][A-Z0-9]+)-\d+$/
@@ -220,6 +221,7 @@ function PanelBody({ issue }: { issue: DetailIssue }) {
         <div className="mt-5">
           {hasDescription ? <RenderAdf doc={issue.description} /> : <NoDescription />}
         </div>
+        <Activity comments={issue.comments} />
       </div>
       <PropertiesRail issue={issue} />
     </div>

@@ -76,7 +76,7 @@ export type JiraDetailedIssue = {
     comment?: {
       comments: Array<{
         id: string
-        author?: { displayName: string } | null
+        author?: { displayName: string; avatarUrls?: Record<string, string> } | null
         created: string
         body?: unknown
       }>

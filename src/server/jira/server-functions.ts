@@ -82,6 +82,7 @@ export type DetailIssue = {
   comments: Array<{
     id: string
     authorName: string | null
+    authorAvatarUrl: string | null
     created: string
     body: AdfNode | null
   }>
@@ -166,12 +167,18 @@ export const getIssue = createServerFn({ method: 'GET' })
           parent: f.parent ? toLinkedRef(f.parent) : null,
           subtasks: (f.subtasks ?? []).map(toLinkedRef),
           links,
-          comments: (f.comment?.comments ?? []).map((c) => ({
-            id: c.id,
-            authorName: c.author?.displayName ?? null,
-            created: c.created,
-            body: (c.body as AdfNode | null | undefined) ?? null,
-          })),
+          comments: (f.comment?.comments ?? []).map((c) => {
+            const urls = c.author?.avatarUrls
+            const avatar =
+              urls?.['48x48'] ?? urls?.['32x32'] ?? urls?.['24x24'] ?? urls?.['16x16'] ?? null
+            return {
+              id: c.id,
+              authorName: c.author?.displayName ?? null,
+              authorAvatarUrl: avatar,
+              created: c.created,
+              body: (c.body as AdfNode | null | undefined) ?? null,
+            }
+          }),
         },
       }
     } catch (err) {

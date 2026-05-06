@@ -19,8 +19,22 @@ function openInNewTab(url: string) {
 }
 
 export function MrSection({ issueKey, column }: { issueKey: string; column: Column }) {
-  if (column !== 'In Code Review') return null
-  return <CodeReviewSection issueKey={issueKey} />
+  if (column === 'In Code Review') return <CodeReviewSection issueKey={issueKey} />
+  if (column === 'Done') return <DoneSection issueKey={issueKey} />
+  return null
+}
+
+function DoneSection({ issueKey }: { issueKey: string }) {
+  const result = useMrStatus(issueKey)
+  if (result.state !== 'ready') return null
+  if (result.summary === null) return null
+  if (result.summary.kind === 'merged') return null
+  return (
+    <MrWarning
+      text="Ticket is Done — MR still open"
+      onClick={openInNewTab(result.summary.webUrl)}
+    />
+  )
 }
 
 function CodeReviewSection({ issueKey }: { issueKey: string }) {

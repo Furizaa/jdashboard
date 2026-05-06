@@ -2,6 +2,10 @@
 node_modules/
 jspm_packages/
 
+# TanStack Start generated
+src/routeTree.gen.ts
+.tanstack/
+
 # Logs
 logs
 *.log

@@ -22,6 +22,8 @@ function detail(overrides: Partial<GitlabMrDetail> = {}): GitlabMrDetail {
     draft: overrides.draft ?? false,
     updated_at: overrides.updated_at ?? '2026-01-01T00:00:00Z',
     reviewers: overrides.reviewers ?? [],
+    head_pipeline: overrides.head_pipeline ?? null,
+    has_conflicts: overrides.has_conflicts ?? false,
   }
 }
 
@@ -75,6 +77,7 @@ describe('summarizeMr', () => {
       ['carol', 'gray-dashed'],
     ])
     expect(result.allApprovedAndClean).toBe(false)
+    expect(result.ciState).toBe('none')
   })
 
   it('marks allApprovedAndClean when every reviewer is in approvedUsernames with no unresolved', () => {
@@ -86,6 +89,7 @@ describe('summarizeMr', () => {
     )
     if (result.kind !== 'review') throw new Error('expected review')
     expect(result.allApprovedAndClean).toBe(true)
+    expect(result.ciState).toBe('none')
   })
 
   it('non-approved reviewer with notes upgrades to blue-dashed; approved with unresolved → green-dashed', () => {
@@ -115,6 +119,7 @@ describe('summarizeMr', () => {
       expect.objectContaining({ username: 'alice', visualState: 'green-dashed' }),
     ])
     expect(result.allApprovedAndClean).toBe(false)
+    expect(result.ciState).toBe('none')
   })
 
   it('reviewer with no notes and not in approvedUsernames → gray-dashed', () => {
@@ -126,5 +131,6 @@ describe('summarizeMr', () => {
     )
     if (result.kind !== 'review') throw new Error('expected review')
     expect(result.reviewers[0]?.visualState).toBe('gray-dashed')
+    expect(result.ciState).toBe('none')
   })
 })

@@ -40,6 +40,8 @@ export type GitlabReviewer = {
 
 export type GitlabMrDetail = GitlabMrSummary & {
   reviewers: GitlabReviewer[]
+  head_pipeline: { status: string } | null
+  has_conflicts: boolean
 }
 
 export type GitlabNote = {

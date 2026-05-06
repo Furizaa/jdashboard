@@ -5,6 +5,7 @@ import { cn } from '~/lib/cn'
 import type { Column } from '~/features/board/status-mapping'
 import { transitionsQueryKey, useTransitionMutation } from '~/features/status-pill'
 import { getTransitions } from '~/server/jira'
+import { MrCiIndicator } from './MrCiIndicator'
 import { MrWarning } from './MrWarning'
 import { ReviewerAvatar } from './ReviewerAvatar'
 import { useMrStatus } from './use-mr-statuses'
@@ -122,10 +123,14 @@ function CodeReviewSection({ issueKey }: { issueKey: string }) {
             +{overflow}
           </span>
         )}
+        <MrCiIndicator state={summary.ciState} className="ml-auto" />
         {summary.unresolvedCount > 0 && (
           <span
             title={`${summary.unresolvedCount} unresolved comment thread${summary.unresolvedCount === 1 ? '' : 's'}`}
-            className="text-muted-foreground ml-auto inline-flex items-center gap-1 text-[11px] tabular-nums"
+            className={cn(
+              'text-muted-foreground inline-flex items-center gap-1 text-[11px] tabular-nums',
+              summary.ciState === 'none' && 'ml-auto',
+            )}
           >
             <MessageSquare className="h-3 w-3" aria-hidden />
             {summary.unresolvedCount}

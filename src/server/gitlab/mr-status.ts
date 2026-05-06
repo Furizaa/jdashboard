@@ -3,6 +3,7 @@ import type {
   GitlabMrDetail,
   GitlabMrSummary,
 } from './client'
+import { ciVisualState, type CiVisualState } from '~/features/mr-status/ci-state'
 import { countUnresolvedThreads } from '~/features/mr-status/count-unresolved'
 import {
   reviewerVisualState,
@@ -32,6 +33,7 @@ export type MrSummary =
       reviewers: MrReviewerState[]
       unresolvedCount: number
       allApprovedAndClean: boolean
+      ciState: CiVisualState
     } & CommonMrFields)
 
 function commonFields(mr: GitlabMrSummary): CommonMrFields {
@@ -95,11 +97,17 @@ export function summarizeMr(
   const allApprovedAndClean =
     unresolvedCount === 0 && reviewers.every((r) => r.visualState === 'green-solid')
 
+  const ciState = ciVisualState({
+    headPipelineStatus: detail.head_pipeline?.status ?? null,
+    hasConflicts: detail.has_conflicts,
+  })
+
   return {
     kind: 'review',
     ...common,
     reviewers,
     unresolvedCount,
     allApprovedAndClean,
+    ciState,
   }
 }

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { ChevronDown, ChevronUp, ExternalLink, X } from 'lucide-react'
+import { toast } from 'sonner'
 import { StatusPillSelect } from '~/features/status-pill'
 import { TypeIcon, colorForLabel } from '~/features/ticket-card'
 import { columnForStatus, useBoardIssues } from '~/features/board'
@@ -84,6 +85,42 @@ function PanelContent({
       nextKey: idx < siblings.length - 1 ? siblings[idx + 1]!.key : null,
     }
   }, [issue, boardQuery.data, issueKey])
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return
+      const active = document.activeElement
+      const inTextInput =
+        active instanceof HTMLInputElement ||
+        active instanceof HTMLTextAreaElement ||
+        (active instanceof HTMLElement && active.isContentEditable)
+      if (inTextInput) return
+
+      const key = event.key.toLowerCase()
+      if (key === 'j' || event.key === 'ArrowDown') {
+        if (nextKey === null) return
+        event.preventDefault()
+        onOpen(nextKey)
+      } else if (key === 'k' || event.key === 'ArrowUp') {
+        if (prevKey === null) return
+        event.preventDefault()
+        onOpen(prevKey)
+      } else if (key === 'o') {
+        if (jiraUrl === null) return
+        event.preventDefault()
+        window.open(jiraUrl, '_blank', 'noopener,noreferrer')
+      } else if (key === 'c') {
+        if (jiraUrl === null) return
+        event.preventDefault()
+        navigator.clipboard.writeText(jiraUrl).then(
+          () => toast.success('Link copied'),
+          () => toast.error("Couldn't copy link to clipboard"),
+        )
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [prevKey, nextKey, jiraUrl, onOpen])
 
   return (
     <div

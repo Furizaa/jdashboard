@@ -7,6 +7,9 @@ const REQUIRED = [
   'JIRA_PROJECT_KEY',
   'JIRA_LABEL_FILTER',
   'JIRA_DONE_WINDOW_DAYS',
+  'GITLAB_BASE_URL',
+  'GITLAB_TOKEN',
+  'GITLAB_PROJECT_PATH',
 ] as const
 
 const VALID_ENV = {
@@ -16,6 +19,9 @@ const VALID_ENV = {
   JIRA_PROJECT_KEY: 'HDR',
   JIRA_LABEL_FILTER: 'Frontend',
   JIRA_DONE_WINDOW_DAYS: '14',
+  GITLAB_BASE_URL: 'https://gitlab.com',
+  GITLAB_TOKEN: 'glpat-xxx',
+  GITLAB_PROJECT_PATH: 'group/project',
 }
 
 const originalEnv = { ...process.env }
@@ -49,6 +55,12 @@ describe('getServerEnv', () => {
     Object.assign(process.env, VALID_ENV, { JIRA_BASE_URL: 'https://example.atlassian.net/' })
     const env = await loadEnv()
     expect(env.JIRA_BASE_URL).toBe('https://example.atlassian.net')
+  })
+
+  it('strips a trailing slash from GITLAB_BASE_URL', async () => {
+    Object.assign(process.env, VALID_ENV, { GITLAB_BASE_URL: 'https://gitlab.com/' })
+    const env = await loadEnv()
+    expect(env.GITLAB_BASE_URL).toBe('https://gitlab.com')
   })
 
   for (const key of REQUIRED) {

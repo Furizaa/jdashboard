@@ -3,6 +3,7 @@ import { formatDistanceToNow } from 'date-fns'
 import { RefreshCw } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { boardIssuesQueryKey, useBoardIssues } from '~/features/board'
+import { GitlabIndicator } from './GitlabIndicator'
 import { SearchInput } from './SearchInput'
 
 const ISSUE_QUERY_PREFIX = ['jira', 'issue'] as const
@@ -38,6 +39,7 @@ export function Header({
       <span className="text-foreground text-sm font-semibold tracking-tight">clashboard</span>
       <SearchInput value={searchQuery} onChange={onSearchChange} />
       <div className="ml-auto flex items-center gap-1">
+        <GitlabIndicator />
         {errored ? (
           <button
             type="button"

@@ -5,6 +5,9 @@ const REQUIRED_ENV_KEYS = [
   'JIRA_PROJECT_KEY',
   'JIRA_LABEL_FILTER',
   'JIRA_DONE_WINDOW_DAYS',
+  'GITLAB_BASE_URL',
+  'GITLAB_TOKEN',
+  'GITLAB_PROJECT_PATH',
 ] as const
 
 type RequiredEnvKey = (typeof REQUIRED_ENV_KEYS)[number]
@@ -17,6 +20,9 @@ export type ServerEnv = {
   JIRA_LABEL_FILTER: string
   JIRA_DONE_WINDOW_DAYS: number
   JIRA_HIDE_LABELS: readonly string[]
+  GITLAB_BASE_URL: string
+  GITLAB_TOKEN: string
+  GITLAB_PROJECT_PATH: string
 }
 
 let cached: ServerEnv | null = null
@@ -51,6 +57,7 @@ function readAndValidate(): ServerEnv {
   }
 
   const baseUrl = values.JIRA_BASE_URL!.replace(/\/+$/, '')
+  const gitlabBaseUrl = values.GITLAB_BASE_URL!.replace(/\/+$/, '')
 
   const hideLabelsRaw = process.env.JIRA_HIDE_LABELS ?? ''
   const hideLabels = hideLabelsRaw
@@ -66,6 +73,9 @@ function readAndValidate(): ServerEnv {
     JIRA_LABEL_FILTER: values.JIRA_LABEL_FILTER!,
     JIRA_DONE_WINDOW_DAYS: doneWindow,
     JIRA_HIDE_LABELS: hideLabels,
+    GITLAB_BASE_URL: gitlabBaseUrl,
+    GITLAB_TOKEN: values.GITLAB_TOKEN!,
+    GITLAB_PROJECT_PATH: values.GITLAB_PROJECT_PATH!,
   }
 }
 

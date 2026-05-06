@@ -3,11 +3,18 @@ import { formatDistanceToNow } from 'date-fns'
 import { RefreshCw } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { boardIssuesQueryKey, useBoardIssues } from '~/features/board'
+import { SearchInput } from './SearchInput'
 
 const ISSUE_QUERY_PREFIX = ['jira', 'issue'] as const
 const TICK_INTERVAL_MS = 5_000
 
-export function Header() {
+export function Header({
+  searchQuery,
+  onSearchChange,
+}: {
+  searchQuery: string
+  onSearchChange: (value: string) => void
+}) {
   const queryClient = useQueryClient()
   const query = useBoardIssues()
 
@@ -29,6 +36,7 @@ export function Header() {
   return (
     <header className="border-border flex h-12 shrink-0 items-center gap-3 border-b px-4">
       <span className="text-foreground text-sm font-semibold tracking-tight">clashboard</span>
+      <SearchInput value={searchQuery} onChange={onSearchChange} />
       <div className="ml-auto flex items-center gap-1">
         {errored ? (
           <button

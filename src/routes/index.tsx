@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { AuthGate } from '~/features/auth-status'
 import { Board } from '~/features/board'
@@ -17,12 +18,13 @@ export const Route = createFileRoute('/')({
 
 function HomePage() {
   const { issue } = Route.useSearch()
+  const [searchQuery, setSearchQuery] = useState('')
   return (
     <AuthGate>
       <div className="flex h-dvh flex-col">
-        <Header />
+        <Header searchQuery={searchQuery} onSearchChange={setSearchQuery} />
         <main className="min-h-0 flex-1">
-          <Board />
+          <Board searchQuery={searchQuery} />
         </main>
       </div>
       <IssueDetailPanel issueKey={issue ?? null} />

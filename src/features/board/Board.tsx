@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useBoardIssues } from './use-board-issues'
 import { useChangeIndication, type LeavingIssue } from './use-change-indication'
 import { COLUMNS, columnForStatus, type Column } from './status-mapping'
+import { filterIssues } from './filter-issues'
 import type { BoardIssue } from '~/server/jira'
 import { TicketCard, type TicketCardAnimationState } from '~/features/ticket-card'
 import { usePolling } from '~/lib/use-polling'
@@ -13,7 +14,7 @@ type ColumnItem = {
   state: TicketCardAnimationState
 }
 
-export function Board() {
+export function Board({ searchQuery }: { searchQuery: string }) {
   const query = useBoardIssues()
   usePolling(() => {
     query.refetch()
@@ -30,7 +31,7 @@ export function Board() {
       Done: [],
     }
     if (liveIssues === undefined) return empty
-    for (const issue of liveIssues) {
+    for (const issue of filterIssues(liveIssues, searchQuery)) {
       const state: TicketCardAnimationState = enteringKeys.has(issue.key)
         ? 'entering'
         : changedKeys.has(issue.key)
@@ -38,11 +39,11 @@ export function Board() {
           : 'idle'
       empty[columnForStatus(issue.statusName)].push({ issue, state })
     }
-    for (const leavingIssue of leaving.values()) {
+    for (const leavingIssue of filterIssues([...leaving.values()], searchQuery)) {
       empty[leavingIssue.column].push({ issue: leavingIssue, state: 'leaving' })
     }
     return empty
-  }, [liveIssues, enteringKeys, changedKeys, leaving])
+  }, [liveIssues, enteringKeys, changedKeys, leaving, searchQuery])
 
   if (query.isPending) {
     return <BoardMessage tone="muted">Loading board…</BoardMessage>

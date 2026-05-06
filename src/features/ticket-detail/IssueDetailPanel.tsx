@@ -213,17 +213,7 @@ function PanelHeader({
           <ChevronDown size={14} />
         </IconButton>
         <OpenMrLink issueKey={issueKey} />
-        {jiraUrl !== null && (
-          <a
-            href={jiraUrl}
-            target="_blank"
-            rel="noreferrer"
-            aria-label="Open in Jira"
-            className="text-muted-foreground hover:text-foreground hover:bg-muted focus-visible:ring-ring inline-flex h-7 w-7 items-center justify-center rounded transition-colors focus-visible:ring-1 focus-visible:outline-none"
-          >
-            <ExternalLink size={14} />
-          </a>
-        )}
+        {jiraUrl !== null && <ExternalLinkButton href={jiraUrl}>Open in Jira</ExternalLinkButton>}
         <IconButton aria-label="Close panel" onClick={onClose}>
           <X size={14} />
         </IconButton>
@@ -236,15 +226,19 @@ function OpenMrLink({ issueKey }: { issueKey: string }) {
   const result = useMrStatus(issueKey)
   if (result.state !== 'ready') return null
   if (result.summary === null) return null
+  return <ExternalLinkButton href={result.summary.webUrl}>Open MR</ExternalLinkButton>
+}
+
+function ExternalLinkButton({ href, children }: { href: string; children: React.ReactNode }) {
   return (
     <a
-      href={result.summary.webUrl}
+      href={href}
       target="_blank"
       rel="noopener noreferrer"
-      aria-label="Open MR"
-      className="text-muted-foreground hover:text-foreground hover:bg-muted focus-visible:ring-ring inline-flex h-7 w-7 items-center justify-center rounded transition-colors focus-visible:ring-1 focus-visible:outline-none"
+      className="text-muted-foreground hover:text-foreground hover:bg-muted focus-visible:ring-ring inline-flex h-7 items-center gap-1.5 rounded px-2 text-xs transition-colors focus-visible:ring-1 focus-visible:outline-none"
     >
-      <ExternalLink size={14} />
+      <span>{children}</span>
+      <ExternalLink size={12} />
     </a>
   )
 }

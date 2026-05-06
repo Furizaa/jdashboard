@@ -6,6 +6,7 @@ import { filterIssues } from './filter-issues'
 import type { BoardIssue } from '~/server/jira'
 import { TicketCard, type TicketCardAnimationState } from '~/features/ticket-card'
 import { usePolling } from '~/lib/use-polling'
+import { useMrStatuses } from '~/features/mr-status'
 
 const POLL_INTERVAL_MS = 60_000
 
@@ -19,6 +20,7 @@ export function Board({ searchQuery }: { searchQuery: string }) {
   usePolling(() => {
     query.refetch()
   }, POLL_INTERVAL_MS)
+  useMrStatuses()
 
   const liveIssues = query.data?.ok === true ? query.data.issues : undefined
   const { enteringKeys, changedKeys, leaving } = useChangeIndication(liveIssues)
@@ -115,6 +117,7 @@ function BoardColumn({
               key={issue.key}
               issue={issue}
               baseUrl={baseUrl}
+              column={column}
               animationState={state}
             />
           ))

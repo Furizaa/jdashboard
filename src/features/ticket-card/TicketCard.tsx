@@ -3,6 +3,8 @@ import { useNavigate } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import type { BoardIssue } from '~/server/jira'
 import { StatusPillSelect } from '~/features/status-pill'
+import { MrSection } from '~/features/mr-status'
+import type { Column } from '~/features/board/status-mapping'
 import { TypeIcon } from './TypeIcon'
 import { colorForLabel } from './hash-color'
 
@@ -18,10 +20,12 @@ function stopPropagation(event: MouseEvent) {
 export function TicketCard({
   issue,
   baseUrl,
+  column,
   animationState = 'idle',
 }: {
   issue: BoardIssue
   baseUrl: string
+  column: Column
   animationState?: TicketCardAnimationState
 }) {
   const visible = issue.labels.slice(0, MAX_VISIBLE_LABELS)
@@ -94,6 +98,8 @@ export function TicketCard({
           )}
         </div>
       )}
+
+      <MrSection issueKey={issue.key} column={column} />
     </article>
   )
 }

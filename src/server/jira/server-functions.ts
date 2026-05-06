@@ -1,5 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
 import { jiraClient, JiraAuthError } from './client'
+import { buildBoardJql } from './jql'
+import { getServerEnv } from '~/server/env'
 
 export type GetMyselfResult =
   | { ok: true; user: { accountId: string; displayName: string; avatarUrl: string } }
@@ -22,6 +24,41 @@ export const getMyself = createServerFn({ method: 'GET' }).handler(
           avatarUrl,
         },
       }
+    } catch (err) {
+      if (err instanceof JiraAuthError) {
+        return { ok: false, reason: 'unauthorized' }
+      }
+      throw err
+    }
+  },
+)
+
+export type BoardIssue = {
+  key: string
+  summary: string
+  statusName: string
+}
+
+export type SearchIssuesResult =
+  | { ok: true; issues: BoardIssue[] }
+  | { ok: false; reason: 'unauthorized' }
+
+export const searchIssues = createServerFn({ method: 'GET' }).handler(
+  async (): Promise<SearchIssuesResult> => {
+    const env = getServerEnv()
+    const jql = buildBoardJql({
+      projectKey: env.JIRA_PROJECT_KEY,
+      label: env.JIRA_LABEL_FILTER,
+      doneWindowDays: env.JIRA_DONE_WINDOW_DAYS,
+    })
+    try {
+      const response = await jiraClient.searchIssues(jql, ['summary', 'status'])
+      const issues: BoardIssue[] = response.issues.map((issue) => ({
+        key: issue.key,
+        summary: issue.fields.summary,
+        statusName: issue.fields.status.name,
+      }))
+      return { ok: true, issues }
     } catch (err) {
       if (err instanceof JiraAuthError) {
         return { ok: false, reason: 'unauthorized' }

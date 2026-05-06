@@ -22,19 +22,46 @@ export type JiraMyself = {
   avatarUrls: Record<string, string>
 }
 
+export type JiraIssue = {
+  id: string
+  key: string
+  fields: {
+    summary: string
+    status: {
+      name: string
+      statusCategory?: { key: string; name: string }
+    }
+  }
+}
+
+export type JiraSearchResponse = {
+  issues: JiraIssue[]
+  nextPageToken?: string
+  isLast?: boolean
+}
+
 function authHeader(email: string, token: string): string {
   const encoded = Buffer.from(`${email}:${token}`, 'utf8').toString('base64')
   return `Basic ${encoded}`
 }
 
-async function request<T>(path: string): Promise<T> {
+async function request<T>(
+  path: string,
+  init?: { method?: string; body?: unknown },
+): Promise<T> {
   const env = getServerEnv()
   const url = `${env.JIRA_BASE_URL}${path}`
+  const headers: Record<string, string> = {
+    Authorization: authHeader(env.JIRA_EMAIL, env.JIRA_API_TOKEN),
+    Accept: 'application/json',
+  }
+  if (init?.body !== undefined) {
+    headers['Content-Type'] = 'application/json'
+  }
   const res = await fetch(url, {
-    headers: {
-      Authorization: authHeader(env.JIRA_EMAIL, env.JIRA_API_TOKEN),
-      Accept: 'application/json',
-    },
+    method: init?.method ?? 'GET',
+    headers,
+    body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
   })
 
   if (res.status === 401) {
@@ -50,5 +77,12 @@ async function request<T>(path: string): Promise<T> {
 export const jiraClient = {
   async getMyself(): Promise<JiraMyself> {
     return await request<JiraMyself>('/rest/api/3/myself')
+  },
+
+  async searchIssues(jql: string, fields: readonly string[]): Promise<JiraSearchResponse> {
+    return await request<JiraSearchResponse>('/rest/api/3/search/jql', {
+      method: 'POST',
+      body: { jql, fields, maxResults: 100 },
+    })
   },
 }

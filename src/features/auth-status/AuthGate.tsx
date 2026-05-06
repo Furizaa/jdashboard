@@ -5,7 +5,7 @@ import { cn } from '~/lib/cn'
 
 const TOKEN_PAGE_URL = 'https://id.atlassian.com/manage-profile/security/api-tokens'
 
-export function AuthStatus() {
+export function AuthGate({ children }: { children: ReactNode }) {
   const query = useQuery({
     queryKey: ['jira', 'myself'],
     queryFn: () => getMyself(),
@@ -30,34 +30,11 @@ export function AuthStatus() {
     )
   }
 
-  const result = query.data
-  if (result.ok === false) {
+  if (query.data.ok === false) {
     return <InvalidCredentials />
   }
 
-  return (
-    <div className="flex min-h-dvh items-center justify-center">
-      <div className="flex items-center gap-3 rounded-lg border border-border bg-card px-5 py-4 shadow-sm">
-        {result.user.avatarUrl ? (
-          <img
-            src={result.user.avatarUrl}
-            alt=""
-            width={40}
-            height={40}
-            className="size-10 rounded-full"
-          />
-        ) : (
-          <div className="bg-muted size-10 rounded-full" />
-        )}
-        <div>
-          <p className="text-muted-foreground text-xs uppercase tracking-wide">
-            Authenticated as
-          </p>
-          <p className="text-foreground text-base font-medium">{result.user.displayName}</p>
-        </div>
-      </div>
-    </div>
-  )
+  return <>{children}</>
 }
 
 function InvalidCredentials() {

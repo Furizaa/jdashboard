@@ -1,3 +1,6 @@
 export { jiraClient, JiraAuthError, JiraHttpError } from './client'
-export type { JiraMyself } from './client'
-export { getMyself } from './server-functions'
+export type { JiraMyself, JiraIssue, JiraSearchResponse } from './client'
+export { buildBoardJql } from './jql'
+export type { BoardJqlConfig } from './jql'
+export { getMyself, searchIssues } from './server-functions'
+export type { GetMyselfResult, BoardIssue, SearchIssuesResult } from './server-functions'

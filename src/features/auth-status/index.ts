@@ -1,1 +1,1 @@
-export { AuthStatus } from './AuthStatus'
+export { AuthGate } from './AuthGate'

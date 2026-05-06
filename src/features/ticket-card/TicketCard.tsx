@@ -9,6 +9,8 @@ import { isDeemphasized } from '~/features/board/deemphasize'
 import { cn } from '~/lib/cn'
 import { TypeIcon } from './TypeIcon'
 import { colorForLabel } from './hash-color'
+import { hasFixasapLabel } from './fixasap'
+import { FixasapRibbon } from './FixasapRibbon'
 
 const MAX_VISIBLE_LABELS = 3
 const COPIED_INDICATOR_MS = 1500
@@ -59,10 +61,11 @@ export function TicketCard({
       data-animation={animationState === 'idle' ? undefined : animationState}
       aria-hidden={isLeaving || undefined}
       className={cn(
-        'ticket-card border-border bg-card hover:border-foreground/30 focus-visible:ring-ring group cursor-pointer rounded-md border px-3 py-2.5 text-left shadow-sm transition-colors focus-visible:ring-1 focus-visible:outline-none',
+        'ticket-card border-border bg-card hover:border-foreground/30 focus-visible:ring-ring group relative cursor-pointer rounded-md border px-3 py-2.5 text-left shadow-sm transition-colors focus-visible:ring-1 focus-visible:outline-none',
         isDeemphasized(issue, column) && 'opacity-60',
       )}
     >
+      {hasFixasapLabel(issue.labels) && <FixasapRibbon size="card" />}
       <div className="flex items-center gap-2">
         <TypeIcon type={issue.typeName} />
         <CardKey jiraKey={issue.key} jiraUrl={jiraUrl} />

@@ -3,7 +3,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { ChevronDown, ChevronUp, ExternalLink, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { StatusPillSelect } from '~/features/status-pill'
-import { TypeIcon, colorForLabel } from '~/features/ticket-card'
+import { FixasapRibbon, TypeIcon, colorForLabel, hasFixasapLabel } from '~/features/ticket-card'
 import { columnForStatus, useBoardIssues } from '~/features/board'
 import { MrPanelBlock, useMrStatus } from '~/features/mr-status'
 import type { BoardIssue, DetailIssue } from '~/server/jira'
@@ -136,6 +136,7 @@ function PanelContent({
         className="border-border bg-card relative my-4 mr-4 flex h-[calc(100dvh-2rem)] w-[760px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-xl border shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
+        {issue !== null && hasFixasapLabel(issue.labels) && <FixasapRibbon size="panel" />}
         <PanelHeader
           issueKey={issueKey}
           projectKey={projectKey}

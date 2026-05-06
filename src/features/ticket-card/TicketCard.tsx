@@ -9,17 +9,29 @@ import { colorForLabel } from './hash-color'
 const MAX_VISIBLE_LABELS = 3
 const COPIED_INDICATOR_MS = 1500
 
+export type TicketCardAnimationState = 'idle' | 'entering' | 'changed' | 'leaving'
+
 function stopPropagation(event: MouseEvent) {
   event.stopPropagation()
 }
 
-export function TicketCard({ issue, baseUrl }: { issue: BoardIssue; baseUrl: string }) {
+export function TicketCard({
+  issue,
+  baseUrl,
+  animationState = 'idle',
+}: {
+  issue: BoardIssue
+  baseUrl: string
+  animationState?: TicketCardAnimationState
+}) {
   const visible = issue.labels.slice(0, MAX_VISIBLE_LABELS)
   const overflow = issue.labels.length - visible.length
   const jiraUrl = `${baseUrl}/browse/${issue.key}`
   const navigate = useNavigate()
+  const isLeaving = animationState === 'leaving'
 
   const openPanel = () => {
+    if (isLeaving) return
     navigate({ to: '/', search: { issue: issue.key } })
   }
 
@@ -34,11 +46,13 @@ export function TicketCard({ issue, baseUrl }: { issue: BoardIssue; baseUrl: str
   return (
     <article
       role="button"
-      tabIndex={0}
+      tabIndex={isLeaving ? -1 : 0}
       onClick={openPanel}
       onKeyDown={handleKeyDown}
       aria-label={`Open ${issue.key}`}
-      className="border-border bg-card hover:border-foreground/30 focus-visible:ring-ring group cursor-pointer rounded-md border px-3 py-2.5 text-left shadow-sm transition-colors focus-visible:ring-1 focus-visible:outline-none"
+      data-animation={animationState === 'idle' ? undefined : animationState}
+      aria-hidden={isLeaving || undefined}
+      className="ticket-card border-border bg-card hover:border-foreground/30 focus-visible:ring-ring group cursor-pointer rounded-md border px-3 py-2.5 text-left shadow-sm transition-colors focus-visible:ring-1 focus-visible:outline-none"
     >
       <div className="flex items-center gap-2">
         <TypeIcon type={issue.typeName} />

@@ -1,11 +1,17 @@
 import { useMemo } from 'react'
 import { useBoardIssues } from './use-board-issues'
+import { useChangeIndication, type LeavingIssue } from './use-change-indication'
 import { COLUMNS, columnForStatus, type Column } from './status-mapping'
 import type { BoardIssue } from '~/server/jira'
-import { TicketCard } from '~/features/ticket-card'
+import { TicketCard, type TicketCardAnimationState } from '~/features/ticket-card'
 import { usePolling } from '~/lib/use-polling'
 
 const POLL_INTERVAL_MS = 60_000
+
+type ColumnItem = {
+  issue: BoardIssue | LeavingIssue
+  state: TicketCardAnimationState
+}
 
 export function Board() {
   const query = useBoardIssues()
@@ -13,19 +19,30 @@ export function Board() {
     query.refetch()
   }, POLL_INTERVAL_MS)
 
-  const issuesByColumn = useMemo<Record<Column, BoardIssue[]>>(() => {
-    const empty: Record<Column, BoardIssue[]> = {
+  const liveIssues = query.data?.ok === true ? query.data.issues : undefined
+  const { enteringKeys, changedKeys, leaving } = useChangeIndication(liveIssues)
+
+  const itemsByColumn = useMemo<Record<Column, ColumnItem[]>>(() => {
+    const empty: Record<Column, ColumnItem[]> = {
       'TO DO': [],
       'In Implementation': [],
       'In Code Review': [],
       Done: [],
     }
-    if (query.data?.ok !== true) return empty
-    for (const issue of query.data.issues) {
-      empty[columnForStatus(issue.statusName)].push(issue)
+    if (liveIssues === undefined) return empty
+    for (const issue of liveIssues) {
+      const state: TicketCardAnimationState = enteringKeys.has(issue.key)
+        ? 'entering'
+        : changedKeys.has(issue.key)
+          ? 'changed'
+          : 'idle'
+      empty[columnForStatus(issue.statusName)].push({ issue, state })
+    }
+    for (const leavingIssue of leaving.values()) {
+      empty[leavingIssue.column].push({ issue: leavingIssue, state: 'leaving' })
     }
     return empty
-  }, [query.data])
+  }, [liveIssues, enteringKeys, changedKeys, leaving])
 
   if (query.isPending) {
     return <BoardMessage tone="muted">Loading board…</BoardMessage>
@@ -51,7 +68,7 @@ export function Board() {
         <BoardColumn
           key={column}
           column={column}
-          issues={issuesByColumn[column]}
+          items={itemsByColumn[column]}
           baseUrl={baseUrl}
         />
       ))}
@@ -61,24 +78,32 @@ export function Board() {
 
 function BoardColumn({
   column,
-  issues,
+  items,
   baseUrl,
 }: {
   column: Column
-  issues: BoardIssue[]
+  items: ColumnItem[]
   baseUrl: string
 }) {
+  const liveCount = items.filter((item) => item.state !== 'leaving').length
   return (
     <section className="flex min-h-0 flex-col">
       <header className="mb-2 flex items-baseline gap-2 px-1">
         <h2 className="text-foreground text-sm font-semibold tracking-wide">{column}</h2>
-        <span className="text-muted-foreground text-xs tabular-nums">{issues.length}</span>
+        <span className="text-muted-foreground text-xs tabular-nums">{liveCount}</span>
       </header>
       <div className="flex flex-1 flex-col gap-2 overflow-y-auto pr-1">
-        {issues.length === 0 ? (
+        {items.length === 0 ? (
           <p className="text-muted-foreground px-2 py-1 text-xs">No tickets</p>
         ) : (
-          issues.map((issue) => <TicketCard key={issue.key} issue={issue} baseUrl={baseUrl} />)
+          items.map(({ issue, state }) => (
+            <TicketCard
+              key={issue.key}
+              issue={issue}
+              baseUrl={baseUrl}
+              animationState={state}
+            />
+          ))
         )}
       </div>
     </section>

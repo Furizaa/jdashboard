@@ -10,6 +10,7 @@ function issue(key: string, overrides: Partial<BoardIssue> = {}): BoardIssue {
     statusName: 'Reviewed',
     typeName: 'Task',
     labels: [],
+    epic: null,
     ...overrides,
   }
 }

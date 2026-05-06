@@ -35,6 +35,13 @@ export type JiraIssue = {
     issuetype?: {
       name: string
     }
+    parent?: {
+      key: string
+      fields?: {
+        summary?: string
+        issuetype?: { name: string }
+      }
+    } | null
   }
 }
 

@@ -3,7 +3,7 @@ import type { BoardIssue } from '~/server/jira'
 import { filterIssues } from './filter-issues'
 
 function issue(key: string, summary: string): BoardIssue {
-  return { key, summary, statusName: 'Reviewed', typeName: 'Task', labels: [] }
+  return { key, summary, statusName: 'Reviewed', typeName: 'Task', labels: [], epic: null }
 }
 
 const issues: readonly BoardIssue[] = [

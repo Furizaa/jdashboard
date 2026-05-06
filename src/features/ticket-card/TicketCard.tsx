@@ -74,8 +74,9 @@ export function TicketCard({
         {issue.summary}
       </div>
 
-      {issue.labels.length > 0 && (
+      {(issue.epic !== null || issue.labels.length > 0) && (
         <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1" onClick={stopPropagation}>
+          {issue.epic !== null && <EpicChip epic={issue.epic} />}
           {visible.map((label) => (
             <span key={label} className="inline-flex items-center gap-1.5">
               <span
@@ -94,6 +95,19 @@ export function TicketCard({
         </div>
       )}
     </article>
+  )
+}
+
+function EpicChip({ epic }: { epic: { key: string; summary: string } }) {
+  const color = colorForLabel(epic.key)
+  return (
+    <span
+      title={`${epic.key} — ${epic.summary}`}
+      className="inline-flex max-w-[140px] items-center gap-1 rounded-sm px-1.5 py-0.5 text-[10px] leading-none font-medium"
+      style={{ backgroundColor: `${color}26`, color }}
+    >
+      <span className="truncate">{epic.summary}</span>
+    </span>
   )
 }
 

@@ -63,6 +63,7 @@ export type BoardIssue = {
   statusName: string
   typeName: string
   labels: string[]
+  epic: { key: string; summary: string } | null
 }
 
 export type SearchIssuesResult =
@@ -181,7 +182,10 @@ export const getIssue = createServerFn({ method: 'GET' })
           statusName: f.status.name,
           typeName: f.issuetype?.name ?? 'Task',
           labels: f.labels ?? [],
-          priorityName: f.priority?.name ?? null,
+          priorityName:
+            f.priority?.name && f.priority.name.toLowerCase() !== 'undefined'
+              ? f.priority.name
+              : null,
           assigneeName: f.assignee?.displayName ?? null,
           reporterName: f.reporter?.displayName ?? null,
           parent: f.parent ? toLinkedRef(f.parent) : null,
@@ -311,14 +315,23 @@ export const searchIssues = createServerFn({ method: 'GET' }).handler(
         'status',
         'labels',
         'issuetype',
+        'parent',
       ])
-      const issues: BoardIssue[] = response.issues.map((issue) => ({
-        key: issue.key,
-        summary: issue.fields.summary,
-        statusName: issue.fields.status.name,
-        typeName: issue.fields.issuetype?.name ?? 'Task',
-        labels: (issue.fields.labels ?? []).filter((label) => !hideSet.has(label.toLowerCase())),
-      }))
+      const issues: BoardIssue[] = response.issues.map((issue) => {
+        const parent = issue.fields.parent
+        const parentIsEpic = parent?.fields?.issuetype?.name?.toLowerCase() === 'epic'
+        return {
+          key: issue.key,
+          summary: issue.fields.summary,
+          statusName: issue.fields.status.name,
+          typeName: issue.fields.issuetype?.name ?? 'Task',
+          labels: (issue.fields.labels ?? []).filter((label) => !hideSet.has(label.toLowerCase())),
+          epic:
+            parentIsEpic && parent
+              ? { key: parent.key, summary: parent.fields?.summary ?? parent.key }
+              : null,
+        }
+      })
       return { ok: true, baseUrl: env.JIRA_BASE_URL, issues }
     } catch (err) {
       if (err instanceof JiraAuthError) {

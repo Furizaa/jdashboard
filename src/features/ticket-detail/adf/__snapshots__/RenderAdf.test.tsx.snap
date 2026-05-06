@@ -4,6 +4,16 @@ exports[`RenderAdf > combined fixtures > renders a typical bug-report descriptio
 
 exports[`RenderAdf > combined fixtures > renders prose with a link, italic, and a horizontal rule 1`] = `"<div class="space-y-3"><p class="text-foreground/85 text-sm leading-relaxed">See the <a href="https://example.com/spec" target="_blank" rel="noopener noreferrer" class="text-sky-400 underline-offset-2 hover:underline">spec</a> for <em>context</em>.</p><hr class="border-border my-1"><blockquote class="border-border text-foreground/75 space-y-2 border-l-2 pl-3 italic"><p class="text-foreground/85 text-sm leading-relaxed">Reviewer note: looks good.</p></blockquote></div>"`;
 
+exports[`RenderAdf > panel > renders panel of type error with distinct styling 1`] = `"<div class="space-y-3"><div class="space-y-2 rounded-md border px-3 py-2 border-red-500/40 bg-red-500/10"><p class="text-foreground/85 text-sm leading-relaxed">error</p></div></div>"`;
+
+exports[`RenderAdf > panel > renders panel of type info with distinct styling 1`] = `"<div class="space-y-3"><div class="space-y-2 rounded-md border px-3 py-2 border-sky-500/40 bg-sky-500/10"><p class="text-foreground/85 text-sm leading-relaxed">info</p></div></div>"`;
+
+exports[`RenderAdf > panel > renders panel of type note with distinct styling 1`] = `"<div class="space-y-3"><div class="space-y-2 rounded-md border px-3 py-2 border-violet-500/40 bg-violet-500/10"><p class="text-foreground/85 text-sm leading-relaxed">note</p></div></div>"`;
+
+exports[`RenderAdf > panel > renders panel of type success with distinct styling 1`] = `"<div class="space-y-3"><div class="space-y-2 rounded-md border px-3 py-2 border-emerald-500/40 bg-emerald-500/10"><p class="text-foreground/85 text-sm leading-relaxed">success</p></div></div>"`;
+
+exports[`RenderAdf > panel > renders panel of type warning with distinct styling 1`] = `"<div class="space-y-3"><div class="space-y-2 rounded-md border px-3 py-2 border-amber-500/40 bg-amber-500/10"><p class="text-foreground/85 text-sm leading-relaxed">warning</p></div></div>"`;
+
 exports[`RenderAdf > renders bulletList with listItems 1`] = `"<div class="space-y-3"><ul class="text-foreground/85 ml-5 list-disc space-y-1 text-sm"><li class="[&amp;>p]:inline [&amp;>p]:text-sm"><p class="text-foreground/85 text-sm leading-relaxed">one</p></li><li class="[&amp;>p]:inline [&amp;>p]:text-sm"><p class="text-foreground/85 text-sm leading-relaxed">two</p></li></ul></div>"`;
 
 exports[`RenderAdf > renders heading level 1 1`] = `"<div class="space-y-3"><h1 class="text-foreground leading-snug text-xl font-semibold mt-2">H1</h1></div>"`;

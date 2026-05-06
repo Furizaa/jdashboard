@@ -245,17 +245,207 @@ describe('RenderAdf', () => {
     )
   })
 
-  it('renders an unknown node type by descending into its children', () => {
-    expect(
-      html(
-        wrap({
-          type: 'mediaSingle',
-          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'inner' }] }],
-        }),
-      ),
-    ).toMatchInlineSnapshot(
-      `"<div class="space-y-3"><span><p class="text-foreground/85 text-sm leading-relaxed">inner</p></span></div>"`,
+  describe('mention', () => {
+    it('renders mention text inline', () => {
+      expect(
+        html(
+          wrap({
+            type: 'paragraph',
+            content: [
+              { type: 'text', text: 'cc ' },
+              { type: 'mention', attrs: { id: 'abc', text: '@Jane Doe' } },
+            ],
+          }),
+        ),
+      ).toMatchInlineSnapshot(
+        `"<div class="space-y-3"><p class="text-foreground/85 text-sm leading-relaxed">cc <span class="inline-flex items-center rounded-sm bg-sky-500/15 px-1 font-medium text-sky-300">@Jane Doe</span></p></div>"`,
+      )
+    })
+  })
+
+  describe('emoji', () => {
+    it('renders unicode glyph from attrs.text', () => {
+      expect(
+        html(
+          wrap({
+            type: 'paragraph',
+            content: [{ type: 'emoji', attrs: { shortName: ':smile:', text: '😄' } }],
+          }),
+        ),
+      ).toMatchInlineSnapshot(
+        `"<div class="space-y-3"><p class="text-foreground/85 text-sm leading-relaxed"><span>😄</span></p></div>"`,
+      )
+    })
+
+    it('falls back to shortName when text is missing', () => {
+      expect(
+        html(
+          wrap({
+            type: 'paragraph',
+            content: [{ type: 'emoji', attrs: { shortName: ':smile:' } }],
+          }),
+        ),
+      ).toMatchInlineSnapshot(
+        `"<div class="space-y-3"><p class="text-foreground/85 text-sm leading-relaxed"><span>:smile:</span></p></div>"`,
+      )
+    })
+  })
+
+  describe('status', () => {
+    it('renders status pill with the configured color and label', () => {
+      expect(
+        html(
+          wrap({
+            type: 'paragraph',
+            content: [
+              { type: 'status', attrs: { text: 'In Review', color: 'yellow', localId: 'x' } },
+            ],
+          }),
+        ),
+      ).toMatchInlineSnapshot(
+        `"<div class="space-y-3"><p class="text-foreground/85 text-sm leading-relaxed"><span class="inline-flex items-center rounded-sm px-1.5 py-0.5 text-[0.7rem] font-medium tracking-wide uppercase bg-yellow-500/20 text-yellow-200">In Review</span></p></div>"`,
+      )
+    })
+
+    it('falls back to neutral styling for an unknown color', () => {
+      expect(
+        html(
+          wrap({
+            type: 'paragraph',
+            content: [{ type: 'status', attrs: { text: 'Pending', color: 'magenta' } }],
+          }),
+        ),
+      ).toMatchInlineSnapshot(
+        `"<div class="space-y-3"><p class="text-foreground/85 text-sm leading-relaxed"><span class="inline-flex items-center rounded-sm px-1.5 py-0.5 text-[0.7rem] font-medium tracking-wide uppercase bg-slate-500/20 text-slate-200">Pending</span></p></div>"`,
+      )
+    })
+  })
+
+  describe('media', () => {
+    it('renders mediaSingle as an inline image when url is present', () => {
+      expect(
+        html(
+          wrap({
+            type: 'mediaSingle',
+            content: [
+              {
+                type: 'media',
+                attrs: {
+                  type: 'file',
+                  id: 'abc',
+                  url: 'https://example.com/img.png',
+                  alt: 'screenshot',
+                  width: 320,
+                  height: 200,
+                },
+              },
+            ],
+          }),
+        ),
+      ).toMatchInlineSnapshot(
+        `"<div class="space-y-3"><div class="my-2"><img alt="screenshot" width="320" height="200" class="border-border max-w-full rounded-md border" src="https://example.com/img.png"></div></div>"`,
+      )
+    })
+
+    it('renders a placeholder with Open in Jira link when only id is present', () => {
+      const doc: AdfNode = wrap({
+        type: 'mediaSingle',
+        content: [{ type: 'media', attrs: { type: 'file', id: 'abc' } }],
+      })
+      expect(
+        render(<RenderAdf doc={doc} jiraUrl="https://j.example.com/browse/X-1" />).container
+          .innerHTML,
+      ).toMatchInlineSnapshot(
+        `"<div class="space-y-3"><div class="my-2"><span class="border-border bg-muted/40 text-muted-foreground inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs"><span>Media hosted in Jira</span><a href="https://j.example.com/browse/X-1" target="_blank" rel="noopener noreferrer" class="text-sky-400 hover:underline">Open in Jira</a></span></div></div>"`,
+      )
+    })
+
+    it('renders a placeholder without a link when no jiraUrl is supplied', () => {
+      expect(
+        html(
+          wrap({
+            type: 'mediaSingle',
+            content: [{ type: 'media', attrs: { type: 'file', id: 'abc' } }],
+          }),
+        ),
+      ).toMatchInlineSnapshot(
+        `"<div class="space-y-3"><div class="my-2"><span class="border-border bg-muted/40 text-muted-foreground inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs"><span>Media hosted in Jira</span></span></div></div>"`,
+      )
+    })
+
+    it('renders mediaGroup with multiple media children', () => {
+      expect(
+        html(
+          wrap({
+            type: 'mediaGroup',
+            content: [
+              {
+                type: 'media',
+                attrs: { type: 'file', id: 'a', url: 'https://example.com/a.png' },
+              },
+              {
+                type: 'media',
+                attrs: { type: 'file', id: 'b', url: 'https://example.com/b.png' },
+              },
+            ],
+          }),
+        ),
+      ).toMatchInlineSnapshot(
+        `"<div class="space-y-3"><div class="my-2 flex flex-wrap gap-2"><img alt="" class="border-border max-w-full rounded-md border" src="https://example.com/a.png"><img alt="" class="border-border max-w-full rounded-md border" src="https://example.com/b.png"></div></div>"`,
+      )
+    })
+  })
+
+  describe('panel', () => {
+    it.each(['info', 'note', 'warning', 'error', 'success'])(
+      'renders panel of type %s with distinct styling',
+      (panelType) => {
+        expect(
+          html(
+            wrap({
+              type: 'panel',
+              attrs: { panelType },
+              content: [{ type: 'paragraph', content: [{ type: 'text', text: panelType }] }],
+            }),
+          ),
+        ).toMatchSnapshot()
+      },
     )
+
+    it('falls back to info styling for an unknown panelType', () => {
+      expect(
+        html(
+          wrap({
+            type: 'panel',
+            attrs: { panelType: 'mystery' },
+            content: [{ type: 'paragraph', content: [{ type: 'text', text: 'fallback' }] }],
+          }),
+        ),
+      ).toMatchInlineSnapshot(
+        `"<div class="space-y-3"><div class="space-y-2 rounded-md border px-3 py-2 border-sky-500/40 bg-sky-500/10"><p class="text-foreground/85 text-sm leading-relaxed">fallback</p></div></div>"`,
+      )
+    })
+  })
+
+  describe('fallback', () => {
+    it('renders unsupported node types as a faint placeholder', () => {
+      expect(
+        html(
+          wrap({
+            type: 'extensionFrame',
+            content: [{ type: 'paragraph', content: [{ type: 'text', text: 'inner' }] }],
+          }),
+        ),
+      ).toMatchInlineSnapshot(
+        `"<div class="space-y-3"><span class="text-muted-foreground/50 italic">[unsupported: extensionFrame]</span></div>"`,
+      )
+    })
+
+    it('does not throw when the renderer encounters an unknown node type', () => {
+      expect(() =>
+        html(wrap({ type: 'someBrandNewNodeType' as string })),
+      ).not.toThrow()
+    })
   })
 
   describe('combined fixtures', () => {

@@ -116,7 +116,7 @@ function PanelContent({
                 : 'Issue not found.'}
             </PanelMessage>
           ) : (
-            <PanelBody issue={issueQuery.data.issue} onOpen={onOpen} />
+            <PanelBody issue={issueQuery.data.issue} onOpen={onOpen} jiraUrl={jiraUrl} />
           )}
         </div>
       </div>
@@ -212,9 +212,11 @@ function IconButton({
 function PanelBody({
   issue,
   onOpen,
+  jiraUrl,
 }: {
   issue: DetailIssue
   onOpen: (key: string) => void
+  jiraUrl: string | null
 }) {
   const hasDescription = useMemo(
     () => extractPlainText(issue.description).length > 0,
@@ -226,7 +228,11 @@ function PanelBody({
       <div className="min-w-0">
         <h1 className="text-foreground text-xl leading-tight font-semibold">{issue.summary}</h1>
         <div className="mt-5">
-          {hasDescription ? <RenderAdf doc={issue.description} /> : <NoDescription />}
+          {hasDescription ? (
+            <RenderAdf doc={issue.description} jiraUrl={jiraUrl ?? undefined} />
+          ) : (
+            <NoDescription />
+          )}
         </div>
         <Relationships
           parent={issue.parent}

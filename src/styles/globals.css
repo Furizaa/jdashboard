@@ -118,3 +118,31 @@
     animation: none;
   }
 }
+
+@keyframes board-skeleton-shimmer {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+
+.skeleton-shimmer {
+  background-color: var(--muted);
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    oklch(1 0 0 / 0.06) 50%,
+    transparent 100%
+  );
+  background-size: 200px 100%;
+  background-repeat: no-repeat;
+  animation: board-skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-shimmer {
+    animation: none;
+  }
+}

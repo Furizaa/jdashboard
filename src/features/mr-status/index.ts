@@ -1,4 +1,5 @@
 export { MrCiIndicator } from './MrCiIndicator'
+export { MrPanelBlock } from './MrPanelBlock'
 export { MrSection } from './MrSection'
 export { MrWarning } from './MrWarning'
 export { ReviewerAvatar } from './ReviewerAvatar'

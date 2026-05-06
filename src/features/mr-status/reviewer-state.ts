@@ -28,3 +28,11 @@ export const REVIEWER_STATE_LABEL: Record<ReviewerVisualState, string> = {
   'green-solid': 'Approved',
   'green-dashed': 'Approved with unresolved comments',
 }
+
+export const REVIEWER_BADGE_LABEL: Record<ReviewerVisualState, string> = {
+  'gray-dashed': 'Pending',
+  'blue-dashed': 'Reviewed',
+  'red-solid': 'Requested changes',
+  'green-solid': 'Approved',
+  'green-dashed': 'Approved (unresolved)',
+}

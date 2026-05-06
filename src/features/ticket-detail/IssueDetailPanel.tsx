@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { StatusPillSelect } from '~/features/status-pill'
 import { TypeIcon, colorForLabel } from '~/features/ticket-card'
 import { columnForStatus, useBoardIssues } from '~/features/board'
+import { MrPanelBlock, useMrStatus } from '~/features/mr-status'
 import type { BoardIssue, DetailIssue } from '~/server/jira'
 import { useIssue } from './use-issue'
 import { RenderAdf } from './adf'
@@ -210,6 +211,7 @@ function PanelHeader({
         >
           <ChevronDown size={14} />
         </IconButton>
+        <OpenMrLink issueKey={issueKey} />
         {jiraUrl !== null && (
           <a
             href={jiraUrl}
@@ -226,6 +228,23 @@ function PanelHeader({
         </IconButton>
       </div>
     </header>
+  )
+}
+
+function OpenMrLink({ issueKey }: { issueKey: string }) {
+  const result = useMrStatus(issueKey)
+  if (result.state !== 'ready') return null
+  if (result.summary === null) return null
+  return (
+    <a
+      href={result.summary.webUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="Open MR"
+      className="text-muted-foreground hover:text-foreground hover:bg-muted focus-visible:ring-ring inline-flex h-7 w-7 items-center justify-center rounded transition-colors focus-visible:ring-1 focus-visible:outline-none"
+    >
+      <ExternalLink size={14} />
+    </a>
   )
 }
 
@@ -333,6 +352,7 @@ function PropertiesRail({ issue }: { issue: DetailIssue }) {
           </div>
         )}
       </Field>
+      <MrPanelBlock issueKey={issue.key} />
     </aside>
   )
 }

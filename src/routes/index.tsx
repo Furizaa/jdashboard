@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { AuthGate } from '~/features/auth-status'
 import { Board } from '~/features/board'
+import { Header } from '~/features/header'
 import { IssueDetailPanel } from '~/features/ticket-detail'
 
 type IndexSearch = { issue?: string }
@@ -18,7 +19,12 @@ function HomePage() {
   const { issue } = Route.useSearch()
   return (
     <AuthGate>
-      <Board />
+      <div className="flex h-dvh flex-col">
+        <Header />
+        <main className="min-h-0 flex-1">
+          <Board />
+        </main>
+      </div>
       <IssueDetailPanel issueKey={issue ?? null} />
     </AuthGate>
   )

@@ -3,9 +3,15 @@ import { useBoardIssues } from './use-board-issues'
 import { COLUMNS, columnForStatus, type Column } from './status-mapping'
 import type { BoardIssue } from '~/server/jira'
 import { TicketCard } from '~/features/ticket-card'
+import { usePolling } from '~/lib/use-polling'
+
+const POLL_INTERVAL_MS = 60_000
 
 export function Board() {
   const query = useBoardIssues()
+  usePolling(() => {
+    query.refetch()
+  }, POLL_INTERVAL_MS)
 
   const issuesByColumn = useMemo<Record<Column, BoardIssue[]>>(() => {
     const empty: Record<Column, BoardIssue[]> = {
@@ -25,7 +31,7 @@ export function Board() {
     return <BoardMessage tone="muted">Loading board…</BoardMessage>
   }
 
-  if (query.isError) {
+  if (query.isError && query.data === undefined) {
     return (
       <BoardMessage tone="destructive">
         Couldn't load board: {query.error instanceof Error ? query.error.message : 'unknown error'}
@@ -33,14 +39,14 @@ export function Board() {
     )
   }
 
-  if (query.data.ok === false) {
+  if (query.data === undefined || query.data.ok === false) {
     return <BoardMessage tone="destructive">Invalid Jira credentials.</BoardMessage>
   }
 
   const { baseUrl } = query.data
 
   return (
-    <div className="grid h-dvh grid-cols-4 gap-4 p-4">
+    <div className="grid h-full grid-cols-4 gap-4 p-4">
       {COLUMNS.map((column) => (
         <BoardColumn
           key={column}
@@ -87,7 +93,7 @@ function BoardMessage({
   tone: 'muted' | 'destructive'
 }) {
   return (
-    <div className="flex min-h-dvh items-center justify-center p-6">
+    <div className="flex h-full items-center justify-center p-6">
       <p
         className={
           tone === 'destructive' ? 'text-destructive text-sm' : 'text-muted-foreground text-sm'

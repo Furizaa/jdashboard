@@ -10,8 +10,10 @@ import { RenderAdf } from './adf'
 import { Activity } from './Activity'
 import { Relationships } from './Relationships'
 import { extractPlainText } from './extract-plain-text'
+import { usePolling } from '~/lib/use-polling'
 
 const PROJECT_KEY_RE = /^([A-Z][A-Z0-9]+)-\d+$/
+const ISSUE_POLL_INTERVAL_MS = 60_000
 
 export function IssueDetailPanel({ issueKey }: { issueKey: string | null }) {
   const navigate = useNavigate()
@@ -55,6 +57,10 @@ function PanelContent({
 }) {
   const issueQuery = useIssue(issueKey)
   const boardQuery = useBoardIssues()
+
+  usePolling(() => {
+    issueQuery.refetch()
+  }, ISSUE_POLL_INTERVAL_MS)
 
   const issue = issueQuery.data?.ok ? issueQuery.data.issue : null
   const baseUrl = issueQuery.data?.ok ? issueQuery.data.baseUrl : null

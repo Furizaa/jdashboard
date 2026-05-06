@@ -110,9 +110,7 @@ function DropdownContents({
   if (!data?.ok) {
     return (
       <DropdownMessage>
-        {data?.reason === 'unauthorized'
-          ? 'Invalid Jira credentials'
-          : "Couldn't load transitions"}
+        {data?.reason === 'unauthorized' ? 'Invalid Jira credentials' : "Couldn't load transitions"}
       </DropdownMessage>
     )
   }

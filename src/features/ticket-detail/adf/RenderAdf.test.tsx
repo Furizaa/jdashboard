@@ -442,9 +442,7 @@ describe('RenderAdf', () => {
     })
 
     it('does not throw when the renderer encounters an unknown node type', () => {
-      expect(() =>
-        html(wrap({ type: 'someBrandNewNodeType' as string })),
-      ).not.toThrow()
+      expect(() => html(wrap({ type: 'someBrandNewNodeType' as string }))).not.toThrow()
     })
   })
 

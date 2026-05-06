@@ -58,8 +58,7 @@ function renderNode(node: AdfNode, key: number, jiraUrl: string | undefined): Re
     }
     case 'emoji': {
       const text = typeof node.attrs?.text === 'string' ? node.attrs.text : undefined
-      const shortName =
-        typeof node.attrs?.shortName === 'string' ? node.attrs.shortName : undefined
+      const shortName = typeof node.attrs?.shortName === 'string' ? node.attrs.shortName : undefined
       return <Emoji key={key} text={text} shortName={shortName} />
     }
     case 'status': {
@@ -68,8 +67,7 @@ function renderNode(node: AdfNode, key: number, jiraUrl: string | undefined): Re
       return <Status key={key} text={text} color={color} />
     }
     case 'panel': {
-      const panelType =
-        typeof node.attrs?.panelType === 'string' ? node.attrs.panelType : 'info'
+      const panelType = typeof node.attrs?.panelType === 'string' ? node.attrs.panelType : 'info'
       return (
         <Panel key={key} panelType={panelType}>
           {renderChildren(node, jiraUrl)}

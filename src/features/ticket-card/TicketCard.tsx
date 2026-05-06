@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type MouseEvent } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
+import { useNavigate } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import type { BoardIssue } from '~/server/jira'
 import { StatusPill } from '~/features/status-pill'
@@ -8,17 +9,40 @@ import { colorForLabel } from './hash-color'
 const MAX_VISIBLE_LABELS = 3
 const COPIED_INDICATOR_MS = 1500
 
+function stopPropagation(event: MouseEvent) {
+  event.stopPropagation()
+}
+
 export function TicketCard({ issue, baseUrl }: { issue: BoardIssue; baseUrl: string }) {
   const visible = issue.labels.slice(0, MAX_VISIBLE_LABELS)
   const overflow = issue.labels.length - visible.length
   const jiraUrl = `${baseUrl}/browse/${issue.key}`
+  const navigate = useNavigate()
+
+  const openPanel = () => {
+    navigate({ to: '/', search: { issue: issue.key } })
+  }
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      openPanel()
+    }
+  }
 
   return (
-    <article className="border-border bg-card hover:border-foreground/30 group rounded-md border px-3 py-2.5 shadow-sm transition-colors">
+    <article
+      role="button"
+      tabIndex={0}
+      onClick={openPanel}
+      onKeyDown={handleKeyDown}
+      aria-label={`Open ${issue.key}`}
+      className="border-border bg-card hover:border-foreground/30 focus-visible:ring-ring group cursor-pointer rounded-md border px-3 py-2.5 text-left shadow-sm transition-colors focus-visible:ring-1 focus-visible:outline-none"
+    >
       <div className="flex items-center gap-2">
         <TypeIcon type={issue.typeName} />
         <CardKey jiraKey={issue.key} jiraUrl={jiraUrl} />
-        <span className="ml-auto">
+        <span className="ml-auto" onClick={stopPropagation}>
           <StatusPill status={issue.statusName} />
         </span>
       </div>
@@ -36,7 +60,7 @@ export function TicketCard({ issue, baseUrl }: { issue: BoardIssue; baseUrl: str
       </div>
 
       {issue.labels.length > 0 && (
-        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1" onClick={stopPropagation}>
           {visible.map((label) => (
             <span key={label} className="inline-flex items-center gap-1.5">
               <span

@@ -44,6 +44,46 @@ export type JiraSearchResponse = {
   isLast?: boolean
 }
 
+type JiraLinkedRef = {
+  key: string
+  fields?: {
+    summary?: string
+    status?: { name: string }
+    issuetype?: { name: string }
+  }
+}
+
+export type JiraDetailedIssue = {
+  id: string
+  key: string
+  fields: {
+    summary: string
+    status: { name: string }
+    issuetype?: { name: string }
+    labels?: string[]
+    priority?: { name: string } | null
+    assignee?: { displayName: string } | null
+    reporter?: { displayName: string } | null
+    description?: unknown
+    parent?: JiraLinkedRef | null
+    subtasks?: JiraLinkedRef[]
+    issuelinks?: Array<{
+      id: string
+      type: { name: string; inward: string; outward: string }
+      inwardIssue?: JiraLinkedRef
+      outwardIssue?: JiraLinkedRef
+    }>
+    comment?: {
+      comments: Array<{
+        id: string
+        author?: { displayName: string } | null
+        created: string
+        body?: unknown
+      }>
+    }
+  }
+}
+
 function authHeader(email: string, token: string): string {
   const encoded = Buffer.from(`${email}:${token}`, 'utf8').toString('base64')
   return `Basic ${encoded}`
@@ -85,5 +125,12 @@ export const jiraClient = {
       method: 'POST',
       body: { jql, fields, maxResults: 100 },
     })
+  },
+
+  async getIssue(key: string, fields: readonly string[]): Promise<JiraDetailedIssue> {
+    const params = new URLSearchParams({ fields: fields.join(',') })
+    return await request<JiraDetailedIssue>(
+      `/rest/api/3/issue/${encodeURIComponent(key)}?${params.toString()}`,
+    )
   },
 }

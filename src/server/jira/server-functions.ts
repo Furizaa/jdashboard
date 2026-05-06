@@ -3,6 +3,30 @@ import { jiraClient, JiraAuthError } from './client'
 import { buildBoardJql } from './jql'
 import { getServerEnv } from '~/server/env'
 
+type LinkedIssueRef = {
+  key: string
+  summary: string
+  typeName: string
+  statusName: string
+}
+
+type AdfMark = { type: string; attrs?: Record<string, string | number | boolean | null> }
+export type AdfNode = {
+  type?: string
+  text?: string
+  attrs?: Record<string, string | number | boolean | null>
+  marks?: AdfMark[]
+  content?: AdfNode[]
+}
+
+type IssueLink = {
+  id: string
+  typeName: string
+  direction: 'inward' | 'outward'
+  relationship: string
+  issue: LinkedIssueRef
+}
+
 export type GetMyselfResult =
   | { ok: true; user: { accountId: string; displayName: string; avatarUrl: string } }
   | { ok: false; reason: 'unauthorized' }
@@ -41,6 +65,122 @@ export type BoardIssue = {
 export type SearchIssuesResult =
   | { ok: true; baseUrl: string; issues: BoardIssue[] }
   | { ok: false; reason: 'unauthorized' }
+
+export type DetailIssue = {
+  key: string
+  summary: string
+  description: AdfNode | null
+  statusName: string
+  typeName: string
+  labels: string[]
+  priorityName: string | null
+  assigneeName: string | null
+  reporterName: string | null
+  parent: LinkedIssueRef | null
+  subtasks: LinkedIssueRef[]
+  links: IssueLink[]
+  comments: Array<{
+    id: string
+    authorName: string | null
+    created: string
+    body: AdfNode | null
+  }>
+}
+
+export type GetIssueResult =
+  | { ok: true; baseUrl: string; issue: DetailIssue }
+  | { ok: false; reason: 'unauthorized' | 'not-found' }
+
+const DETAIL_ISSUE_FIELDS = [
+  'summary',
+  'status',
+  'labels',
+  'issuetype',
+  'priority',
+  'assignee',
+  'reporter',
+  'description',
+  'parent',
+  'subtasks',
+  'issuelinks',
+  'comment',
+] as const
+
+function toLinkedRef(ref: {
+  key: string
+  fields?: { summary?: string; status?: { name: string }; issuetype?: { name: string } }
+}): LinkedIssueRef {
+  return {
+    key: ref.key,
+    summary: ref.fields?.summary ?? '',
+    typeName: ref.fields?.issuetype?.name ?? 'Task',
+    statusName: ref.fields?.status?.name ?? '',
+  }
+}
+
+export const getIssue = createServerFn({ method: 'GET' })
+  .inputValidator((data: { key: string }) => {
+    if (!data || typeof data.key !== 'string' || data.key.trim() === '') {
+      throw new Error('getIssue: key is required')
+    }
+    return { key: data.key.trim() }
+  })
+  .handler(async ({ data }): Promise<GetIssueResult> => {
+    const env = getServerEnv()
+    try {
+      const issue = await jiraClient.getIssue(data.key, DETAIL_ISSUE_FIELDS)
+      const f = issue.fields
+      const links: IssueLink[] = []
+      for (const link of f.issuelinks ?? []) {
+        if (link.outwardIssue) {
+          links.push({
+            id: link.id,
+            typeName: link.type.name,
+            direction: 'outward',
+            relationship: link.type.outward,
+            issue: toLinkedRef(link.outwardIssue),
+          })
+        } else if (link.inwardIssue) {
+          links.push({
+            id: link.id,
+            typeName: link.type.name,
+            direction: 'inward',
+            relationship: link.type.inward,
+            issue: toLinkedRef(link.inwardIssue),
+          })
+        }
+      }
+      return {
+        ok: true,
+        baseUrl: env.JIRA_BASE_URL,
+        issue: {
+          key: issue.key,
+          summary: f.summary,
+          description: (f.description as AdfNode | null | undefined) ?? null,
+          statusName: f.status.name,
+          typeName: f.issuetype?.name ?? 'Task',
+          labels: f.labels ?? [],
+          priorityName: f.priority?.name ?? null,
+          assigneeName: f.assignee?.displayName ?? null,
+          reporterName: f.reporter?.displayName ?? null,
+          parent: f.parent ? toLinkedRef(f.parent) : null,
+          subtasks: (f.subtasks ?? []).map(toLinkedRef),
+          links,
+          comments: (f.comment?.comments ?? []).map((c) => ({
+            id: c.id,
+            authorName: c.author?.displayName ?? null,
+            created: c.created,
+            body: (c.body as AdfNode | null | undefined) ?? null,
+          })),
+        },
+      }
+    } catch (err) {
+      if (err instanceof JiraAuthError) {
+        return { ok: false, reason: 'unauthorized' }
+      }
+      throw err
+    }
+  })
 
 export const searchIssues = createServerFn({ method: 'GET' }).handler(
   async (): Promise<SearchIssuesResult> => {

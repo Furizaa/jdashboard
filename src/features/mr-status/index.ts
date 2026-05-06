@@ -1,4 +1,5 @@
 export { MrSection } from './MrSection'
+export { MrWarning } from './MrWarning'
 export { ReviewerAvatar } from './ReviewerAvatar'
 export { useMrStatuses, useMrStatus, mrStatusesQueryKey } from './use-mr-statuses'
 export type { MrStatusResult } from './use-mr-statuses'

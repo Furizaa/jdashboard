@@ -1,10 +1,17 @@
 import { MessageSquare } from 'lucide-react'
 import { cn } from '~/lib/cn'
 import type { Column } from '~/features/board/status-mapping'
+import { MrWarning } from './MrWarning'
 import { ReviewerAvatar } from './ReviewerAvatar'
 import { useMrStatus } from './use-mr-statuses'
 
 const MAX_VISIBLE_REVIEWERS = 4
+
+function openInNewTab(url: string) {
+  return () => {
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+}
 
 export function MrSection({ issueKey, column }: { issueKey: string; column: Column }) {
   if (column !== 'In Code Review') return null
@@ -18,7 +25,18 @@ function CodeReviewSection({ issueKey }: { issueKey: string }) {
   if (result.state === 'loading') return <SkeletonRow />
 
   const summary = result.summary
-  if (summary === null) return null
+  if (summary === null) return <MrWarning text="No MR found" />
+  if (summary.kind === 'draft') {
+    return <MrWarning text="MR is draft" onClick={openInNewTab(summary.webUrl)} />
+  }
+  if (summary.kind === 'no-reviewers') {
+    return (
+      <MrWarning
+        text="MR open, no reviewers assigned"
+        onClick={openInNewTab(summary.webUrl)}
+      />
+    )
+  }
   if (summary.kind !== 'review') return null
 
   const visible = summary.reviewers.slice(0, MAX_VISIBLE_REVIEWERS)

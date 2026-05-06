@@ -8,6 +8,7 @@ import type { BoardIssue, DetailIssue } from '~/server/jira'
 import { useIssue } from './use-issue'
 import { RenderAdf } from './adf'
 import { Activity } from './Activity'
+import { Relationships } from './Relationships'
 import { extractPlainText } from './extract-plain-text'
 
 const PROJECT_KEY_RE = /^([A-Z][A-Z0-9]+)-\d+$/
@@ -115,7 +116,7 @@ function PanelContent({
                 : 'Issue not found.'}
             </PanelMessage>
           ) : (
-            <PanelBody issue={issueQuery.data.issue} />
+            <PanelBody issue={issueQuery.data.issue} onOpen={onOpen} />
           )}
         </div>
       </div>
@@ -208,7 +209,13 @@ function IconButton({
   )
 }
 
-function PanelBody({ issue }: { issue: DetailIssue }) {
+function PanelBody({
+  issue,
+  onOpen,
+}: {
+  issue: DetailIssue
+  onOpen: (key: string) => void
+}) {
   const hasDescription = useMemo(
     () => extractPlainText(issue.description).length > 0,
     [issue.description],
@@ -221,6 +228,12 @@ function PanelBody({ issue }: { issue: DetailIssue }) {
         <div className="mt-5">
           {hasDescription ? <RenderAdf doc={issue.description} /> : <NoDescription />}
         </div>
+        <Relationships
+          parent={issue.parent}
+          subIssues={issue.subIssues}
+          links={issue.links}
+          onOpen={onOpen}
+        />
         <Activity comments={issue.comments} />
       </div>
       <PropertiesRail issue={issue} />

@@ -10,4 +10,7 @@ export type {
   DetailIssue,
   GetIssueResult,
   AdfNode,
+  LinkedIssueRef,
+  IssueLink,
+  StatusCategoryKey,
 } from './server-functions'

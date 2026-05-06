@@ -3,11 +3,14 @@ import { jiraClient, JiraAuthError } from './client'
 import { buildBoardJql } from './jql'
 import { getServerEnv } from '~/server/env'
 
-type LinkedIssueRef = {
+export type StatusCategoryKey = 'new' | 'indeterminate' | 'done' | 'undefined'
+
+export type LinkedIssueRef = {
   key: string
   summary: string
   typeName: string
   statusName: string
+  statusCategory: StatusCategoryKey
 }
 
 type AdfMark = { type: string; attrs?: Record<string, string | number | boolean | null> }
@@ -19,7 +22,7 @@ export type AdfNode = {
   content?: AdfNode[]
 }
 
-type IssueLink = {
+export type IssueLink = {
   id: string
   typeName: string
   direction: 'inward' | 'outward'
@@ -77,7 +80,7 @@ export type DetailIssue = {
   assigneeName: string | null
   reporterName: string | null
   parent: LinkedIssueRef | null
-  subtasks: LinkedIssueRef[]
+  subIssues: LinkedIssueRef[]
   links: IssueLink[]
   comments: Array<{
     id: string
@@ -102,20 +105,34 @@ const DETAIL_ISSUE_FIELDS = [
   'reporter',
   'description',
   'parent',
-  'subtasks',
   'issuelinks',
   'comment',
 ] as const
 
+const SUB_ISSUE_FIELDS = ['summary', 'status', 'issuetype'] as const
+
 function toLinkedRef(ref: {
   key: string
-  fields?: { summary?: string; status?: { name: string }; issuetype?: { name: string } }
+  fields?: {
+    summary?: string
+    status?: { name: string; statusCategory?: { key: string; name: string } }
+    issuetype?: { name: string }
+  }
 }): LinkedIssueRef {
+  const categoryKey = ref.fields?.status?.statusCategory?.key
+  const statusCategory: StatusCategoryKey =
+    categoryKey === 'new' ||
+    categoryKey === 'indeterminate' ||
+    categoryKey === 'done' ||
+    categoryKey === 'undefined'
+      ? categoryKey
+      : 'undefined'
   return {
     key: ref.key,
     summary: ref.fields?.summary ?? '',
     typeName: ref.fields?.issuetype?.name ?? 'Task',
     statusName: ref.fields?.status?.name ?? '',
+    statusCategory,
   }
 }
 
@@ -129,7 +146,10 @@ export const getIssue = createServerFn({ method: 'GET' })
   .handler(async ({ data }): Promise<GetIssueResult> => {
     const env = getServerEnv()
     try {
-      const issue = await jiraClient.getIssue(data.key, DETAIL_ISSUE_FIELDS)
+      const [issue, subIssuesResp] = await Promise.all([
+        jiraClient.getIssue(data.key, DETAIL_ISSUE_FIELDS),
+        jiraClient.searchIssues(`parent = "${data.key}"`, SUB_ISSUE_FIELDS),
+      ])
       const f = issue.fields
       const links: IssueLink[] = []
       for (const link of f.issuelinks ?? []) {
@@ -165,7 +185,7 @@ export const getIssue = createServerFn({ method: 'GET' })
           assigneeName: f.assignee?.displayName ?? null,
           reporterName: f.reporter?.displayName ?? null,
           parent: f.parent ? toLinkedRef(f.parent) : null,
-          subtasks: (f.subtasks ?? []).map(toLinkedRef),
+          subIssues: subIssuesResp.issues.map(toLinkedRef),
           links,
           comments: (f.comment?.comments ?? []).map((c) => {
             const urls = c.author?.avatarUrls

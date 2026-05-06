@@ -48,7 +48,7 @@ type JiraLinkedRef = {
   key: string
   fields?: {
     summary?: string
-    status?: { name: string }
+    status?: { name: string; statusCategory?: { key: string; name: string } }
     issuetype?: { name: string }
   }
 }
@@ -66,7 +66,6 @@ export type JiraDetailedIssue = {
     reporter?: { displayName: string } | null
     description?: unknown
     parent?: JiraLinkedRef | null
-    subtasks?: JiraLinkedRef[]
     issuelinks?: Array<{
       id: string
       type: { name: string; inward: string; outward: string }

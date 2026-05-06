@@ -1,6 +1,6 @@
 # clashboard issues
 
-Tracer-bullet vertical slices derived from [the clashboard PRD](../prds/clashboard.md) and [the GitLab MR status PRD](../prds/gitlab-mr-status.md). Each slice cuts through all layers (server function → query hook → UI → tests where applicable) and is demoable on its own.
+Tracer-bullet vertical slices derived from [the clashboard PRD](../prds/clashboard.md), [the GitLab MR status PRD](../prds/gitlab-mr-status.md), and [the misc improvements PRD](../prds/misc-improvements.md). Each slice cuts through all layers (server function → query hook → UI → tests where applicable) and is demoable on its own.
 
 ## Order & dependencies
 
@@ -18,6 +18,10 @@ Tracer-bullet vertical slices derived from [the clashboard PRD](../prds/clashboa
 16 → 17 ─┬─→ 18 ─┬─→ 19
          │       └─→ 20
          └─→ 21
+
+22
+23 → 24
+25
 ```
 
 ## Index
@@ -52,3 +56,12 @@ Tracer-bullet vertical slices derived from [the clashboard PRD](../prds/clashboa
 | 19 | [Merged warning + In STG transition](./19-merged-warning-transition.md) | AFK | 18 |
 | 20 | [Done lane desync warning](./20-done-desync.md) | AFK | 18 |
 | 21 | [Manual refresh integration + one-time GitLab 401 toast](./21-refresh-and-401.md) | AFK | 17 |
+
+### Misc improvements (PRD: [misc-improvements.md](../prds/misc-improvements.md))
+
+| # | File | Type | Blocked by |
+|---|---|---|---|
+| 22 | [Per-column sort + TO DO deemphasized tier](./22-column-sort-and-deemphasized.md) | AFK | — |
+| 23 | [MR CI/conflict indicator on Code Review row](./23-mr-ci-conflict-indicator.md) | AFK | — |
+| 24 | [MR block in detail panel + Open MR button](./24-mr-panel-block.md) | AFK | 23 |
+| 25 | [FIXASAP corner ribbon](./25-fixasap-ribbon.md) | AFK | — |

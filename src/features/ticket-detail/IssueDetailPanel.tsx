@@ -6,6 +6,7 @@ import { TypeIcon, colorForLabel } from '~/features/ticket-card'
 import { columnForStatus, useBoardIssues } from '~/features/board'
 import type { BoardIssue, DetailIssue } from '~/server/jira'
 import { useIssue } from './use-issue'
+import { RenderAdf } from './adf'
 import { extractPlainText } from './extract-plain-text'
 
 const PROJECT_KEY_RE = /^([A-Z][A-Z0-9]+)-\d+$/
@@ -207,14 +208,17 @@ function IconButton({
 }
 
 function PanelBody({ issue }: { issue: DetailIssue }) {
-  const plainText = useMemo(() => extractPlainText(issue.description), [issue.description])
+  const hasDescription = useMemo(
+    () => extractPlainText(issue.description).length > 0,
+    [issue.description],
+  )
 
   return (
     <div className="grid grid-cols-[1fr_180px] gap-6 p-6">
       <div className="min-w-0">
         <h1 className="text-foreground text-xl leading-tight font-semibold">{issue.summary}</h1>
-        <div className="text-foreground/85 mt-5 text-sm leading-relaxed whitespace-pre-wrap">
-          {plainText.length > 0 ? plainText : <NoDescription />}
+        <div className="mt-5">
+          {hasDescription ? <RenderAdf doc={issue.description} /> : <NoDescription />}
         </div>
       </div>
       <PropertiesRail issue={issue} />

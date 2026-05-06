@@ -1,0 +1,21 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`RenderAdf > combined fixtures > renders a typical bug-report description (heading + paragraph + bullet list + code block) 1`] = `"<div class="space-y-3"><h2 class="text-foreground leading-snug text-lg font-semibold mt-2">Steps to reproduce</h2><p class="text-foreground/85 text-sm leading-relaxed">Open the <strong class="text-foreground font-semibold">admin panel</strong> and:</p><ol class="text-foreground/85 ml-5 list-decimal space-y-1 text-sm"><li class="[&amp;>p]:inline [&amp;>p]:text-sm"><p class="text-foreground/85 text-sm leading-relaxed">Click Settings</p></li><li class="[&amp;>p]:inline [&amp;>p]:text-sm"><p class="text-foreground/85 text-sm leading-relaxed">Run <code class="bg-muted/60 text-foreground rounded px-1 py-0.5 font-mono text-[0.85em]">npm run build</code></p></li></ol><pre class="bg-muted/50 border-border text-foreground/90 overflow-x-auto rounded-md border p-3 font-mono text-xs leading-relaxed"><code>Error: ENOENT</code></pre></div>"`;
+
+exports[`RenderAdf > combined fixtures > renders prose with a link, italic, and a horizontal rule 1`] = `"<div class="space-y-3"><p class="text-foreground/85 text-sm leading-relaxed">See the <a href="https://example.com/spec" target="_blank" rel="noopener noreferrer" class="text-sky-400 underline-offset-2 hover:underline">spec</a> for <em>context</em>.</p><hr class="border-border my-1"><blockquote class="border-border text-foreground/75 space-y-2 border-l-2 pl-3 italic"><p class="text-foreground/85 text-sm leading-relaxed">Reviewer note: looks good.</p></blockquote></div>"`;
+
+exports[`RenderAdf > renders bulletList with listItems 1`] = `"<div class="space-y-3"><ul class="text-foreground/85 ml-5 list-disc space-y-1 text-sm"><li class="[&amp;>p]:inline [&amp;>p]:text-sm"><p class="text-foreground/85 text-sm leading-relaxed">one</p></li><li class="[&amp;>p]:inline [&amp;>p]:text-sm"><p class="text-foreground/85 text-sm leading-relaxed">two</p></li></ul></div>"`;
+
+exports[`RenderAdf > renders heading level 1 1`] = `"<div class="space-y-3"><h1 class="text-foreground leading-snug text-xl font-semibold mt-2">H1</h1></div>"`;
+
+exports[`RenderAdf > renders heading level 2 1`] = `"<div class="space-y-3"><h2 class="text-foreground leading-snug text-lg font-semibold mt-2">H2</h2></div>"`;
+
+exports[`RenderAdf > renders heading level 3 1`] = `"<div class="space-y-3"><h3 class="text-foreground leading-snug text-base font-semibold mt-1.5">H3</h3></div>"`;
+
+exports[`RenderAdf > renders heading level 4 1`] = `"<div class="space-y-3"><h4 class="text-foreground leading-snug text-sm font-semibold mt-1.5">H4</h4></div>"`;
+
+exports[`RenderAdf > renders heading level 5 1`] = `"<div class="space-y-3"><h5 class="text-foreground leading-snug text-sm font-medium">H5</h5></div>"`;
+
+exports[`RenderAdf > renders heading level 6 1`] = `"<div class="space-y-3"><h6 class="text-foreground leading-snug text-xs font-medium uppercase tracking-wide">H6</h6></div>"`;
+
+exports[`RenderAdf > renders orderedList with listItems 1`] = `"<div class="space-y-3"><ol class="text-foreground/85 ml-5 list-decimal space-y-1 text-sm"><li class="[&amp;>p]:inline [&amp;>p]:text-sm"><p class="text-foreground/85 text-sm leading-relaxed">first</p></li><li class="[&amp;>p]:inline [&amp;>p]:text-sm"><p class="text-foreground/85 text-sm leading-relaxed">second</p></li></ol></div>"`;

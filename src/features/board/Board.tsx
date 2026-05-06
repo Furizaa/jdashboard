@@ -1,10 +1,6 @@
 import { useMemo } from 'react'
 import { useBoardIssues } from './use-board-issues'
-import {
-  COLUMNS,
-  columnForStatus,
-  type Column,
-} from './status-mapping'
+import { COLUMNS, columnForStatus, type Column } from './status-mapping'
 import type { BoardIssue } from '~/server/jira'
 import { TicketCard } from '~/features/ticket-card'
 
@@ -41,16 +37,31 @@ export function Board() {
     return <BoardMessage tone="destructive">Invalid Jira credentials.</BoardMessage>
   }
 
+  const { baseUrl } = query.data
+
   return (
     <div className="grid h-dvh grid-cols-4 gap-4 p-4">
       {COLUMNS.map((column) => (
-        <BoardColumn key={column} column={column} issues={issuesByColumn[column]} />
+        <BoardColumn
+          key={column}
+          column={column}
+          issues={issuesByColumn[column]}
+          baseUrl={baseUrl}
+        />
       ))}
     </div>
   )
 }
 
-function BoardColumn({ column, issues }: { column: Column; issues: BoardIssue[] }) {
+function BoardColumn({
+  column,
+  issues,
+  baseUrl,
+}: {
+  column: Column
+  issues: BoardIssue[]
+  baseUrl: string
+}) {
   return (
     <section className="flex min-h-0 flex-col">
       <header className="mb-2 flex items-baseline gap-2 px-1">
@@ -61,7 +72,7 @@ function BoardColumn({ column, issues }: { column: Column; issues: BoardIssue[] 
         {issues.length === 0 ? (
           <p className="text-muted-foreground px-2 py-1 text-xs">No tickets</p>
         ) : (
-          issues.map((issue) => <TicketCard key={issue.key} issue={issue} />)
+          issues.map((issue) => <TicketCard key={issue.key} issue={issue} baseUrl={baseUrl} />)
         )}
       </div>
     </section>
@@ -79,9 +90,7 @@ function BoardMessage({
     <div className="flex min-h-dvh items-center justify-center p-6">
       <p
         className={
-          tone === 'destructive'
-            ? 'text-destructive text-sm'
-            : 'text-muted-foreground text-sm'
+          tone === 'destructive' ? 'text-destructive text-sm' : 'text-muted-foreground text-sm'
         }
       >
         {children}

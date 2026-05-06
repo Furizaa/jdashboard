@@ -26,14 +26,7 @@ export function StatusIcon({
         aria-hidden
         style={{ color, flexShrink: 0 }}
       >
-        <circle
-          cx="8"
-          cy="8"
-          r="6"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={stroke}
-        />
+        <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth={stroke} />
       </svg>
     )
   }
@@ -84,14 +77,7 @@ export function StatusIcon({
       aria-hidden
       style={{ color, flexShrink: 0 }}
     >
-      <circle
-        cx="8"
-        cy="8"
-        r="6"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={stroke}
-      />
+      <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth={stroke} />
       <circle
         cx="8"
         cy="8"

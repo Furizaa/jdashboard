@@ -45,8 +45,7 @@ function readAndValidate(): ServerEnv {
   const doneWindowRaw = values.JIRA_DONE_WINDOW_DAYS!
   const doneWindow = Number.parseInt(doneWindowRaw, 10)
   if (!Number.isFinite(doneWindow) || doneWindow < 0) {
-    const message =
-      `[clashboard] JIRA_DONE_WINDOW_DAYS must be a non-negative integer, got "${doneWindowRaw}".`
+    const message = `[clashboard] JIRA_DONE_WINDOW_DAYS must be a non-negative integer, got "${doneWindowRaw}".`
     console.error(message)
     throw new Error(message)
   }

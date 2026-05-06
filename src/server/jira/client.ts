@@ -49,10 +49,7 @@ function authHeader(email: string, token: string): string {
   return `Basic ${encoded}`
 }
 
-async function request<T>(
-  path: string,
-  init?: { method?: string; body?: unknown },
-): Promise<T> {
+async function request<T>(path: string, init?: { method?: string; body?: unknown }): Promise<T> {
   const env = getServerEnv()
   const url = `${env.JIRA_BASE_URL}${path}`
   const headers: Record<string, string> = {

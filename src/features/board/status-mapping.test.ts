@@ -1,20 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import {
-  COLUMNS,
-  columnForStatus,
-  statusesForColumn,
-  type Column,
-} from './status-mapping'
+import { COLUMNS, columnForStatus, statusesForColumn, type Column } from './status-mapping'
 
 describe('status mapping', () => {
   describe('COLUMNS canonical ordering', () => {
     it('lists columns left-to-right as TO DO, In Implementation, In Code Review, Done', () => {
-      expect(COLUMNS).toEqual([
-        'TO DO',
-        'In Implementation',
-        'In Code Review',
-        'Done',
-      ])
+      expect(COLUMNS).toEqual(['TO DO', 'In Implementation', 'In Code Review', 'Done'])
     })
   })
 

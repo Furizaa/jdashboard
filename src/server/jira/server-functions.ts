@@ -12,10 +12,7 @@ export const getMyself = createServerFn({ method: 'GET' }).handler(
     try {
       const me = await jiraClient.getMyself()
       const avatarUrl =
-        me.avatarUrls['48x48'] ??
-        me.avatarUrls['32x32'] ??
-        me.avatarUrls['24x24'] ??
-        ''
+        me.avatarUrls['48x48'] ?? me.avatarUrls['32x32'] ?? me.avatarUrls['24x24'] ?? ''
       return {
         ok: true,
         user: {
@@ -42,7 +39,7 @@ export type BoardIssue = {
 }
 
 export type SearchIssuesResult =
-  | { ok: true; issues: BoardIssue[] }
+  | { ok: true; baseUrl: string; issues: BoardIssue[] }
   | { ok: false; reason: 'unauthorized' }
 
 export const searchIssues = createServerFn({ method: 'GET' }).handler(
@@ -66,11 +63,9 @@ export const searchIssues = createServerFn({ method: 'GET' }).handler(
         summary: issue.fields.summary,
         statusName: issue.fields.status.name,
         typeName: issue.fields.issuetype?.name ?? 'Task',
-        labels: (issue.fields.labels ?? []).filter(
-          (label) => !hideSet.has(label.toLowerCase()),
-        ),
+        labels: (issue.fields.labels ?? []).filter((label) => !hideSet.has(label.toLowerCase())),
       }))
-      return { ok: true, issues }
+      return { ok: true, baseUrl: env.JIRA_BASE_URL, issues }
     } catch (err) {
       if (err instanceof JiraAuthError) {
         return { ok: false, reason: 'unauthorized' }

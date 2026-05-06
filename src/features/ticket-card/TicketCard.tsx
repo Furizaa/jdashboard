@@ -1,19 +1,23 @@
+import { useEffect, useRef, useState, type MouseEvent } from 'react'
+import { toast } from 'sonner'
 import type { BoardIssue } from '~/server/jira'
 import { StatusPill } from '~/features/status-pill'
 import { TypeIcon } from './TypeIcon'
 import { colorForLabel } from './hash-color'
 
 const MAX_VISIBLE_LABELS = 3
+const COPIED_INDICATOR_MS = 1500
 
-export function TicketCard({ issue }: { issue: BoardIssue }) {
+export function TicketCard({ issue, baseUrl }: { issue: BoardIssue; baseUrl: string }) {
   const visible = issue.labels.slice(0, MAX_VISIBLE_LABELS)
   const overflow = issue.labels.length - visible.length
+  const jiraUrl = `${baseUrl}/browse/${issue.key}`
 
   return (
     <article className="border-border bg-card hover:border-foreground/30 group rounded-md border px-3 py-2.5 shadow-sm transition-colors">
       <div className="flex items-center gap-2">
         <TypeIcon type={issue.typeName} />
-        <span className="text-muted-foreground font-mono text-xs">{issue.key}</span>
+        <CardKey jiraKey={issue.key} jiraUrl={jiraUrl} />
         <span className="ml-auto">
           <StatusPill status={issue.statusName} />
         </span>
@@ -51,5 +55,44 @@ export function TicketCard({ issue }: { issue: BoardIssue }) {
         </div>
       )}
     </article>
+  )
+}
+
+function CardKey({ jiraKey, jiraUrl }: { jiraKey: string; jiraUrl: string }) {
+  const [copied, setCopied] = useState(false)
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(
+    () => () => {
+      if (timeoutRef.current !== null) clearTimeout(timeoutRef.current)
+    },
+    [],
+  )
+
+  async function handleClick(event: MouseEvent<HTMLButtonElement>) {
+    event.stopPropagation()
+    if (event.metaKey || event.ctrlKey) {
+      window.open(jiraUrl, '_blank', 'noopener,noreferrer')
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(jiraUrl)
+      setCopied(true)
+      if (timeoutRef.current !== null) clearTimeout(timeoutRef.current)
+      timeoutRef.current = setTimeout(() => setCopied(false), COPIED_INDICATOR_MS)
+    } catch {
+      toast.error("Couldn't copy link to clipboard")
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      aria-label={`Copy Jira URL for ${jiraKey} (Cmd/Ctrl-click to open)`}
+      className="text-muted-foreground hover:text-foreground focus-visible:ring-ring rounded font-mono text-xs transition-colors focus-visible:ring-1 focus-visible:outline-none"
+    >
+      {copied ? 'Copied' : jiraKey}
+    </button>
   )
 }

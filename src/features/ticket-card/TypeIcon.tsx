@@ -1,12 +1,4 @@
-import {
-  BookOpen,
-  Bug,
-  CheckSquare,
-  Flame,
-  TrendingUp,
-  Zap,
-  type LucideIcon,
-} from 'lucide-react'
+import { BookOpen, Bug, CheckSquare, Flame, TrendingUp, Zap, type LucideIcon } from 'lucide-react'
 
 type TypeStyle = {
   Icon: LucideIcon

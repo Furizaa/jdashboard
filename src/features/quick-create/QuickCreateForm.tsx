@@ -1,10 +1,10 @@
-import { useRef, type RefObject } from 'react'
+import { type RefObject } from 'react'
 import { useForm } from '@tanstack/react-form'
 import { quickCreateSchema, type QuickCreateInput } from '~/server/jira/quick-create-schema'
 import { ParentSelect } from './ParentSelect'
 import { SummaryInput } from './SummaryInput'
 import { TypeSegmented } from './TypeSegmented'
-import { useCreateIssueMutation } from './use-create-issue-mutation'
+import type { useCreateIssueMutation } from './use-create-issue-mutation'
 
 const DEFAULT_VALUES: QuickCreateInput = {
   type: 'Bug',
@@ -22,31 +22,30 @@ const REQUIRED_ASTERISK = (
 const INPUT_CLASS =
   'border-border bg-background text-foreground placeholder:text-muted-foreground focus-visible:ring-ring w-full rounded border px-2 py-1.5 text-xs focus-visible:ring-1 focus-visible:outline-none'
 
+type CreateIssueMutation = ReturnType<typeof useCreateIssueMutation>
+
 export function QuickCreateForm({
   summaryRef,
   closeModal,
   open,
+  mutation,
+  resetRef,
 }: {
   summaryRef: RefObject<HTMLInputElement | null>
   closeModal: () => void
   open: boolean
+  mutation: CreateIssueMutation
+  resetRef: RefObject<(() => void) | null>
 }) {
-  const mutateAsyncRef = useRef<((value: QuickCreateInput) => Promise<unknown>) | null>(null)
-
   const form = useForm({
     defaultValues: DEFAULT_VALUES,
     validators: { onChange: quickCreateSchema },
     onSubmit: async ({ value }) => {
-      await mutateAsyncRef.current?.(value)
+      await mutation.mutateAsync(value)
     },
   })
 
-  const mutation = useCreateIssueMutation({
-    closeModal,
-    resetForm: () => form.reset(),
-  })
-
-  mutateAsyncRef.current = mutation.mutateAsync
+  resetRef.current = () => form.reset()
 
   return (
     <form
@@ -125,7 +124,8 @@ export function QuickCreateForm({
         <button
           type="button"
           onClick={closeModal}
-          className="border-border text-foreground hover:bg-muted/60 focus-visible:ring-ring rounded border px-3 py-1.5 text-xs transition-colors focus-visible:ring-1 focus-visible:outline-none"
+          disabled={mutation.isPending}
+          className="border-border text-foreground hover:bg-muted/60 focus-visible:ring-ring rounded border px-3 py-1.5 text-xs transition-colors focus-visible:ring-1 focus-visible:outline-none disabled:cursor-default disabled:opacity-50"
         >
           Cancel
         </button>
@@ -145,4 +145,3 @@ export function QuickCreateForm({
     </form>
   )
 }
-

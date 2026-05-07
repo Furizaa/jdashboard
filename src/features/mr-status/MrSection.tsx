@@ -1,14 +1,10 @@
-import { useQueryClient } from '@tanstack/react-query'
 import { MessageSquare } from 'lucide-react'
-import { toast } from 'sonner'
 import { cn } from '~/lib/cn'
 import type { Column } from '~/features/board/status-mapping'
-import { transitionsQueryKey, useTransitionMutation } from '~/features/status-pill'
-import { getTransitions } from '~/server/jira'
+import { useMrFor, useMrMergedAction } from '~/dashboard'
 import { MrCiIndicator } from './MrCiIndicator'
 import { MrWarning } from './MrWarning'
 import { ReviewerAvatar } from './ReviewerAvatar'
-import { useMrStatus } from './use-mr-statuses'
 
 const MAX_VISIBLE_REVIEWERS = 4
 const MERGED_TARGET_STATUS = 'In STG'
@@ -26,7 +22,7 @@ export function MrSection({ issueKey, column }: { issueKey: string; column: Colu
 }
 
 function DoneSection({ issueKey }: { issueKey: string }) {
-  const result = useMrStatus(issueKey)
+  const result = useMrFor(issueKey)
   if (result.state !== 'ready') return null
   if (result.summary === null) return null
   if (result.summary.kind === 'merged') return null
@@ -39,9 +35,8 @@ function DoneSection({ issueKey }: { issueKey: string }) {
 }
 
 function CodeReviewSection({ issueKey }: { issueKey: string }) {
-  const result = useMrStatus(issueKey)
-  const queryClient = useQueryClient()
-  const transitionMutation = useTransitionMutation()
+  const result = useMrFor(issueKey)
+  const merge = useMrMergedAction()
 
   if (result.state === 'idle' || result.state === 'unavailable') return null
   if (result.state === 'loading') return <SkeletonRow />
@@ -60,38 +55,10 @@ function CodeReviewSection({ issueKey }: { issueKey: string }) {
     )
   }
   if (summary.kind === 'merged') {
-    const handleMergedClick = async () => {
-      const data = await queryClient.fetchQuery({
-        queryKey: transitionsQueryKey(issueKey),
-        queryFn: () => getTransitions({ data: { key: issueKey } }),
-      })
-      if (!data.ok) {
-        toast.error(
-          data.reason === 'unauthorized'
-            ? 'Invalid Jira credentials'
-            : "Couldn't load transitions",
-        )
-        return
-      }
-      const target = data.transitions.find(
-        (t) => t.toStatusName.toLowerCase() === MERGED_TARGET_STATUS.toLowerCase(),
-      )
-      if (target === undefined) {
-        toast.error(
-          `No direct transition to ${MERGED_TARGET_STATUS}. Move ${issueKey} in Jira.`,
-        )
-        return
-      }
-      transitionMutation.mutate({
-        key: issueKey,
-        transitionId: target.id,
-        toStatusName: MERGED_TARGET_STATUS,
-      })
-    }
     return (
       <MrWarning
         text={`MR is merged — move ticket to ${MERGED_TARGET_STATUS}`}
-        onClick={handleMergedClick}
+        onClick={() => merge({ key: issueKey, targetStatusName: MERGED_TARGET_STATUS })}
         viewMrUrl={summary.webUrl}
       />
     )

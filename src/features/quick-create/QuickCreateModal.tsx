@@ -1,8 +1,8 @@
 import { useRef } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { Loader2, X } from 'lucide-react'
+import { useCreateAction } from '~/dashboard'
 import { QuickCreateForm } from './QuickCreateForm'
-import { useCreateIssueMutation } from './use-create-issue-mutation'
 
 export function QuickCreateModal({
   open,
@@ -14,7 +14,7 @@ export function QuickCreateModal({
   const summaryRef = useRef<HTMLInputElement>(null)
   const formResetRef = useRef<(() => void) | null>(null)
 
-  const mutation = useCreateIssueMutation({
+  const mutation = useCreateAction({
     closeModal: () => setOpen(false),
     resetForm: () => formResetRef.current?.(),
   })

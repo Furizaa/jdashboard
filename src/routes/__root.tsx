@@ -4,6 +4,7 @@ import { QueryClientProvider, type QueryClient } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
 import type { ReactNode } from 'react'
 import globalsCss from '~/styles/globals.css?url'
+import { DashboardProvider } from '~/dashboard'
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
@@ -25,8 +26,10 @@ function RootComponent() {
   return (
     <RootDocument>
       <QueryClientProvider client={queryClient}>
-        <Outlet />
-        <Toaster theme="dark" position="bottom-right" />
+        <DashboardProvider>
+          <Outlet />
+          <Toaster theme="dark" position="bottom-right" />
+        </DashboardProvider>
       </QueryClientProvider>
     </RootDocument>
   )

@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState, type MouseEvent } from 'react'
 import { Check } from 'lucide-react'
 import { cn } from '~/lib/cn'
+import { useTransitionAction, useTransitions } from '~/dashboard'
 import { StatusPill } from './StatusPill'
 import { StatusIcon } from './StatusIcon'
 import { styleForStatus } from './status-color'
-import { useTransitions } from './use-transitions'
-import { useTransitionMutation } from './use-transition-mutation'
 
 function stopBubble(event: MouseEvent) {
   event.stopPropagation()
@@ -23,7 +22,7 @@ export function StatusPillSelect({
   const [open, setOpen] = useState(false)
   const wrapperRef = useRef<HTMLDivElement>(null)
   const transitions = useTransitions(issueKey, open)
-  const mutation = useTransitionMutation()
+  const mutation = useTransitionAction()
 
   useEffect(() => {
     if (!open) return

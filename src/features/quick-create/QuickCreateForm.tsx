@@ -1,10 +1,10 @@
 import { type RefObject } from 'react'
 import { useForm } from '@tanstack/react-form'
 import { quickCreateSchema, type QuickCreateInput } from '~/server/jira/quick-create-schema'
+import type { useCreateAction } from '~/dashboard'
 import { ParentSelect } from './ParentSelect'
 import { SummaryInput } from './SummaryInput'
 import { TypeSegmented } from './TypeSegmented'
-import type { useCreateIssueMutation } from './use-create-issue-mutation'
 
 const DEFAULT_VALUES: QuickCreateInput = {
   type: 'Bug',
@@ -22,7 +22,7 @@ const REQUIRED_ASTERISK = (
 const INPUT_CLASS =
   'border-border bg-background text-foreground placeholder:text-muted-foreground focus-visible:ring-ring w-full rounded border px-2 py-1.5 text-xs focus-visible:ring-1 focus-visible:outline-none'
 
-type CreateIssueMutation = ReturnType<typeof useCreateIssueMutation>
+type CreateIssueMutation = ReturnType<typeof useCreateAction>
 
 export function QuickCreateForm({
   summaryRef,

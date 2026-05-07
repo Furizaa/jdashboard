@@ -4,10 +4,10 @@ import { ChevronDown, ChevronUp, ExternalLink, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { StatusPillSelect } from '~/features/status-pill'
 import { FixasapRibbon, TypeIcon, colorForLabel, hasFixasapLabel } from '~/features/ticket-card'
-import { columnForStatus, useBoardIssues } from '~/features/board'
-import { MrPanelBlock, useMrStatus } from '~/features/mr-status'
+import { columnForStatus } from '~/features/board'
+import { MrPanelBlock } from '~/features/mr-status'
+import { useBoardData, useTicket, useMrFor } from '~/dashboard'
 import type { BoardIssue, DetailIssue } from '~/server/jira'
-import { useIssue } from './use-issue'
 import { RenderAdf } from './adf'
 import { Activity } from './Activity'
 import { Relationships } from './Relationships'
@@ -57,8 +57,8 @@ function PanelContent({
   onClose: () => void
   onOpen: (key: string) => void
 }) {
-  const issueQuery = useIssue(issueKey)
-  const boardQuery = useBoardIssues()
+  const issueQuery = useTicket(issueKey)
+  const boardQuery = useBoardData()
 
   usePolling(() => {
     issueQuery.refetch()
@@ -223,7 +223,7 @@ function PanelHeader({
 }
 
 function OpenMrLink({ issueKey }: { issueKey: string }) {
-  const result = useMrStatus(issueKey)
+  const result = useMrFor(issueKey)
   if (result.state !== 'ready') return null
   if (result.summary === null) return null
   return <ExternalLinkButton href={result.summary.webUrl}>Open MR</ExternalLinkButton>

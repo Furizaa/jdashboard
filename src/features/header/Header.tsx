@@ -1,15 +1,12 @@
 import { useEffect, useState } from 'react'
 import { formatDistanceToNow } from 'date-fns'
 import { RefreshCw } from 'lucide-react'
-import { useQueryClient } from '@tanstack/react-query'
-import { boardIssuesQueryKey, useBoardIssues } from '~/features/board'
-import { mrStatusesQueryKey } from '~/features/mr-status'
+import { useBoardData, useRefreshAll } from '~/dashboard'
 import { QuickCreateButton } from '~/features/quick-create'
 import { GitlabIndicator } from './GitlabIndicator'
 import { Logo } from './Logo'
 import { SearchInput } from './SearchInput'
 
-const ISSUE_QUERY_PREFIX = ['jira', 'issue'] as const
 const TICK_INTERVAL_MS = 5_000
 
 export function Header({
@@ -19,20 +16,14 @@ export function Header({
   searchQuery: string
   onSearchChange: (value: string) => void
 }) {
-  const queryClient = useQueryClient()
-  const query = useBoardIssues()
+  const refresh = useRefreshAll()
+  const query = useBoardData()
 
   const [, setTick] = useState(0)
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), TICK_INTERVAL_MS)
     return () => clearInterval(id)
   }, [])
-
-  const refresh = () => {
-    queryClient.invalidateQueries({ queryKey: boardIssuesQueryKey })
-    queryClient.invalidateQueries({ queryKey: ISSUE_QUERY_PREFIX })
-    queryClient.invalidateQueries({ queryKey: mrStatusesQueryKey })
-  }
 
   const errored = query.isError
   const errorMessage =

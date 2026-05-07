@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { useBoardIssues } from './use-board-issues'
+import { useBoardData, useMrStatuses } from '~/dashboard'
 import { useChangeIndication, type LeavingIssue } from './use-change-indication'
 import { COLUMNS, columnForStatus, type Column } from './status-mapping'
 import { filterIssues } from './filter-issues'
@@ -7,7 +7,6 @@ import { sortColumnIssues } from './sort-column'
 import type { BoardIssue } from '~/server/jira'
 import { TicketCard, type TicketCardAnimationState } from '~/features/ticket-card'
 import { usePolling } from '~/lib/use-polling'
-import { useMrStatuses } from '~/features/mr-status'
 
 const POLL_INTERVAL_MS = 60_000
 
@@ -17,7 +16,7 @@ type ColumnItem = {
 }
 
 export function Board({ searchQuery }: { searchQuery: string }) {
-  const query = useBoardIssues()
+  const query = useBoardData()
   usePolling(() => {
     query.refetch()
   }, POLL_INTERVAL_MS)

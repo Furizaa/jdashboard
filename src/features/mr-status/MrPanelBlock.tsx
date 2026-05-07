@@ -1,18 +1,18 @@
 import { AlertTriangle, MessageSquare } from 'lucide-react'
 import { cn } from '~/lib/cn'
-import { columnForStatus, useBoardIssues } from '~/features/board'
+import { columnForStatus } from '~/features/board'
+import { useBoardData, useMrFor } from '~/dashboard'
 import type { MrReviewerState } from '~/server/gitlab'
 import type { CiVisualState } from './ci-state'
 import { MrCiIndicator } from './MrCiIndicator'
 import { ReviewerAvatar } from './ReviewerAvatar'
 import { REVIEWER_BADGE_LABEL } from './reviewer-state'
-import { useMrStatus } from './use-mr-statuses'
 
 const MERGED_TARGET_STATUS = 'In STG'
 
 export function MrPanelBlock({ issueKey }: { issueKey: string }) {
-  const result = useMrStatus(issueKey)
-  const board = useBoardIssues()
+  const result = useMrFor(issueKey)
+  const board = useBoardData()
 
   if (result.state !== 'ready') return null
   const summary = result.summary

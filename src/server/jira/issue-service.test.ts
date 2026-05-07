@@ -8,10 +8,7 @@ import type {
   RawDetailedIssue,
   RawSearchResponse,
 } from './gateway'
-import {
-  createJiraIssueService,
-  type JiraServiceConfig,
-} from './issue-service'
+import { createJiraIssueService, type JiraServiceConfig } from './issue-service'
 
 const notImpl = (): never => {
   throw new Error('not used in this test')

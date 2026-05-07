@@ -45,8 +45,7 @@ export function useIssuePanel(issueKey: string | null): IssuePanelState {
   const navigate = useNavigate()
   const deps = useMemo<IssuePanelDeps>(
     () => ({
-      navigateToIssue: (key) =>
-        navigate({ to: '/', search: key === null ? {} : { issue: key } }),
+      navigateToIssue: (key) => navigate({ to: '/', search: key === null ? {} : { issue: key } }),
       openInBrowser: (url) => {
         window.open(url, '_blank', 'noopener,noreferrer')
       },
@@ -82,8 +81,7 @@ export function useIssuePanelWithDeps(
 
   const issue = issueQuery.data?.ok === true ? issueQuery.data.issue : null
   const baseUrl = issueQuery.data?.ok === true ? issueQuery.data.baseUrl : null
-  const jiraUrl =
-    baseUrl !== null && issueKey !== null ? `${baseUrl}/browse/${issueKey}` : null
+  const jiraUrl = baseUrl !== null && issueKey !== null ? `${baseUrl}/browse/${issueKey}` : null
 
   const projectKey = useMemo(() => {
     if (issueKey === null) return null
@@ -138,15 +136,12 @@ export function useIssuePanelWithDeps(
 
   if (issueQuery.isPending) return { ...openFields, phase: 'loading' }
   if (issueQuery.isError) {
-    const message =
-      issueQuery.error instanceof Error ? issueQuery.error.message : 'unknown error'
+    const message = issueQuery.error instanceof Error ? issueQuery.error.message : 'unknown error'
     return { ...openFields, phase: 'error', message: `Couldn't load issue: ${message}` }
   }
   if (issueQuery.data.ok === false) {
     const message =
-      issueQuery.data.reason === 'unauthorized'
-        ? 'Invalid Jira credentials.'
-        : 'Issue not found.'
+      issueQuery.data.reason === 'unauthorized' ? 'Invalid Jira credentials.' : 'Issue not found.'
     return { ...openFields, phase: 'error', message }
   }
 

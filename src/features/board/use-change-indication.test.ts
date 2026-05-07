@@ -36,10 +36,9 @@ describe('useChangeIndication', () => {
   })
 
   it('marks newly appeared keys as entering and clears them after the fade duration', () => {
-    const { result, rerender } = renderHook(
-      ({ data }) => useChangeIndication(data),
-      { initialProps: { data: [issue('A-1')] as readonly BoardIssue[] | undefined } },
-    )
+    const { result, rerender } = renderHook(({ data }) => useChangeIndication(data), {
+      initialProps: { data: [issue('A-1')] as readonly BoardIssue[] | undefined },
+    })
 
     rerender({ data: [issue('A-1'), issue('A-2')] })
 
@@ -53,10 +52,9 @@ describe('useChangeIndication', () => {
   })
 
   it('marks keys whose status/labels/title changed as changed and clears them after the pulse duration', () => {
-    const { result, rerender } = renderHook(
-      ({ data }) => useChangeIndication(data),
-      { initialProps: { data: [issue('A-1')] as readonly BoardIssue[] | undefined } },
-    )
+    const { result, rerender } = renderHook(({ data }) => useChangeIndication(data), {
+      initialProps: { data: [issue('A-1')] as readonly BoardIssue[] | undefined },
+    })
 
     rerender({ data: [issue('A-1', { statusName: 'In Implementation' })] })
     expect(result.current.changedKeys.has('A-1')).toBe(true)
@@ -75,16 +73,19 @@ describe('useChangeIndication', () => {
       vi.advanceTimersByTime(PULSE_MS)
     })
     rerender({
-      data: [issue('A-1', { statusName: 'In Implementation', labels: ['hot'], summary: 'Renamed' })],
+      data: [
+        issue('A-1', { statusName: 'In Implementation', labels: ['hot'], summary: 'Renamed' }),
+      ],
     })
     expect(result.current.changedKeys.has('A-1')).toBe(true)
   })
 
   it('does not mark a card as changed when no displayed field changed', () => {
-    const { result, rerender } = renderHook(
-      ({ data }) => useChangeIndication(data),
-      { initialProps: { data: [issue('A-1', { labels: ['a', 'b'] })] as readonly BoardIssue[] | undefined } },
-    )
+    const { result, rerender } = renderHook(({ data }) => useChangeIndication(data), {
+      initialProps: {
+        data: [issue('A-1', { labels: ['a', 'b'] })] as readonly BoardIssue[] | undefined,
+      },
+    })
 
     rerender({ data: [issue('A-1', { labels: ['b', 'a'] })] })
 
@@ -93,16 +94,13 @@ describe('useChangeIndication', () => {
   })
 
   it('keeps removed cards in leaving until the fade duration elapses', () => {
-    const { result, rerender } = renderHook(
-      ({ data }) => useChangeIndication(data),
-      {
-        initialProps: {
-          data: [issue('A-1'), issue('A-2', { statusName: 'In Code Review' })] as
-            | readonly BoardIssue[]
-            | undefined,
-        },
+    const { result, rerender } = renderHook(({ data }) => useChangeIndication(data), {
+      initialProps: {
+        data: [issue('A-1'), issue('A-2', { statusName: 'In Code Review' })] as
+          | readonly BoardIssue[]
+          | undefined,
       },
-    )
+    })
 
     rerender({ data: [issue('A-1')] })
 
@@ -116,10 +114,9 @@ describe('useChangeIndication', () => {
   })
 
   it('skips animation classes when a leaving card returns in the next poll', () => {
-    const { result, rerender } = renderHook(
-      ({ data }) => useChangeIndication(data),
-      { initialProps: { data: [issue('A-1'), issue('A-2')] as readonly BoardIssue[] | undefined } },
-    )
+    const { result, rerender } = renderHook(({ data }) => useChangeIndication(data), {
+      initialProps: { data: [issue('A-1'), issue('A-2')] as readonly BoardIssue[] | undefined },
+    })
 
     rerender({ data: [issue('A-1')] })
     expect(result.current.leaving.has('A-2')).toBe(true)

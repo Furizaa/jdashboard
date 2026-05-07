@@ -29,12 +29,12 @@ export function MrWarning({
     ) : null
 
   return (
-    <div className="border-border/50 -mx-3 -mb-2.5 mt-2 border-t">
+    <div className="border-border/50 -mx-3 mt-2 -mb-2.5 border-t">
       {onClick !== undefined ? (
         <button
           type="button"
           onClick={onClick}
-          className={cn(ROW_CLASS, 'hover:bg-amber-500/15 w-full text-left')}
+          className={cn(ROW_CLASS, 'w-full text-left hover:bg-amber-500/15')}
         >
           {icon}
           {label}

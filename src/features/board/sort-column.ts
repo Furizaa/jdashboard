@@ -17,8 +17,7 @@ export function sortColumnIssues<T extends Sortable>(
 ): readonly T[] {
   if (column === 'TO DO') {
     return issues.toSorted(
-      (a, b) =>
-        tierIndex(a.statusName, TODO_TIER_ORDER) - tierIndex(b.statusName, TODO_TIER_ORDER),
+      (a, b) => tierIndex(a.statusName, TODO_TIER_ORDER) - tierIndex(b.statusName, TODO_TIER_ORDER),
     )
   }
   if (column === 'Done') {

@@ -133,20 +133,18 @@ afterEach(() => {
 describe('useIssuePanelWithDeps — phase resolution', () => {
   it('returns phase: closed when issueKey is null', () => {
     const client = makeClient()
-    const { result } = renderHook(
-      () => useIssuePanelWithDeps(null, fakeDeps()),
-      { wrapper: makeWrapper(client) },
-    )
+    const { result } = renderHook(() => useIssuePanelWithDeps(null, fakeDeps()), {
+      wrapper: makeWrapper(client),
+    })
     expect(result.current.phase).toBe('closed')
   })
 
   it('returns phase: loading while the ticket query is pending', () => {
     const client = makeClient()
     seedPendingIssueQuery(client)
-    const { result, unmount } = renderHook(
-      () => useIssuePanelWithDeps(ISSUE_KEY, fakeDeps()),
-      { wrapper: makeWrapper(client) },
-    )
+    const { result, unmount } = renderHook(() => useIssuePanelWithDeps(ISSUE_KEY, fakeDeps()), {
+      wrapper: makeWrapper(client),
+    })
     expect(result.current.phase).toBe('loading')
     unmount()
   })
@@ -154,10 +152,9 @@ describe('useIssuePanelWithDeps — phase resolution', () => {
   it('returns phase: error with a wrapped message when the ticket query throws', () => {
     const client = makeClient()
     seedErroredIssueQuery(client, new Error('boom'))
-    const { result } = renderHook(
-      () => useIssuePanelWithDeps(ISSUE_KEY, fakeDeps()),
-      { wrapper: makeWrapper(client) },
-    )
+    const { result } = renderHook(() => useIssuePanelWithDeps(ISSUE_KEY, fakeDeps()), {
+      wrapper: makeWrapper(client),
+    })
     expect(result.current).toMatchObject({
       phase: 'error',
       message: "Couldn't load issue: boom",
@@ -167,10 +164,9 @@ describe('useIssuePanelWithDeps — phase resolution', () => {
   it('returns phase: error with the unauthorized message when data.ok is false', () => {
     const client = makeClient()
     seedIssue(client, { ok: false, reason: 'unauthorized' })
-    const { result } = renderHook(
-      () => useIssuePanelWithDeps(ISSUE_KEY, fakeDeps()),
-      { wrapper: makeWrapper(client) },
-    )
+    const { result } = renderHook(() => useIssuePanelWithDeps(ISSUE_KEY, fakeDeps()), {
+      wrapper: makeWrapper(client),
+    })
     expect(result.current).toMatchObject({
       phase: 'error',
       message: 'Invalid Jira credentials.',
@@ -180,10 +176,9 @@ describe('useIssuePanelWithDeps — phase resolution', () => {
   it('returns phase: error with the not-found message when data.ok is false', () => {
     const client = makeClient()
     seedIssue(client, { ok: false, reason: 'not-found' })
-    const { result } = renderHook(
-      () => useIssuePanelWithDeps(ISSUE_KEY, fakeDeps()),
-      { wrapper: makeWrapper(client) },
-    )
+    const { result } = renderHook(() => useIssuePanelWithDeps(ISSUE_KEY, fakeDeps()), {
+      wrapper: makeWrapper(client),
+    })
     expect(result.current).toMatchObject({
       phase: 'error',
       message: 'Issue not found.',
@@ -194,10 +189,9 @@ describe('useIssuePanelWithDeps — phase resolution', () => {
     const client = makeClient()
     seedReady(client)
     seedBoard(client, [boardIssue(ISSUE_KEY, 'In Implementation')])
-    const { result } = renderHook(
-      () => useIssuePanelWithDeps(ISSUE_KEY, fakeDeps()),
-      { wrapper: makeWrapper(client) },
-    )
+    const { result } = renderHook(() => useIssuePanelWithDeps(ISSUE_KEY, fakeDeps()), {
+      wrapper: makeWrapper(client),
+    })
     expect(result.current.phase).toBe('ready')
     if (result.current.phase !== 'ready') throw new Error('expected ready')
     expect(result.current.issue.key).toBe(ISSUE_KEY)
@@ -213,10 +207,9 @@ describe('useIssuePanelWithDeps — phase resolution', () => {
       boardIssue(ISSUE_KEY, 'In Implementation'),
       boardIssue(NEXT_KEY, 'In Implementation'),
     ])
-    const { result } = renderHook(
-      () => useIssuePanelWithDeps(ISSUE_KEY, fakeDeps()),
-      { wrapper: makeWrapper(client) },
-    )
+    const { result } = renderHook(() => useIssuePanelWithDeps(ISSUE_KEY, fakeDeps()), {
+      wrapper: makeWrapper(client),
+    })
     if (result.current.phase !== 'ready') throw new Error('expected ready')
     expect(result.current.prevKey).toBe('HDR-0')
     expect(result.current.nextKey).toBe(NEXT_KEY)
@@ -231,10 +224,9 @@ describe('useIssuePanelWithDeps — bound action callbacks', () => {
       boardIssue(ISSUE_KEY, 'In Implementation'),
       boardIssue(NEXT_KEY, 'In Implementation'),
     ])
-    const view = renderHook(
-      () => useIssuePanelWithDeps(ISSUE_KEY, deps),
-      { wrapper: makeWrapper(client) },
-    )
+    const view = renderHook(() => useIssuePanelWithDeps(ISSUE_KEY, deps), {
+      wrapper: makeWrapper(client),
+    })
     if (view.result.current.phase !== 'ready') {
       throw new Error('expected ready phase')
     }
@@ -292,10 +284,7 @@ describe('useIssuePanelWithDeps — Escape handler', () => {
     const client = makeClient()
     seedReady(client)
     seedBoard(client, [boardIssue(ISSUE_KEY, 'In Implementation')])
-    renderHook(
-      () => useIssuePanelWithDeps(ISSUE_KEY, deps),
-      { wrapper: makeWrapper(client) },
-    )
+    renderHook(() => useIssuePanelWithDeps(ISSUE_KEY, deps), { wrapper: makeWrapper(client) })
     dispatchKey({ key: 'Escape' })
     expect(deps.navigateToIssue).toHaveBeenCalledWith(null)
   })
@@ -303,10 +292,7 @@ describe('useIssuePanelWithDeps — Escape handler', () => {
   it('Escape while closed does NOT call navigateToIssue', () => {
     const deps = fakeDeps()
     const client = makeClient()
-    renderHook(
-      () => useIssuePanelWithDeps(null, deps),
-      { wrapper: makeWrapper(client) },
-    )
+    renderHook(() => useIssuePanelWithDeps(null, deps), { wrapper: makeWrapper(client) })
     dispatchKey({ key: 'Escape' })
     expect(deps.navigateToIssue).not.toHaveBeenCalled()
   })
@@ -321,10 +307,9 @@ describe('useIssuePanelWithDeps — navigation shortcuts', () => {
     const client = makeClient()
     seedReady(client, issue)
     seedBoard(client, issues)
-    return renderHook(
-      () => useIssuePanelWithDeps(ISSUE_KEY, deps),
-      { wrapper: makeWrapper(client) },
-    )
+    return renderHook(() => useIssuePanelWithDeps(ISSUE_KEY, deps), {
+      wrapper: makeWrapper(client),
+    })
   }
 
   it('j navigates to nextKey', () => {
@@ -430,10 +415,7 @@ describe('useIssuePanelWithDeps — polling', () => {
     const client = makeClient()
     seedReady(client)
     seedBoard(client, [boardIssue(ISSUE_KEY, 'In Implementation')])
-    renderHook(
-      () => useIssuePanelWithDeps(ISSUE_KEY, deps),
-      { wrapper: makeWrapper(client) },
-    )
+    renderHook(() => useIssuePanelWithDeps(ISSUE_KEY, deps), { wrapper: makeWrapper(client) })
 
     const query = client.getQueryCache().find({ queryKey: ISSUE_QUERY_KEY })
     expect(query?.state.fetchStatus).toBe('idle')

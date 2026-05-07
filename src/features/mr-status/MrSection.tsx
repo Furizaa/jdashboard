@@ -48,10 +48,7 @@ function CodeReviewSection({ issueKey }: { issueKey: string }) {
   }
   if (summary.kind === 'no-reviewers') {
     return (
-      <MrWarning
-        text="MR open, no reviewers assigned"
-        onClick={openInNewTab(summary.webUrl)}
-      />
+      <MrWarning text="MR open, no reviewers assigned" onClick={openInNewTab(summary.webUrl)} />
     )
   }
   if (summary.kind === 'merged') {
@@ -69,12 +66,12 @@ function CodeReviewSection({ issueKey }: { issueKey: string }) {
   const overflow = summary.reviewers.length - visible.length
 
   return (
-    <div className="border-border/50 -mx-3 -mb-2.5 mt-2 border-t">
+    <div className="border-border/50 -mx-3 mt-2 -mb-2.5 border-t">
       <div
         className={cn(
           'flex items-center gap-2 px-3 py-1.5',
           summary.allApprovedAndClean &&
-            'bg-green-500/10 border-l-2 border-green-500/40 rounded-b-md',
+            'rounded-b-md border-l-2 border-green-500/40 bg-green-500/10',
         )}
       >
         {visible.map((reviewer) => (
@@ -110,7 +107,7 @@ function CodeReviewSection({ issueKey }: { issueKey: string }) {
 
 function SkeletonRow() {
   return (
-    <div className="border-border/50 -mx-3 -mb-2.5 mt-2 border-t" aria-hidden>
+    <div className="border-border/50 -mx-3 mt-2 -mb-2.5 border-t" aria-hidden>
       <div className="px-3 py-1.5">
         <div className="skeleton-shimmer h-5 w-24 rounded-full" />
       </div>

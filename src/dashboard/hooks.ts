@@ -77,9 +77,7 @@ export type MrStatusResult =
   | { state: 'unavailable' }
   | { state: 'ready'; summary: MrSummary | null }
 
-type SelectedSlice =
-  | { available: false }
-  | { available: true; summary: MrSummary | null }
+type SelectedSlice = { available: false } | { available: true; summary: MrSummary | null }
 
 export function useMrFor(jiraKey: string): MrStatusResult {
   const board = useBoardData()

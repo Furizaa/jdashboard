@@ -1,8 +1,4 @@
-import type {
-  GetIssueResult,
-  GetTransitionsResult,
-  SearchIssuesResult,
-} from '~/server/jira'
+import type { GetIssueResult, GetTransitionsResult, SearchIssuesResult } from '~/server/jira'
 import type { GetMrStatusesResult } from '~/server/gitlab'
 
 export type Patch<T> = (prev: T | undefined) => T | undefined

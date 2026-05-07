@@ -8,11 +8,7 @@ import type {
 } from '~/server/jira'
 import type { QuickCreateInput } from '~/server/jira/quick-create-schema'
 import type { DashboardCache, Patch, Rollback } from './cache'
-import {
-  createDashboardService,
-  type DashboardServiceDeps,
-  type ToastFn,
-} from './service'
+import { createDashboardService, type DashboardServiceDeps, type ToastFn } from './service'
 
 type Calls = string[]
 
@@ -99,9 +95,15 @@ function fakeTimers() {
 
 const noopJira = {
   transitionIssue: (() =>
-    Promise.resolve({ ok: true } as TransitionIssueResult)) as DashboardServiceDeps['jira']['transitionIssue'],
+    Promise.resolve({
+      ok: true,
+    } as TransitionIssueResult)) as DashboardServiceDeps['jira']['transitionIssue'],
   createIssue: (() =>
-    Promise.resolve({ ok: true, key: 'HDR-1', baseUrl: 'https://j' } as CreateIssueResult)) as DashboardServiceDeps['jira']['createIssue'],
+    Promise.resolve({
+      ok: true,
+      key: 'HDR-1',
+      baseUrl: 'https://j',
+    } as CreateIssueResult)) as DashboardServiceDeps['jira']['createIssue'],
 }
 
 function makeDeps(overrides: Partial<DashboardServiceDeps> = {}): DashboardServiceDeps {
@@ -153,8 +155,7 @@ describe('applyTransition', () => {
         cache,
         jira: {
           ...noopJira,
-          transitionIssue: () =>
-            Promise.resolve({ ok: true } as TransitionIssueResult),
+          transitionIssue: () => Promise.resolve({ ok: true } as TransitionIssueResult),
         },
       }),
     )
@@ -163,10 +164,7 @@ describe('applyTransition', () => {
       transitionId: 't1',
       toStatusName: 'Done',
     })
-    const cancelEnd = Math.max(
-      order.indexOf('cancelBoard'),
-      order.indexOf('cancelIssue:HDR-1'),
-    )
+    const cancelEnd = Math.max(order.indexOf('cancelBoard'), order.indexOf('cancelIssue:HDR-1'))
     const patchStart = Math.min(order.indexOf('patchBoard'), order.indexOf('patchIssue'))
     expect(cancelEnd).toBeLessThan(patchStart)
   })
@@ -176,7 +174,14 @@ describe('applyTransition', () => {
       ok: true,
       baseUrl: 'https://j',
       issues: [
-        { key: 'HDR-1', summary: 's', statusName: 'TO DO', typeName: 'Bug', labels: [], epic: null },
+        {
+          key: 'HDR-1',
+          summary: 's',
+          statusName: 'TO DO',
+          typeName: 'Bug',
+          labels: [],
+          epic: null,
+        },
       ],
     }
     const issue: GetIssueResult = {
@@ -252,9 +257,7 @@ describe('applyTransition', () => {
       }),
     ).rejects.toThrow('network down')
     expect(rollbacks).toEqual(['board', 'issue'])
-    expect(t.events).toEqual([
-      { kind: 'error', message: "Couldn't change status: network down" },
-    ])
+    expect(t.events).toEqual([{ kind: 'error', message: "Couldn't change status: network down" }])
   })
 
   it('rolls back both caches AND toasts the message when result.ok === false', async () => {
@@ -315,8 +318,7 @@ describe('applyTransition', () => {
         cache,
         jira: {
           ...noopJira,
-          transitionIssue: () =>
-            Promise.resolve({ ok: true } as TransitionIssueResult),
+          transitionIssue: () => Promise.resolve({ ok: true } as TransitionIssueResult),
         },
       }),
     )
@@ -379,9 +381,7 @@ describe('createIssue', () => {
       message: 'Request timed out',
     })
     expect(timers.timers[0]?.cleared).toBe(true)
-    expect(t.events).toEqual([
-      { kind: 'error', message: 'Request timed out — try again' },
-    ])
+    expect(t.events).toEqual([{ kind: 'error', message: 'Request timed out — try again' }])
     expect(resolveCreate).not.toBeNull()
   })
 
@@ -462,8 +462,7 @@ describe('handleMrMerged', () => {
   it('returns transitions-failed and toasts unauthorized when fetchTransitions returns unauthorized', async () => {
     const t = fakeToast()
     const cache = fakeCache({
-      fetchTransitions: async () =>
-        ({ ok: false, reason: 'unauthorized' }) as GetTransitionsResult,
+      fetchTransitions: async () => ({ ok: false, reason: 'unauthorized' }) as GetTransitionsResult,
     })
     const service = createDashboardService(makeDeps({ cache, toast: t.toast }))
     const result = await service.handleMrMerged({
@@ -478,8 +477,7 @@ describe('handleMrMerged', () => {
   it('returns transitions-failed and toasts generic when fetchTransitions returns not-found', async () => {
     const t = fakeToast()
     const cache = fakeCache({
-      fetchTransitions: async () =>
-        ({ ok: false, reason: 'not-found' }) as GetTransitionsResult,
+      fetchTransitions: async () => ({ ok: false, reason: 'not-found' }) as GetTransitionsResult,
     })
     const service = createDashboardService(makeDeps({ cache, toast: t.toast }))
     const result = await service.handleMrMerged({
@@ -496,9 +494,7 @@ describe('handleMrMerged', () => {
       fetchTransitions: async () =>
         ({
           ok: true,
-          transitions: [
-            { id: '99', name: 'Move', toStatusName: 'in stg' },
-          ],
+          transitions: [{ id: '99', name: 'Move', toStatusName: 'in stg' }],
         }) as GetTransitionsResult,
       cancelBoard: async () => {},
       cancelIssue: async () => {},

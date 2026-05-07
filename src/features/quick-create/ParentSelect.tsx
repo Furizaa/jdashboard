@@ -6,7 +6,8 @@ import { useMyEpics } from './use-my-epics'
 const TRIGGER_CLASS =
   'border-border bg-background text-foreground placeholder:text-muted-foreground focus-visible:ring-ring flex w-full items-center justify-between rounded border px-2 py-1.5 text-left text-xs focus-visible:ring-1 focus-visible:outline-none'
 
-const SECTION_LABEL_CLASS = 'text-muted-foreground px-2.5 pt-1.5 pb-1 text-[10px] uppercase tracking-wide'
+const SECTION_LABEL_CLASS =
+  'text-muted-foreground px-2.5 pt-1.5 pb-1 text-[10px] uppercase tracking-wide'
 
 export function ParentSelect({
   value,
@@ -162,7 +163,7 @@ function DynamicSection({
         <button
           type="button"
           onClick={onRetry}
-          className="text-foreground underline-offset-2 hover:underline focus-visible:ring-ring focus-visible:ring-1 focus-visible:outline-none"
+          className="text-foreground focus-visible:ring-ring underline-offset-2 hover:underline focus-visible:ring-1 focus-visible:outline-none"
         >
           retry
         </button>

@@ -4,13 +4,7 @@ import type { CiVisualState } from './ci-state'
 
 const ICON_CLASS = 'h-3 w-3 shrink-0'
 
-export function MrCiIndicator({
-  state,
-  className,
-}: {
-  state: CiVisualState
-  className?: string
-}) {
+export function MrCiIndicator({ state, className }: { state: CiVisualState; className?: string }) {
   if (state === 'none') return null
   const { label, icon } = render(state)
   return (

@@ -42,10 +42,7 @@ export type DashboardService = {
     toStatusName: string
   }): Promise<TransitionIssueResult>
   createIssue(form: QuickCreateInput): Promise<CreateIssueResultWithTimeout>
-  handleMrMerged(input: {
-    key: string
-    targetStatusName: string
-  }): Promise<HandleMrMergedResult>
+  handleMrMerged(input: { key: string; targetStatusName: string }): Promise<HandleMrMergedResult>
   refreshAll(): void
   notifyUnauthorizedOnce(service: 'gitlab'): void
 }
@@ -118,9 +115,7 @@ export function createDashboardService(deps: DashboardServiceDeps): DashboardSer
     return result
   }
 
-  async function createIssueAction(
-    form: QuickCreateInput,
-  ): Promise<CreateIssueResultWithTimeout> {
+  async function createIssueAction(form: QuickCreateInput): Promise<CreateIssueResultWithTimeout> {
     const controller = new AbortController()
     let timedOut = false
     const handle = deps.setTimeout(() => {

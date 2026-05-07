@@ -42,8 +42,7 @@ export function createTanstackDashboardCache(queryClient: QueryClient): Dashboar
   return {
     readBoard: () => queryClient.getQueryData<SearchIssuesResult>(KEY_BOARD),
     readIssue: (key) => queryClient.getQueryData<GetIssueResult>(KEY_ISSUE(key)),
-    readTransitions: (key) =>
-      queryClient.getQueryData<GetTransitionsResult>(KEY_TRANSITIONS(key)),
+    readTransitions: (key) => queryClient.getQueryData<GetTransitionsResult>(KEY_TRANSITIONS(key)),
     readMrStatuses: () => queryClient.getQueryData<GetMrStatusesResult>(KEY_MR),
 
     fetchTransitions: (key) =>

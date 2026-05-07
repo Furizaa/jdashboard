@@ -42,11 +42,7 @@ describe('findSiblings', () => {
   })
 
   it('returns null prev and the second key when the issue is first in the column', () => {
-    const board = [
-      issue('A-1', 'Reviewed'),
-      issue('A-2', 'Reviewed'),
-      issue('A-3', 'Reviewed'),
-    ]
+    const board = [issue('A-1', 'Reviewed'), issue('A-2', 'Reviewed'), issue('A-3', 'Reviewed')]
     expect(findSiblings('A-1', 'Reviewed', board)).toEqual({
       prevKey: null,
       nextKey: 'A-2',
@@ -54,11 +50,7 @@ describe('findSiblings', () => {
   })
 
   it('returns the second-to-last key as prev and null next when the issue is last', () => {
-    const board = [
-      issue('A-1', 'Reviewed'),
-      issue('A-2', 'Reviewed'),
-      issue('A-3', 'Reviewed'),
-    ]
+    const board = [issue('A-1', 'Reviewed'), issue('A-2', 'Reviewed'), issue('A-3', 'Reviewed')]
     expect(findSiblings('A-3', 'Reviewed', board)).toEqual({
       prevKey: 'A-2',
       nextKey: null,
@@ -66,11 +58,7 @@ describe('findSiblings', () => {
   })
 
   it('skips other-column issues so neighbors come from the same column only', () => {
-    const board = [
-      issue('A-1', 'Done'),
-      issue('A-2', 'In Implementation'),
-      issue('A-3', 'Done'),
-    ]
+    const board = [issue('A-1', 'Done'), issue('A-2', 'In Implementation'), issue('A-3', 'Done')]
     expect(findSiblings('A-1', 'Done', board)).toEqual({
       prevKey: null,
       nextKey: 'A-3',

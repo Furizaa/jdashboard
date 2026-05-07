@@ -108,11 +108,7 @@ describe('sortColumnIssues', () => {
     })
 
     it('preserves input order when every issue shares the same status', () => {
-      const issues = [
-        issue('HDR-1', 'In STG'),
-        issue('HDR-2', 'In STG'),
-        issue('HDR-3', 'In STG'),
-      ]
+      const issues = [issue('HDR-1', 'In STG'), issue('HDR-2', 'In STG'), issue('HDR-3', 'In STG')]
       expect(sortColumnIssues(issues, 'Done').map((i) => i.key)).toEqual([
         'HDR-1',
         'HDR-2',
@@ -121,11 +117,7 @@ describe('sortColumnIssues', () => {
     })
 
     it('is stable for issues that share the same status group', () => {
-      const issues = [
-        issue('HDR-1', 'In QA'),
-        issue('HDR-2', 'In QA'),
-        issue('HDR-3', 'In QA'),
-      ]
+      const issues = [issue('HDR-1', 'In QA'), issue('HDR-2', 'In QA'), issue('HDR-3', 'In QA')]
       expect(sortColumnIssues(issues, 'Done').map((i) => i.key)).toEqual([
         'HDR-1',
         'HDR-2',

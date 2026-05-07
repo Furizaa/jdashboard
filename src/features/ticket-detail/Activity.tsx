@@ -8,9 +8,7 @@ type Comment = DetailIssue['comments'][number]
 export function Activity({ comments }: { comments: Comment[] }) {
   const ordered = useMemo(
     () =>
-      comments.toSorted(
-        (a, b) => new Date(a.created).getTime() - new Date(b.created).getTime(),
-      ),
+      comments.toSorted((a, b) => new Date(a.created).getTime() - new Date(b.created).getTime()),
     [comments],
   )
 
@@ -53,15 +51,7 @@ function CommentRow({ comment }: { comment: Comment }) {
   )
 }
 
-function Avatar({
-  src,
-  name,
-  initial,
-}: {
-  src: string | null
-  name: string
-  initial: string
-}) {
+function Avatar({ src, name, initial }: { src: string | null; name: string; initial: string }) {
   if (src !== null) {
     return (
       <img

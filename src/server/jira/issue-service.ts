@@ -1,10 +1,5 @@
 import type { EpicConfig, QuickCreateConfig } from './config'
-import type {
-  AdfNode,
-  CreateIssueBody,
-  JiraGateway,
-  RawLinkedRef,
-} from './gateway'
+import type { AdfNode, CreateIssueBody, JiraGateway, RawLinkedRef } from './gateway'
 import type { QuickCreateInput } from './quick-create-schema'
 
 export type { AdfNode }
@@ -266,9 +261,7 @@ export function createJiraIssueService(
           summary: issue.fields.summary,
           statusName: issue.fields.status.name,
           typeName: issue.fields.issuetype?.name ?? 'Task',
-          labels: (issue.fields.labels ?? []).filter(
-            (label) => !hideSet.has(label.toLowerCase()),
-          ),
+          labels: (issue.fields.labels ?? []).filter((label) => !hideSet.has(label.toLowerCase())),
           epic:
             parentIsEpic && parent
               ? { key: parent.key, summary: parent.fields?.summary ?? parent.key }

@@ -1,135 +1,32 @@
-import { useCallback, useEffect, useMemo } from 'react'
-import { useNavigate } from '@tanstack/react-router'
 import { ChevronDown, ChevronUp, ExternalLink, X } from 'lucide-react'
-import { toast } from 'sonner'
 import { StatusPillSelect } from '~/features/status-pill'
 import { FixasapRibbon, TypeIcon, colorForLabel, hasFixasapLabel } from '~/features/ticket-card'
-import { columnForStatus } from '~/features/board'
 import { MrPanelBlock } from '~/features/mr-status'
-import { useBoardData, useTicket, useMrFor } from '~/dashboard'
-import type { BoardIssue, DetailIssue } from '~/server/jira'
+import { useMrFor } from '~/dashboard'
+import type { DetailIssue } from '~/server/jira'
 import { RenderAdf } from './adf'
 import { Activity } from './Activity'
 import { Relationships } from './Relationships'
 import { extractPlainText } from './extract-plain-text'
-import { usePolling } from '~/lib/use-polling'
+import { useIssuePanel, type IssuePanelState } from './use-issue-panel'
 
-const PROJECT_KEY_RE = /^([A-Z][A-Z0-9]+)-\d+$/
-const ISSUE_POLL_INTERVAL_MS = 60_000
+type OpenPanel = Exclude<IssuePanelState, { phase: 'closed' }>
 
 export function IssueDetailPanel({ issueKey }: { issueKey: string | null }) {
-  const navigate = useNavigate()
-
-  const close = useCallback(() => {
-    navigate({ to: '/', search: {} })
-  }, [navigate])
-
-  const open = useCallback(
-    (key: string) => {
-      navigate({ to: '/', search: { issue: key } })
-    },
-    [navigate],
-  )
-
-  useEffect(() => {
-    if (issueKey === null) return
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        close()
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [issueKey, close])
-
-  if (issueKey === null) return null
-
-  return <PanelContent issueKey={issueKey} onClose={close} onOpen={open} />
+  const panel = useIssuePanel(issueKey)
+  if (panel.phase === 'closed') return null
+  return <Panel panel={panel} />
 }
 
-function PanelContent({
-  issueKey,
-  onClose,
-  onOpen,
-}: {
-  issueKey: string
-  onClose: () => void
-  onOpen: (key: string) => void
-}) {
-  const issueQuery = useTicket(issueKey)
-  const boardQuery = useBoardData()
-
-  usePolling(() => {
-    issueQuery.refetch()
-  }, ISSUE_POLL_INTERVAL_MS)
-
-  const issue = issueQuery.data?.ok ? issueQuery.data.issue : null
-  const baseUrl = issueQuery.data?.ok ? issueQuery.data.baseUrl : null
-  const jiraUrl = baseUrl ? `${baseUrl}/browse/${issueKey}` : null
-
-  const projectKey = useMemo(() => {
-    const match = PROJECT_KEY_RE.exec(issueKey)
-    return match ? (match[1] ?? null) : null
-  }, [issueKey])
-
-  const { prevKey, nextKey } = useMemo(() => {
-    if (!issue || !boardQuery.data?.ok) return { prevKey: null, nextKey: null }
-    const column = columnForStatus(issue.statusName)
-    const siblings: BoardIssue[] = boardQuery.data.issues.filter(
-      (i) => columnForStatus(i.statusName) === column,
-    )
-    const idx = siblings.findIndex((i) => i.key === issueKey)
-    if (idx === -1) return { prevKey: null, nextKey: null }
-    return {
-      prevKey: idx > 0 ? siblings[idx - 1]!.key : null,
-      nextKey: idx < siblings.length - 1 ? siblings[idx + 1]!.key : null,
-    }
-  }, [issue, boardQuery.data, issueKey])
-
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.metaKey || event.ctrlKey || event.altKey) return
-      const active = document.activeElement
-      const inTextInput =
-        active instanceof HTMLInputElement ||
-        active instanceof HTMLTextAreaElement ||
-        (active instanceof HTMLElement && active.isContentEditable)
-      if (inTextInput) return
-
-      const key = event.key.toLowerCase()
-      if (key === 'j' || event.key === 'ArrowDown') {
-        if (nextKey === null) return
-        event.preventDefault()
-        onOpen(nextKey)
-      } else if (key === 'k' || event.key === 'ArrowUp') {
-        if (prevKey === null) return
-        event.preventDefault()
-        onOpen(prevKey)
-      } else if (key === 'o') {
-        if (jiraUrl === null) return
-        event.preventDefault()
-        window.open(jiraUrl, '_blank', 'noopener,noreferrer')
-      } else if (key === 'c') {
-        if (jiraUrl === null) return
-        event.preventDefault()
-        navigator.clipboard.writeText(jiraUrl).then(
-          () => toast.success('Link copied'),
-          () => toast.error("Couldn't copy link to clipboard"),
-        )
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [prevKey, nextKey, jiraUrl, onOpen])
-
+function Panel({ panel }: { panel: OpenPanel }) {
+  const issue = panel.phase === 'ready' ? panel.issue : null
   return (
     <div
       className="fixed inset-0 z-50 flex justify-end"
-      onClick={onClose}
+      onClick={panel.close}
       role="dialog"
       aria-modal="true"
-      aria-label={issue ? `${issueKey} — ${issue.summary}` : issueKey}
+      aria-label={issue !== null ? `${panel.issueKey} — ${issue.summary}` : panel.issueKey}
     >
       <div className="bg-background/40 absolute inset-0 backdrop-blur-[1px]" aria-hidden />
       <div
@@ -137,31 +34,14 @@ function PanelContent({
         onClick={(e) => e.stopPropagation()}
       >
         {issue !== null && hasFixasapLabel(issue.labels) && <FixasapRibbon size="panel" />}
-        <PanelHeader
-          issueKey={issueKey}
-          projectKey={projectKey}
-          jiraUrl={jiraUrl}
-          prevKey={prevKey}
-          nextKey={nextKey}
-          onClose={onClose}
-          onOpen={onOpen}
-        />
+        <PanelHeader panel={panel} />
         <div className="flex-1 overflow-y-auto">
-          {issueQuery.isPending ? (
+          {panel.phase === 'loading' ? (
             <PanelSkeleton />
-          ) : issueQuery.isError ? (
-            <PanelMessage>
-              Couldn't load issue:{' '}
-              {issueQuery.error instanceof Error ? issueQuery.error.message : 'unknown error'}
-            </PanelMessage>
-          ) : issueQuery.data.ok === false ? (
-            <PanelMessage>
-              {issueQuery.data.reason === 'unauthorized'
-                ? 'Invalid Jira credentials.'
-                : 'Issue not found.'}
-            </PanelMessage>
+          ) : panel.phase === 'error' ? (
+            <PanelMessage>{panel.message}</PanelMessage>
           ) : (
-            <PanelBody issue={issueQuery.data.issue} onOpen={onOpen} jiraUrl={jiraUrl} />
+            <PanelBody issue={panel.issue} jiraUrl={panel.jiraUrl} onOpen={panel.open} />
           )}
         </div>
       </div>
@@ -169,52 +49,39 @@ function PanelContent({
   )
 }
 
-function PanelHeader({
-  issueKey,
-  projectKey,
-  jiraUrl,
-  prevKey,
-  nextKey,
-  onClose,
-  onOpen,
-}: {
-  issueKey: string
-  projectKey: string | null
-  jiraUrl: string | null
-  prevKey: string | null
-  nextKey: string | null
-  onClose: () => void
-  onOpen: (key: string) => void
-}) {
+function PanelHeader({ panel }: { panel: OpenPanel }) {
+  const jiraUrl = panel.phase === 'ready' ? panel.jiraUrl : null
+  const prevKey = panel.phase === 'ready' ? panel.prevKey : null
+  const nextKey = panel.phase === 'ready' ? panel.nextKey : null
   return (
     <header className="border-border flex items-center gap-2 border-b px-4 py-2.5">
       <nav aria-label="Breadcrumb" className="text-muted-foreground font-mono text-xs">
-        {projectKey !== null && (
+        {panel.projectKey !== null && (
           <>
-            <span>{projectKey}</span>
+            <span>{panel.projectKey}</span>
             <span className="px-1.5">·</span>
           </>
         )}
-        <span className="text-foreground">{issueKey}</span>
+        <span className="text-foreground">{panel.issueKey}</span>
       </nav>
       <div className="ml-auto flex items-center gap-1">
         <IconButton
           aria-label="Previous ticket in column"
           disabled={prevKey === null}
-          onClick={() => prevKey && onOpen(prevKey)}
+          onClick={() => prevKey && panel.open(prevKey)}
         >
           <ChevronUp size={14} />
         </IconButton>
         <IconButton
           aria-label="Next ticket in column"
           disabled={nextKey === null}
-          onClick={() => nextKey && onOpen(nextKey)}
+          onClick={() => nextKey && panel.open(nextKey)}
         >
           <ChevronDown size={14} />
         </IconButton>
-        <OpenMrLink issueKey={issueKey} />
+        <OpenMrLink issueKey={panel.issueKey} />
         {jiraUrl !== null && <ExternalLinkButton href={jiraUrl}>Open in Jira</ExternalLinkButton>}
-        <IconButton aria-label="Close panel" onClick={onClose}>
+        <IconButton aria-label="Close panel" onClick={panel.close}>
           <X size={14} />
         </IconButton>
       </div>
@@ -275,10 +142,7 @@ function PanelBody({
   onOpen: (key: string) => void
   jiraUrl: string | null
 }) {
-  const hasDescription = useMemo(
-    () => extractPlainText(issue.description).length > 0,
-    [issue.description],
-  )
+  const hasDescription = extractPlainText(issue.description).length > 0
 
   return (
     <div className="grid grid-cols-[1fr_180px] gap-6 p-6">

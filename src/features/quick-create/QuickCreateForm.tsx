@@ -3,6 +3,7 @@ import { useForm } from '@tanstack/react-form'
 import { ChevronDown } from 'lucide-react'
 import { quickCreateSchema, type QuickCreateInput } from '~/server/jira/quick-create-schema'
 import { HARDCODED_PARENTS } from './hardcoded-parents'
+import { TypeSegmented } from './TypeSegmented'
 import { useCreateIssueMutation } from './use-create-issue-mutation'
 
 const DEFAULT_VALUES: QuickCreateInput = {
@@ -58,20 +59,10 @@ export function QuickCreateForm({
         name="type"
         children={(field) => (
           <div>
-            <label htmlFor="quick-create-type" className={REQUIRED_LABEL_CLASS}>
+            <span className={REQUIRED_LABEL_CLASS}>
               Type{REQUIRED_ASTERISK}
-            </label>
-            <select
-              id="quick-create-type"
-              value={field.state.value}
-              onChange={(e) => field.handleChange(e.target.value as QuickCreateInput['type'])}
-              onBlur={field.handleBlur}
-              className={INPUT_CLASS}
-            >
-              <option value="Bug">Bug</option>
-              <option value="Task">Task</option>
-              <option value="Improvement">Improvement</option>
-            </select>
+            </span>
+            <TypeSegmented value={field.state.value} onChange={field.handleChange} />
           </div>
         )}
       />

@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import { createIssue, type CreateIssueResult } from '~/server/jira'
 import { boardIssuesQueryKey } from '~/features/board'
@@ -18,6 +19,7 @@ export function useCreateIssueMutation({
   resetForm: () => void
 }) {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
 
   return useMutation<CreateIssueResult, Error, QuickCreateInput>({
     mutationFn: async (form) => {
@@ -40,11 +42,25 @@ export function useCreateIssueMutation({
     },
     onSuccess: (result) => {
       if (!result.ok) {
-        toast.error('Failed to create ticket')
+        toast.error('Failed to create ticket', { description: result.message })
         return
       }
       queryClient.invalidateQueries({ queryKey: boardIssuesQueryKey })
-      toast.success(`Created ${result.key}`)
+      const { key, baseUrl } = result
+      toast.success(`Created ${key}`, {
+        action: {
+          label: 'Open',
+          onClick: () => {
+            navigate({ to: '/', search: { issue: key } })
+          },
+        },
+        cancel: {
+          label: 'View in Jira',
+          onClick: () => {
+            window.open(`${baseUrl}/browse/${key}`, '_blank', 'noopener,noreferrer')
+          },
+        },
+      })
       resetForm()
       closeModal()
     },

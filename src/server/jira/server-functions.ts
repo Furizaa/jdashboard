@@ -297,7 +297,7 @@ export const transitionIssue = createServerFn({ method: 'POST' })
   })
 
 export type CreateIssueResult =
-  | { ok: true; key: string }
+  | { ok: true; key: string; baseUrl: string }
   | { ok: false; reason: 'unauthorized' | 'rejected'; message: string }
 
 export const createIssue = createServerFn({ method: 'POST' })
@@ -318,7 +318,7 @@ export const createIssue = createServerFn({ method: 'POST' })
         projectKey: env.JIRA_PROJECT_KEY,
       })
       const created = await jiraClient.createIssue(body)
-      return { ok: true, key: created.key }
+      return { ok: true, key: created.key, baseUrl: env.JIRA_BASE_URL }
     } catch (err) {
       if (err instanceof JiraAuthError) {
         return { ok: false, reason: 'unauthorized', message: 'Invalid Jira credentials' }

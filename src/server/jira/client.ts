@@ -1,5 +1,15 @@
 import { getServerEnv } from '~/server/env'
 
+type AdfMark = { type: string; attrs?: Record<string, string | number | boolean | null> }
+export type AdfNode = {
+  type?: string
+  version?: number
+  text?: string
+  attrs?: Record<string, string | number | boolean | null>
+  marks?: AdfMark[]
+  content?: AdfNode[]
+}
+
 export class JiraAuthError extends Error {
   override readonly name = 'JiraAuthError'
 }
@@ -134,6 +144,25 @@ export type JiraTransitionsResponse = {
   transitions: JiraTransition[]
 }
 
+export type JiraCreateIssueBody = {
+  fields: {
+    project: { key: string }
+    issuetype: { name: string }
+    summary: string
+    description: AdfNode
+    priority: { name: string }
+    labels: string[]
+    parent: { key: string }
+    assignee: { accountId: string }
+  }
+}
+
+export type JiraCreateIssueResponse = {
+  id: string
+  key: string
+  self: string
+}
+
 export const jiraClient = {
   async getMyself(): Promise<JiraMyself> {
     return await request<JiraMyself>('/rest/api/3/myself')
@@ -163,6 +192,13 @@ export const jiraClient = {
     await request<void>(`/rest/api/3/issue/${encodeURIComponent(key)}/transitions`, {
       method: 'POST',
       body: { transition: { id: transitionId } },
+    })
+  },
+
+  async createIssue(body: JiraCreateIssueBody): Promise<JiraCreateIssueResponse> {
+    return await request<JiraCreateIssueResponse>('/rest/api/3/issue', {
+      method: 'POST',
+      body,
     })
   },
 }

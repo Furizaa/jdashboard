@@ -1,7 +1,11 @@
 import { createServerFn } from '@tanstack/react-start'
-import { jiraClient, JiraAuthError, JiraHttpError } from './client'
+import { jiraClient, JiraAuthError, JiraHttpError, type AdfNode } from './client'
 import { buildBoardJql } from './jql'
+import { buildCreatePayload } from './quick-create-payload'
+import { quickCreateSchema } from './quick-create-schema'
 import { getServerEnv } from '~/server/env'
+
+export type { AdfNode }
 
 export type StatusCategoryKey = 'new' | 'indeterminate' | 'done' | 'undefined'
 
@@ -11,15 +15,6 @@ export type LinkedIssueRef = {
   typeName: string
   statusName: string
   statusCategory: StatusCategoryKey
-}
-
-type AdfMark = { type: string; attrs?: Record<string, string | number | boolean | null> }
-export type AdfNode = {
-  type?: string
-  text?: string
-  attrs?: Record<string, string | number | boolean | null>
-  marks?: AdfMark[]
-  content?: AdfNode[]
 }
 
 export type IssueLink = {
@@ -289,6 +284,40 @@ export const transitionIssue = createServerFn({ method: 'POST' })
     try {
       await jiraClient.transitionIssue(data.key, data.transitionId)
       return { ok: true }
+    } catch (err) {
+      if (err instanceof JiraAuthError) {
+        return { ok: false, reason: 'unauthorized', message: 'Invalid Jira credentials' }
+      }
+      if (err instanceof JiraHttpError) {
+        return { ok: false, reason: 'rejected', message: parseJiraErrorMessage(err.body) }
+      }
+      throw err
+    }
+  })
+
+export type CreateIssueResult =
+  | { ok: true; key: string }
+  | { ok: false; reason: 'unauthorized' | 'rejected'; message: string }
+
+export const createIssue = createServerFn({ method: 'POST' })
+  .inputValidator((data: unknown) => {
+    const parsed = quickCreateSchema.safeParse(data)
+    if (!parsed.success) {
+      throw new Error(`createIssue: invalid input — ${parsed.error.message}`)
+    }
+    return parsed.data
+  })
+  .handler(async ({ data }): Promise<CreateIssueResult> => {
+    const env = getServerEnv()
+    try {
+      const me = await jiraClient.getMyself()
+      const body = buildCreatePayload({
+        form: data,
+        currentUser: { accountId: me.accountId },
+        projectKey: env.JIRA_PROJECT_KEY,
+      })
+      const created = await jiraClient.createIssue(body)
+      return { ok: true, key: created.key }
     } catch (err) {
       if (err instanceof JiraAuthError) {
         return { ok: false, reason: 'unauthorized', message: 'Invalid Jira credentials' }

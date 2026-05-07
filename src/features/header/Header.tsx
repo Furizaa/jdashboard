@@ -4,6 +4,7 @@ import { RefreshCw } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { boardIssuesQueryKey, useBoardIssues } from '~/features/board'
 import { mrStatusesQueryKey } from '~/features/mr-status'
+import { QuickCreateButton } from '~/features/quick-create'
 import { GitlabIndicator } from './GitlabIndicator'
 import { Logo } from './Logo'
 import { SearchInput } from './SearchInput'
@@ -43,6 +44,7 @@ export function Header({
         <Logo />
         <span className="text-foreground text-sm font-semibold tracking-tight">clashboard</span>
       </span>
+      <QuickCreateButton />
       <SearchInput value={searchQuery} onChange={onSearchChange} />
       <div className="ml-auto flex items-center gap-1">
         <GitlabIndicator />

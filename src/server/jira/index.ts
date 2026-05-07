@@ -6,6 +6,8 @@ export type {
   JiraDetailedIssue,
   JiraTransition,
   JiraTransitionsResponse,
+  JiraCreateIssueBody,
+  JiraCreateIssueResponse,
 } from './client'
 export { buildBoardJql } from './jql'
 export type { BoardJqlConfig } from './jql'
@@ -15,6 +17,7 @@ export {
   getIssue,
   getTransitions,
   transitionIssue,
+  createIssue,
 } from './server-functions'
 export type {
   GetMyselfResult,
@@ -29,4 +32,5 @@ export type {
   AllowedTransition,
   GetTransitionsResult,
   TransitionIssueResult,
+  CreateIssueResult,
 } from './server-functions'

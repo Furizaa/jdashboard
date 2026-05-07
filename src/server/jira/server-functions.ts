@@ -1,5 +1,6 @@
 import { createServerFn } from '@tanstack/react-start'
 import { jiraClient, JiraAuthError, JiraHttpError, type AdfNode } from './client'
+import { buildEpicJql } from './epic-jql'
 import { buildBoardJql } from './jql'
 import { buildCreatePayload } from './quick-create-payload'
 import { quickCreateSchema } from './quick-create-schema'
@@ -362,6 +363,33 @@ export const searchIssues = createServerFn({ method: 'GET' }).handler(
         }
       })
       return { ok: true, baseUrl: env.JIRA_BASE_URL, issues }
+    } catch (err) {
+      if (err instanceof JiraAuthError) {
+        return { ok: false, reason: 'unauthorized' }
+      }
+      throw err
+    }
+  },
+)
+
+export type EpicRef = { key: string; summary: string }
+
+export type GetMyEpicsResult =
+  | { ok: true; epics: EpicRef[] }
+  | { ok: false; reason: 'unauthorized' }
+
+export const getMyEpics = createServerFn({ method: 'GET' }).handler(
+  async (): Promise<GetMyEpicsResult> => {
+    const env = getServerEnv()
+    try {
+      const response = await jiraClient.searchIssues(buildEpicJql(env.JIRA_PROJECT_KEY), [
+        'summary',
+      ])
+      const epics: EpicRef[] = response.issues.map((issue) => ({
+        key: issue.key,
+        summary: issue.fields.summary,
+      }))
+      return { ok: true, epics }
     } catch (err) {
       if (err instanceof JiraAuthError) {
         return { ok: false, reason: 'unauthorized' }

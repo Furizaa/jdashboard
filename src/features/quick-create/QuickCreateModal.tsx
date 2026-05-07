@@ -35,7 +35,11 @@ export function QuickCreateModal({
               <X size={14} />
             </Dialog.Close>
           </div>
-          <QuickCreateForm summaryRef={summaryRef} closeModal={() => setOpen(false)} />
+          <QuickCreateForm
+            summaryRef={summaryRef}
+            closeModal={() => setOpen(false)}
+            open={open}
+          />
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

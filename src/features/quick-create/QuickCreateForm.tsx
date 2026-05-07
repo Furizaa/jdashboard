@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState, type RefObject } from 'react'
+import { useRef, type RefObject } from 'react'
 import { useForm } from '@tanstack/react-form'
-import { ChevronDown } from 'lucide-react'
 import { quickCreateSchema, type QuickCreateInput } from '~/server/jira/quick-create-schema'
-import { HARDCODED_PARENTS } from './hardcoded-parents'
+import { ParentSelect } from './ParentSelect'
 import { SummaryInput } from './SummaryInput'
 import { TypeSegmented } from './TypeSegmented'
 import { useCreateIssueMutation } from './use-create-issue-mutation'
@@ -26,9 +25,11 @@ const INPUT_CLASS =
 export function QuickCreateForm({
   summaryRef,
   closeModal,
+  open,
 }: {
   summaryRef: RefObject<HTMLInputElement | null>
   closeModal: () => void
+  open: boolean
 }) {
   const mutateAsyncRef = useRef<((value: QuickCreateInput) => Promise<unknown>) | null>(null)
 
@@ -73,8 +74,9 @@ export function QuickCreateForm({
         children={(field) => (
           <div>
             <label className={REQUIRED_LABEL_CLASS}>Parent{REQUIRED_ASTERISK}</label>
-            <ParentDropdown
+            <ParentSelect
               value={field.state.value}
+              open={open}
               onChange={(key) => {
                 field.handleChange(key)
                 field.handleBlur()
@@ -144,80 +146,3 @@ export function QuickCreateForm({
   )
 }
 
-function ParentDropdown({
-  value,
-  onChange,
-}: {
-  value: string
-  onChange: (key: string) => void
-}) {
-  const [open, setOpen] = useState(false)
-  const wrapperRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-    const onPointerDown = (event: PointerEvent) => {
-      if (!wrapperRef.current) return
-      if (!wrapperRef.current.contains(event.target as Node)) setOpen(false)
-    }
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.stopPropagation()
-        setOpen(false)
-      }
-    }
-    document.addEventListener('pointerdown', onPointerDown)
-    document.addEventListener('keydown', onKeyDown, true)
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown)
-      document.removeEventListener('keydown', onKeyDown, true)
-    }
-  }, [open])
-
-  const selected = HARDCODED_PARENTS.find((p) => p.key === value) ?? null
-
-  return (
-    <div ref={wrapperRef} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        className={`${INPUT_CLASS} flex items-center justify-between text-left`}
-      >
-        <span className={selected ? 'text-foreground' : 'text-muted-foreground'}>
-          {selected ? `${selected.key} · ${selected.label}` : 'Select a parent…'}
-        </span>
-        <ChevronDown size={14} className="text-muted-foreground ml-2 shrink-0" />
-      </button>
-      {open && (
-        <ul
-          role="listbox"
-          className="border-border bg-popover absolute top-full left-0 z-30 mt-1 w-full overflow-hidden rounded-md border py-1 text-xs shadow-lg"
-        >
-          {HARDCODED_PARENTS.map((parent) => {
-            const isSelected = parent.key === value
-            return (
-              <li key={parent.key}>
-                <button
-                  type="button"
-                  role="option"
-                  aria-selected={isSelected}
-                  onClick={() => {
-                    onChange(parent.key)
-                    setOpen(false)
-                  }}
-                  className="hover:bg-muted/60 text-foreground flex w-full items-center gap-2 px-2.5 py-1.5 text-left"
-                >
-                  <span className="text-muted-foreground font-mono">{parent.key}</span>
-                  <span>·</span>
-                  <span className="flex-1 truncate">{parent.label}</span>
-                </button>
-              </li>
-            )
-          })}
-        </ul>
-      )}
-    </div>
-  )
-}

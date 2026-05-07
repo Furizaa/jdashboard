@@ -18,6 +18,7 @@ export {
   getTransitions,
   transitionIssue,
   createIssue,
+  getMyEpics,
 } from './server-functions'
 export type {
   GetMyselfResult,
@@ -33,4 +34,6 @@ export type {
   GetTransitionsResult,
   TransitionIssueResult,
   CreateIssueResult,
+  EpicRef,
+  GetMyEpicsResult,
 } from './server-functions'

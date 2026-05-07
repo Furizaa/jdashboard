@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { boardIssuesQueryKey, useBoardIssues } from '~/features/board'
 import { mrStatusesQueryKey } from '~/features/mr-status'
 import { GitlabIndicator } from './GitlabIndicator'
+import { Logo } from './Logo'
 import { SearchInput } from './SearchInput'
 
 const ISSUE_QUERY_PREFIX = ['jira', 'issue'] as const
@@ -38,7 +39,10 @@ export function Header({
 
   return (
     <header className="border-border flex h-12 shrink-0 items-center gap-3 border-b px-4">
-      <span className="text-foreground text-sm font-semibold tracking-tight">clashboard</span>
+      <span className="flex items-center gap-2">
+        <Logo />
+        <span className="text-foreground text-sm font-semibold tracking-tight">clashboard</span>
+      </span>
       <SearchInput value={searchQuery} onChange={onSearchChange} />
       <div className="ml-auto flex items-center gap-1">
         <GitlabIndicator />

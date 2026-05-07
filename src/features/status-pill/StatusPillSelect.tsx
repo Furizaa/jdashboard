@@ -71,7 +71,7 @@ export function StatusPillSelect({
         <div
           role="menu"
           className={cn(
-            'border-border bg-popover absolute top-full z-30 mt-1 min-w-[180px] overflow-hidden rounded-md border py-1 text-xs shadow-lg',
+            'border-border bg-popover absolute top-full z-30 mt-1 min-w-45 overflow-hidden rounded-md border py-1 text-xs shadow-lg',
             align === 'end' ? 'right-0' : 'left-0',
           )}
         >

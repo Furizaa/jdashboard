@@ -12,7 +12,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
       { title: 'clashboard' },
     ],
-    links: [{ rel: 'stylesheet', href: globalsCss }],
+    links: [
+      { rel: 'stylesheet', href: globalsCss },
+      { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' },
+    ],
   }),
   component: RootComponent,
 })

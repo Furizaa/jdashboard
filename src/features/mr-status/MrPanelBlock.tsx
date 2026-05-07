@@ -77,7 +77,7 @@ function ReviewBody({
       className={cn(
         'flex flex-col gap-1.5 rounded-md',
         allApprovedAndClean &&
-          'bg-green-500/10 border-l-2 border-green-500/40 -ml-2 pl-2 py-1.5 pr-1.5',
+          '-ml-2 border-l-2 border-green-500/40 bg-green-500/10 py-1.5 pr-1.5 pl-2',
       )}
     >
       <ul className="flex flex-col gap-1.5">
@@ -112,8 +112,8 @@ function ReviewBody({
 
 function WarningRow({ text }: { text: string }) {
   return (
-    <div className="flex items-start gap-2 bg-amber-500/10 border-l-2 border-amber-500/40 rounded-md px-2 py-1.5 text-[11px]">
-      <AlertTriangle className="h-3 w-3 shrink-0 text-amber-500 mt-[2px]" aria-hidden />
+    <div className="flex items-start gap-2 rounded-md border-l-2 border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-[11px]">
+      <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-amber-500" aria-hidden />
       <span className="text-foreground/90 leading-tight">{text}</span>
     </div>
   )

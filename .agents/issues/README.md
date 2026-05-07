@@ -1,6 +1,6 @@
 # clashboard issues
 
-Tracer-bullet vertical slices derived from [the clashboard PRD](../prds/clashboard.md), [the GitLab MR status PRD](../prds/gitlab-mr-status.md), and [the misc improvements PRD](../prds/misc-improvements.md). Each slice cuts through all layers (server function → query hook → UI → tests where applicable) and is demoable on its own.
+Tracer-bullet vertical slices derived from [the clashboard PRD](../prds/clashboard.md), [the GitLab MR status PRD](../prds/gitlab-mr-status.md), [the misc improvements PRD](../prds/misc-improvements.md), and [the Quick Create PRD](../prds/quick-create.md). Each slice cuts through all layers (server function → query hook → UI → tests where applicable) and is demoable on its own.
 
 ## Order & dependencies
 
@@ -22,6 +22,13 @@ Tracer-bullet vertical slices derived from [the clashboard PRD](../prds/clashboa
 22
 23 → 24
 25
+
+26 ─┬─→ 27
+    ├─→ 28
+    ├─→ 29
+    ├─→ 30
+    ├─→ 31
+    └─→ 32
 ```
 
 ## Index
@@ -65,3 +72,15 @@ Tracer-bullet vertical slices derived from [the clashboard PRD](../prds/clashboa
 | 23 | [MR CI/conflict indicator on Code Review row](./23-mr-ci-conflict-indicator.md) | AFK | — |
 | 24 | [MR block in detail panel + Open MR button](./24-mr-panel-block.md) | AFK | 23 |
 | 25 | [FIXASAP corner ribbon](./25-fixasap-ribbon.md) | AFK | — |
+
+### Quick Create (PRD: [quick-create.md](../prds/quick-create.md))
+
+| # | File | Type | Blocked by |
+|---|---|---|---|
+| 26 | [Quick Create MVP (end-to-end)](./26-quick-create-mvp.md) | AFK | — |
+| 27 | [Quick Create Type segmented control](./27-quick-create-type-segmented.md) | AFK | 26 |
+| 28 | [Quick Create pinned `[FE]:` Summary prefix](./28-quick-create-summary-prefix.md) | AFK | 26 |
+| 29 | [Quick Create dynamic in-progress epics in Parent dropdown](./29-quick-create-dynamic-epics.md) | AFK | 26 |
+| 30 | [Quick Create in-flight spinner, 10s timeout, locked modal](./30-quick-create-spinner-timeout.md) | AFK | 26 |
+| 31 | [Quick Create toast actions + parsed Jira error messages](./31-quick-create-toast-actions.md) | AFK | 26 |
+| 32 | [Quick Create `c` keyboard shortcut](./32-quick-create-shortcut.md) | AFK | 26 |

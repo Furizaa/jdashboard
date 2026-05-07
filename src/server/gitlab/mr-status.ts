@@ -1,8 +1,4 @@
-import type {
-  GitlabDiscussion,
-  GitlabMrDetail,
-  GitlabMrSummary,
-} from './client'
+import type { RawDiscussion, RawMrDetail, RawMrSummary } from './gateway'
 import { ciVisualState, type CiVisualState } from '~/features/mr-status/ci-state'
 import { countUnresolvedThreads } from '~/features/mr-status/count-unresolved'
 import {
@@ -36,17 +32,14 @@ export type MrSummary =
       ciState: CiVisualState
     } & CommonMrFields)
 
-function commonFields(mr: GitlabMrSummary): CommonMrFields {
-  return { iid: mr.iid, title: mr.title, webUrl: mr.web_url }
+function commonFields(mr: RawMrSummary): CommonMrFields {
+  return { iid: mr.iid, title: mr.title, webUrl: mr.webUrl }
 }
 
-function hasNotesFromUser(
-  discussions: readonly GitlabDiscussion[],
-  username: string,
-): boolean {
+function hasNotesFromUser(discussions: readonly RawDiscussion[], username: string): boolean {
   for (const discussion of discussions) {
     for (const note of discussion.notes) {
-      if (note.author.username === username) return true
+      if (note.authorUsername === username) return true
     }
   }
   return false
@@ -63,8 +56,8 @@ function deriveApprovalStatus(
 }
 
 export function summarizeMr(
-  detail: GitlabMrDetail,
-  discussions: readonly GitlabDiscussion[],
+  detail: RawMrDetail,
+  discussions: readonly RawDiscussion[],
   approvedUsernames: ReadonlySet<string>,
   currentUsername: string,
 ): MrSummary {
@@ -88,8 +81,8 @@ export function summarizeMr(
     const visualState = reviewerVisualState(approvalStatus, hasNotes, unresolvedCount)
     return {
       username: reviewer.username,
-      displayName: reviewer.name,
-      avatarUrl: reviewer.avatar_url ?? null,
+      displayName: reviewer.displayName,
+      avatarUrl: reviewer.avatarUrl,
       visualState,
     }
   })
@@ -98,8 +91,8 @@ export function summarizeMr(
     unresolvedCount === 0 && reviewers.every((r) => r.visualState === 'green-solid')
 
   const ciState = ciVisualState({
-    headPipelineStatus: detail.head_pipeline?.status ?? null,
-    hasConflicts: detail.has_conflicts,
+    headPipelineStatus: detail.headPipelineStatus,
+    hasConflicts: detail.hasConflicts,
   })
 
   return {

@@ -1,4 +1,4 @@
-import type { GitlabMrSummary } from './client'
+import type { RawMrSummary } from './gateway'
 
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -13,7 +13,7 @@ export function extractKeysFromTitle(title: string, projectKey: string): string[
   return [...new Set(matches)]
 }
 
-export function buildMrKeyMap<T extends GitlabMrSummary>(
+export function buildMrKeyMap<T extends RawMrSummary>(
   mrs: readonly T[],
   projectKey: string,
 ): Record<string, T> {
@@ -30,7 +30,7 @@ export function buildMrKeyMap<T extends GitlabMrSummary>(
         result[key] = mr
         continue
       }
-      if (Date.parse(mr.updated_at) > Date.parse(existing.updated_at)) {
+      if (Date.parse(mr.updatedAt) > Date.parse(existing.updatedAt)) {
         result[key] = mr
       }
     }

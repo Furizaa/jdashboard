@@ -1,33 +1,32 @@
 import { describe, expect, it } from 'vitest'
-import type { GitlabDiscussion, GitlabMrDetail, GitlabReviewer } from './client'
+import type { RawDiscussion, RawMrDetail, RawReviewer } from './gateway'
 import { summarizeMr } from './mr-status'
 
-function reviewer(username: string): GitlabReviewer {
+function reviewer(username: string): RawReviewer {
   return {
-    id: username.length,
     username,
-    name: username,
-    avatar_url: `https://avatars/${username}`,
+    displayName: username,
+    avatarUrl: `https://avatars/${username}`,
   }
 }
 
 const NO_APPROVALS: ReadonlySet<string> = new Set()
 
-function detail(overrides: Partial<GitlabMrDetail> = {}): GitlabMrDetail {
+function detail(overrides: Partial<RawMrDetail> = {}): RawMrDetail {
   return {
     iid: overrides.iid ?? 1,
     title: overrides.title ?? 'HDR-1: do thing',
-    web_url: overrides.web_url ?? 'https://gitlab/p/-/merge_requests/1',
+    webUrl: overrides.webUrl ?? 'https://gitlab/p/-/merge_requests/1',
     state: overrides.state ?? 'opened',
     draft: overrides.draft ?? false,
-    updated_at: overrides.updated_at ?? '2026-01-01T00:00:00Z',
+    updatedAt: overrides.updatedAt ?? '2026-01-01T00:00:00Z',
     reviewers: overrides.reviewers ?? [],
-    head_pipeline: overrides.head_pipeline ?? null,
-    has_conflicts: overrides.has_conflicts ?? false,
+    headPipelineStatus: overrides.headPipelineStatus ?? null,
+    hasConflicts: overrides.hasConflicts ?? false,
   }
 }
 
-const NO_DISCUSSIONS: GitlabDiscussion[] = []
+const NO_DISCUSSIONS: RawDiscussion[] = []
 
 describe('summarizeMr', () => {
   it('returns merged regardless of other fields', () => {
@@ -93,13 +92,12 @@ describe('summarizeMr', () => {
   })
 
   it('non-approved reviewer with notes upgrades to blue-dashed; approved with unresolved → green-dashed', () => {
-    const discussions: GitlabDiscussion[] = [
+    const discussions: RawDiscussion[] = [
       {
         id: 'd1',
         notes: [
           {
-            id: 1,
-            author: { id: 1, username: 'carol', name: 'Carol' },
+            authorUsername: 'carol',
             resolvable: true,
             resolved: false,
           },

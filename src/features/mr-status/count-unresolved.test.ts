@@ -1,27 +1,31 @@
 import { describe, expect, it } from 'vitest'
-import type { GitlabDiscussion, GitlabNote } from '~/server/gitlab'
 import { countUnresolvedThreads } from './count-unresolved'
+
+type DiscussionNote = {
+  authorUsername: string
+  resolvable: boolean
+  resolved: boolean
+}
+
+type Discussion = {
+  id: string
+  notes: DiscussionNote[]
+}
 
 let nextId = 1
 function note(overrides: {
-  id?: number
-  author?: Partial<GitlabNote['author']>
+  authorUsername?: string
   resolvable?: boolean
   resolved?: boolean
-}): GitlabNote {
+}): DiscussionNote {
   return {
-    id: overrides.id ?? nextId++,
-    author: {
-      id: overrides.author?.id ?? 1,
-      username: overrides.author?.username ?? 'someone-else',
-      name: overrides.author?.name ?? 'Someone Else',
-    },
+    authorUsername: overrides.authorUsername ?? 'someone-else',
     resolvable: overrides.resolvable ?? true,
     resolved: overrides.resolved ?? false,
   }
 }
 
-function discussion(notes: GitlabNote[]): GitlabDiscussion {
+function discussion(notes: DiscussionNote[]): Discussion {
   return { id: `d${nextId++}`, notes }
 }
 
@@ -33,41 +37,38 @@ describe('countUnresolvedThreads', () => {
   })
 
   it('counts a single unresolved resolvable thread from another user', () => {
-    const d = discussion([note({ author: { username: 'alice' } })])
+    const d = discussion([note({ authorUsername: 'alice' })])
     expect(countUnresolvedThreads([d], ME)).toBe(1)
   })
 
   it('excludes resolved threads', () => {
-    const d = discussion([note({ author: { username: 'alice' }, resolved: true })])
+    const d = discussion([note({ authorUsername: 'alice', resolved: true })])
     expect(countUnresolvedThreads([d], ME)).toBe(0)
   })
 
   it('excludes non-resolvable threads (general comments)', () => {
-    const d = discussion([note({ author: { username: 'alice' }, resolvable: false })])
+    const d = discussion([note({ authorUsername: 'alice', resolvable: false })])
     expect(countUnresolvedThreads([d], ME)).toBe(0)
   })
 
   it('excludes threads started by the current user, even with replies from others', () => {
-    const d = discussion([
-      note({ author: { username: ME } }),
-      note({ author: { username: 'alice' } }),
-    ])
+    const d = discussion([note({ authorUsername: ME }), note({ authorUsername: 'alice' })])
     expect(countUnresolvedThreads([d], ME)).toBe(0)
   })
 
   it('counts mixed threads correctly', () => {
-    const ds: GitlabDiscussion[] = [
-      discussion([note({ author: { username: 'alice' } })]),
-      discussion([note({ author: { username: 'bob' }, resolved: true })]),
-      discussion([note({ author: { username: 'carol' }, resolvable: false })]),
-      discussion([note({ author: { username: ME } })]),
-      discussion([note({ author: { username: 'dave' } })]),
+    const ds: Discussion[] = [
+      discussion([note({ authorUsername: 'alice' })]),
+      discussion([note({ authorUsername: 'bob', resolved: true })]),
+      discussion([note({ authorUsername: 'carol', resolvable: false })]),
+      discussion([note({ authorUsername: ME })]),
+      discussion([note({ authorUsername: 'dave' })]),
     ]
     expect(countUnresolvedThreads(ds, ME)).toBe(2)
   })
 
   it('skips empty-note discussions', () => {
-    const d: GitlabDiscussion = { id: 'empty', notes: [] }
+    const d: Discussion = { id: 'empty', notes: [] }
     expect(countUnresolvedThreads([d], ME)).toBe(0)
   })
 })

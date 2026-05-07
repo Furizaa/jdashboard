@@ -1,102 +1,32 @@
-import { useMemo } from 'react'
-import { useBoardData, useMrStatuses } from '~/dashboard'
-import { useChangeIndication, type LeavingIssue } from './use-change-indication'
-import { COLUMNS, columnForStatus, type Column } from './status-mapping'
-import { filterIssues } from './filter-issues'
-import { sortColumnIssues } from './sort-column'
-import type { BoardIssue } from '~/server/jira'
-import { TicketCard, type TicketCardAnimationState } from '~/features/ticket-card'
-import { usePolling } from '~/lib/use-polling'
-
-const POLL_INTERVAL_MS = 60_000
-
-type ColumnItem = {
-  issue: BoardIssue | LeavingIssue
-  state: TicketCardAnimationState
-}
+import { TicketCard } from '~/features/ticket-card'
+import { useBoardView, BOARD_POLL_INTERVAL_MS } from './use-board-view'
+import type { ColumnItem } from './assemble-columns'
+import { COLUMNS, type Column } from './status-mapping'
 
 export function Board({ searchQuery }: { searchQuery: string }) {
-  const query = useBoardData()
-  usePolling(() => {
-    query.refetch()
-  }, POLL_INTERVAL_MS)
-  useMrStatuses()
+  const view = useBoardView(searchQuery)
 
-  const liveIssues = query.data?.ok === true ? query.data.issues : undefined
-  const { enteringKeys, changedKeys, leaving } = useChangeIndication(liveIssues)
-
-  const itemsByColumn = useMemo<Record<Column, ColumnItem[]>>(() => {
-    const empty: Record<Column, ColumnItem[]> = {
-      'TO DO': [],
-      'In Implementation': [],
-      'In Code Review': [],
-      Done: [],
-    }
-    if (liveIssues === undefined) return empty
-    for (const issue of filterIssues(liveIssues, searchQuery)) {
-      const state: TicketCardAnimationState = enteringKeys.has(issue.key)
-        ? 'entering'
-        : changedKeys.has(issue.key)
-          ? 'changed'
-          : 'idle'
-      empty[columnForStatus(issue.statusName)].push({ issue, state })
-    }
-    for (const leavingIssue of filterIssues([...leaving.values()], searchQuery)) {
-      empty[leavingIssue.column].push({ issue: leavingIssue, state: 'leaving' })
-    }
-    for (const column of COLUMNS) {
-      const items = empty[column]
-      const stateByKey = new Map(items.map((item) => [item.issue.key, item.state]))
-      const sortedIssues = sortColumnIssues(
-        items.map((item) => item.issue),
-        column,
-      )
-      empty[column] = sortedIssues.map((issue) => ({
-        issue,
-        state: stateByKey.get(issue.key)!,
-      }))
-    }
-    return empty
-  }, [liveIssues, enteringKeys, changedKeys, leaving, searchQuery])
-
-  if (query.isPending) {
-    return <BoardSkeleton />
+  if (view.phase === 'loading') return <BoardSkeleton />
+  if (view.phase === 'error-hard') {
+    return <BoardMessage tone="destructive">{view.message}</BoardMessage>
   }
-
-  if (query.isError && query.data === undefined) {
-    return (
-      <BoardMessage tone="destructive">
-        Couldn't load board: {query.error instanceof Error ? query.error.message : 'unknown error'}
-      </BoardMessage>
-    )
-  }
-
-  if (query.data === undefined || query.data.ok === false) {
+  if (view.phase === 'unauthorized') {
     return <BoardMessage tone="destructive">Invalid Jira credentials.</BoardMessage>
   }
-
-  if (query.data.issues.length === 0) {
-    return <EmptyBoardMessage />
-  }
-
-  const { baseUrl } = query.data
-  const showErrorBanner = query.isError
+  if (view.phase === 'empty') return <EmptyBoardMessage />
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {showErrorBanner && (
-        <ErrorBanner
-          errorMessage={query.error instanceof Error ? query.error.message : undefined}
-          onRetry={() => query.refetch()}
-        />
+      {view.showErrorBanner && (
+        <ErrorBanner errorMessage={view.errorMessage} onRetry={view.retry} />
       )}
       <div className="grid min-h-0 flex-1 grid-cols-4 gap-4 p-4">
         {COLUMNS.map((column) => (
           <BoardColumn
             key={column}
             column={column}
-            items={itemsByColumn[column]}
-            baseUrl={baseUrl}
+            items={view.itemsByColumn[column]}
+            baseUrl={view.baseUrl}
           />
         ))}
       </div>
@@ -231,7 +161,7 @@ function ErrorBanner({
   errorMessage: string | undefined
   onRetry: () => void
 }) {
-  const retrySeconds = Math.round(POLL_INTERVAL_MS / 1000)
+  const retrySeconds = Math.round(BOARD_POLL_INTERVAL_MS / 1000)
   return (
     <div
       role="alert"

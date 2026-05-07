@@ -1,7 +1,7 @@
-import { type RefObject } from 'react'
+import { useEffect, type RefObject } from 'react'
 import { useForm } from '@tanstack/react-form'
 import { quickCreateSchema, type QuickCreateInput } from '~/server/jira/quick-create-schema'
-import type { useCreateAction } from '~/dashboard'
+import type { CreateIssueResultWithTimeout } from '~/dashboard/service'
 import { ParentSelect } from './ParentSelect'
 import { SummaryInput } from './SummaryInput'
 import { TypeSegmented } from './TypeSegmented'
@@ -22,30 +22,32 @@ const REQUIRED_ASTERISK = (
 const INPUT_CLASS =
   'border-border bg-background text-foreground placeholder:text-muted-foreground focus-visible:ring-ring w-full rounded border px-2 py-1.5 text-xs focus-visible:ring-1 focus-visible:outline-none'
 
-type CreateIssueMutation = ReturnType<typeof useCreateAction>
-
 export function QuickCreateForm({
   summaryRef,
-  closeModal,
   open,
-  mutation,
-  resetRef,
+  isPending,
+  onCancel,
+  onSubmit,
+  registerReset,
 }: {
   summaryRef: RefObject<HTMLInputElement | null>
-  closeModal: () => void
   open: boolean
-  mutation: CreateIssueMutation
-  resetRef: RefObject<(() => void) | null>
+  isPending: boolean
+  onCancel: () => void
+  onSubmit: (input: QuickCreateInput) => Promise<CreateIssueResultWithTimeout>
+  registerReset: (reset: () => void) => void
 }) {
   const form = useForm({
     defaultValues: DEFAULT_VALUES,
     validators: { onChange: quickCreateSchema },
     onSubmit: async ({ value }) => {
-      await mutation.mutateAsync(value)
+      await onSubmit(value)
     },
   })
 
-  resetRef.current = () => form.reset()
+  useEffect(() => {
+    registerReset(() => form.reset())
+  }, [registerReset, form])
 
   return (
     <form
@@ -60,9 +62,7 @@ export function QuickCreateForm({
         name="type"
         children={(field) => (
           <div>
-            <span className={REQUIRED_LABEL_CLASS}>
-              Type{REQUIRED_ASTERISK}
-            </span>
+            <span className={REQUIRED_LABEL_CLASS}>Type{REQUIRED_ASTERISK}</span>
             <TypeSegmented value={field.state.value} onChange={field.handleChange} />
           </div>
         )}
@@ -123,8 +123,8 @@ export function QuickCreateForm({
       <div className="mt-2 flex items-center justify-end gap-2">
         <button
           type="button"
-          onClick={closeModal}
-          disabled={mutation.isPending}
+          onClick={onCancel}
+          disabled={isPending}
           className="border-border text-foreground hover:bg-muted/60 focus-visible:ring-ring rounded border px-3 py-1.5 text-xs transition-colors focus-visible:ring-1 focus-visible:outline-none disabled:cursor-default disabled:opacity-50"
         >
           Cancel
@@ -134,7 +134,7 @@ export function QuickCreateForm({
           children={([canSubmit, isSubmitting]) => (
             <button
               type="submit"
-              disabled={!canSubmit || isSubmitting || mutation.isPending}
+              disabled={!canSubmit || isSubmitting || isPending}
               className="bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-ring rounded px-3 py-1.5 text-xs font-medium transition-colors focus-visible:ring-1 focus-visible:outline-none disabled:cursor-default disabled:opacity-50"
             >
               Create

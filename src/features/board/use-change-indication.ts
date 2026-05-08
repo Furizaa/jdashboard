@@ -1,24 +1,32 @@
 import { useEffect, useRef, useState } from 'react'
-import type { BoardIssue } from '~/server/jira'
-import { columnForStatus, type Column } from './status-mapping'
 
 export const PULSE_MS = 600
 export const FADE_MS = 300
 
-export type LeavingIssue = BoardIssue & { column: Column }
-
-function fingerprint(issue: BoardIssue): string {
-  const labels = issue.labels.toSorted().join('|')
-  return `${issue.statusName}::${issue.summary}::${labels}`
+export type ChangeIndicationOptions<T> = {
+  id: (item: T) => string
+  equals: (prev: T, next: T) => boolean
 }
 
-export function useChangeIndication(issues: readonly BoardIssue[] | undefined) {
-  const prevByKeyRef = useRef<Map<string, BoardIssue> | null>(null)
-  const leavingRef = useRef<Map<string, LeavingIssue>>(new Map())
+export type ChangeIndicationResult<T> = {
+  enteringKeys: ReadonlySet<string>
+  changedKeys: ReadonlySet<string>
+  leaving: ReadonlyMap<string, T>
+}
+
+export function useChangeIndication<T>(
+  items: readonly T[] | undefined,
+  options: ChangeIndicationOptions<T>,
+): ChangeIndicationResult<T> {
+  const optionsRef = useRef(options)
+  optionsRef.current = options
+
+  const prevByKeyRef = useRef<Map<string, T> | null>(null)
+  const leavingRef = useRef<Map<string, T>>(new Map())
   const timersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set())
   const [enteringKeys, setEnteringKeys] = useState<ReadonlySet<string>>(() => new Set())
   const [changedKeys, setChangedKeys] = useState<ReadonlySet<string>>(() => new Set())
-  const [leaving, setLeaving] = useState<ReadonlyMap<string, LeavingIssue>>(() => new Map())
+  const [leaving, setLeaving] = useState<ReadonlyMap<string, T>>(() => new Map())
 
   useEffect(() => {
     const timers = timersRef.current
@@ -29,8 +37,9 @@ export function useChangeIndication(issues: readonly BoardIssue[] | undefined) {
   }, [])
 
   useEffect(() => {
-    if (issues === undefined) return
-    const currentByKey = new Map(issues.map((issue) => [issue.key, issue]))
+    if (items === undefined) return
+    const { id, equals } = optionsRef.current
+    const currentByKey = new Map(items.map((item) => [id(item), item]))
 
     if (prevByKeyRef.current === null) {
       prevByKeyRef.current = currentByKey
@@ -40,26 +49,26 @@ export function useChangeIndication(issues: readonly BoardIssue[] | undefined) {
     const prev = prevByKeyRef.current
     const entering = new Set<string>()
     const changed = new Set<string>()
-    const leavingNow = new Map<string, LeavingIssue>()
+    const leavingNow = new Map<string, T>()
     const returning = new Set<string>()
     const currentLeaving = leavingRef.current
 
-    for (const [key, issue] of currentByKey) {
-      const prevIssue = prev.get(key)
-      if (prevIssue === undefined) {
+    for (const [key, item] of currentByKey) {
+      const prevItem = prev.get(key)
+      if (prevItem === undefined) {
         if (currentLeaving.has(key)) {
           returning.add(key)
         } else {
           entering.add(key)
         }
-      } else if (fingerprint(prevIssue) !== fingerprint(issue)) {
+      } else if (!equals(prevItem, item)) {
         changed.add(key)
       }
     }
 
-    for (const [key, prevIssue] of prev) {
+    for (const [key, prevItem] of prev) {
       if (!currentByKey.has(key)) {
-        leavingNow.set(key, { ...prevIssue, column: columnForStatus(prevIssue.statusName) })
+        leavingNow.set(key, prevItem)
       }
     }
 
@@ -118,7 +127,7 @@ export function useChangeIndication(issues: readonly BoardIssue[] | undefined) {
       }, FADE_MS)
       timersRef.current.add(t)
     }
-  }, [issues])
+  }, [items])
 
   return { enteringKeys, changedKeys, leaving }
 }

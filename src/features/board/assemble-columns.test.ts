@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { BoardIssue } from '~/server/jira'
-import type { ReviewCardReal } from '~/server/gitlab'
+import type { ReviewCard, ReviewCardReal } from '~/server/gitlab'
 import { assembleColumns, type ColumnItem } from './assemble-columns'
-import type { LeavingIssue } from './use-change-indication'
+import type { ChangeIndicationResult } from './use-change-indication'
 
 function issue(key: string, overrides: Partial<BoardIssue> = {}): BoardIssue {
   return {
@@ -16,16 +16,29 @@ function issue(key: string, overrides: Partial<BoardIssue> = {}): BoardIssue {
   }
 }
 
-function leavingIssue(
-  key: string,
-  column: LeavingIssue['column'],
-  overrides: Partial<BoardIssue> = {},
-): LeavingIssue {
-  return { ...issue(key, overrides), column }
+function jiraChange(
+  overrides: Partial<ChangeIndicationResult<BoardIssue>> = {},
+): ChangeIndicationResult<BoardIssue> {
+  return {
+    enteringKeys: new Set<string>(),
+    changedKeys: new Set<string>(),
+    leaving: new Map<string, BoardIssue>(),
+    ...overrides,
+  }
 }
 
-const NO_LEAVING: ReadonlyMap<string, LeavingIssue> = new Map()
-const NO_KEYS: ReadonlySet<string> = new Set()
+function reviewChange(
+  overrides: Partial<ChangeIndicationResult<ReviewCard>> = {},
+): ChangeIndicationResult<ReviewCard> {
+  return {
+    enteringKeys: new Set<string>(),
+    changedKeys: new Set<string>(),
+    leaving: new Map<string, ReviewCard>(),
+    ...overrides,
+  }
+}
+
+const NO_JIRA_CHANGE = jiraChange()
 
 function jiraKeyOf(item: ColumnItem): string {
   if (item.card.kind !== 'jira') throw new Error('expected jira card')
@@ -63,9 +76,7 @@ describe('assembleColumns', () => {
   it('returns four empty columns when there are no live or leaving issues', () => {
     const result = assembleColumns({
       liveIssues: [],
-      leaving: NO_LEAVING,
-      enteringKeys: NO_KEYS,
-      changedKeys: NO_KEYS,
+      jiraChange: NO_JIRA_CHANGE,
       searchQuery: '',
     })
     expect(result['TO DO']).toEqual([])
@@ -82,9 +93,7 @@ describe('assembleColumns', () => {
         issue('A-3', { statusName: 'In Code Review' }),
         issue('A-4', { statusName: 'Done' }),
       ],
-      leaving: NO_LEAVING,
-      enteringKeys: NO_KEYS,
-      changedKeys: NO_KEYS,
+      jiraChange: NO_JIRA_CHANGE,
       searchQuery: '',
     })
     expect(result['TO DO'].map(jiraKeyOf)).toEqual(['A-1'])
@@ -97,9 +106,7 @@ describe('assembleColumns', () => {
   it('marks an issue in enteringKeys as entering', () => {
     const result = assembleColumns({
       liveIssues: [issue('A-1')],
-      leaving: NO_LEAVING,
-      enteringKeys: new Set(['A-1']),
-      changedKeys: NO_KEYS,
+      jiraChange: jiraChange({ enteringKeys: new Set(['A-1']) }),
       searchQuery: '',
     })
     expect(result['TO DO'][0]?.state).toBe('entering')
@@ -108,9 +115,7 @@ describe('assembleColumns', () => {
   it('marks an issue in changedKeys as changed', () => {
     const result = assembleColumns({
       liveIssues: [issue('A-1')],
-      leaving: NO_LEAVING,
-      enteringKeys: NO_KEYS,
-      changedKeys: new Set(['A-1']),
+      jiraChange: jiraChange({ changedKeys: new Set(['A-1']) }),
       searchQuery: '',
     })
     expect(result['TO DO'][0]?.state).toBe('changed')
@@ -119,23 +124,21 @@ describe('assembleColumns', () => {
   it("when an issue is in both enteringKeys and changedKeys, 'entering' wins", () => {
     const result = assembleColumns({
       liveIssues: [issue('A-1')],
-      leaving: NO_LEAVING,
-      enteringKeys: new Set(['A-1']),
-      changedKeys: new Set(['A-1']),
+      jiraChange: jiraChange({
+        enteringKeys: new Set(['A-1']),
+        changedKeys: new Set(['A-1']),
+      }),
       searchQuery: '',
     })
     expect(result['TO DO'][0]?.state).toBe('entering')
   })
 
-  it('appends a leaving issue to its frozen column, not its current statusName column', () => {
-    const leaving = new Map<string, LeavingIssue>([
-      ['A-1', leavingIssue('A-1', 'Done', { statusName: 'Reviewed' })],
-    ])
+  it("places a leaving issue in the column derived from its snapshot's statusName", () => {
     const result = assembleColumns({
       liveIssues: [],
-      leaving,
-      enteringKeys: NO_KEYS,
-      changedKeys: NO_KEYS,
+      jiraChange: jiraChange({
+        leaving: new Map([['A-1', issue('A-1', { statusName: 'Done' })]]),
+      }),
       searchQuery: '',
     })
     expect(result['TO DO']).toEqual([])
@@ -149,24 +152,21 @@ describe('assembleColumns', () => {
         issue('A-1', { summary: 'Add login flow' }),
         issue('A-2', { summary: 'Refactor auth' }),
       ],
-      leaving: NO_LEAVING,
-      enteringKeys: NO_KEYS,
-      changedKeys: NO_KEYS,
+      jiraChange: NO_JIRA_CHANGE,
       searchQuery: 'login',
     })
     expect(result['TO DO'].map(jiraKeyOf)).toEqual(['A-1'])
   })
 
   it('searchQuery filters leaving issues', () => {
-    const leaving = new Map<string, LeavingIssue>([
-      ['A-1', leavingIssue('A-1', 'TO DO', { summary: 'Add login flow' })],
-      ['A-2', leavingIssue('A-2', 'TO DO', { summary: 'Refactor auth' })],
-    ])
     const result = assembleColumns({
       liveIssues: [],
-      leaving,
-      enteringKeys: NO_KEYS,
-      changedKeys: NO_KEYS,
+      jiraChange: jiraChange({
+        leaving: new Map([
+          ['A-1', issue('A-1', { summary: 'Add login flow' })],
+          ['A-2', issue('A-2', { summary: 'Refactor auth' })],
+        ]),
+      }),
       searchQuery: 'login',
     })
     expect(result['TO DO'].map(jiraKeyOf)).toEqual(['A-1'])
@@ -180,9 +180,7 @@ describe('assembleColumns', () => {
     ]
     const result = assembleColumns({
       liveIssues,
-      leaving: NO_LEAVING,
-      enteringKeys: NO_KEYS,
-      changedKeys: new Set(['A-2']),
+      jiraChange: jiraChange({ changedKeys: new Set(['A-2']) }),
       searchQuery: '',
     })
     expect(result.Done.map(jiraKeyOf)).toEqual(['A-2', 'A-3', 'A-1'])
@@ -192,9 +190,7 @@ describe('assembleColumns', () => {
   it('places HDR-cased status names into the same column as Title-cased equivalents', () => {
     const result = assembleColumns({
       liveIssues: [issue('A-1', { statusName: 'IN STG' }), issue('A-2', { statusName: 'In STG' })],
-      leaving: NO_LEAVING,
-      enteringKeys: NO_KEYS,
-      changedKeys: NO_KEYS,
+      jiraChange: NO_JIRA_CHANGE,
       searchQuery: '',
     })
     expect(result.Done.map(jiraKeyOf).toSorted()).toEqual(['A-1', 'A-2'])
@@ -203,9 +199,7 @@ describe('assembleColumns', () => {
   it('places needs-review and rejected review cards in TO DO and accepted in Done', () => {
     const result = assembleColumns({
       liveIssues: [],
-      leaving: NO_LEAVING,
-      enteringKeys: NO_KEYS,
-      changedKeys: NO_KEYS,
+      jiraChange: NO_JIRA_CHANGE,
       reviewCards: [
         reviewCard(101, 'needs-review', 'A-10'),
         reviewCard(102, 'rejected', 'A-11'),
@@ -220,9 +214,7 @@ describe('assembleColumns', () => {
   it('searchQuery also filters review cards by jira key/summary', () => {
     const result = assembleColumns({
       liveIssues: [],
-      leaving: NO_LEAVING,
-      enteringKeys: NO_KEYS,
-      changedKeys: NO_KEYS,
+      jiraChange: NO_JIRA_CHANGE,
       reviewCards: [
         reviewCard(201, 'needs-review', 'A-20', { summary: 'Add login flow' }),
         reviewCard(202, 'needs-review', 'A-21', { summary: 'Refactor auth' }),
@@ -234,13 +226,8 @@ describe('assembleColumns', () => {
 
   it('does not affect Jira card placement when review cards are present', () => {
     const result = assembleColumns({
-      liveIssues: [
-        issue('A-1', { statusName: 'Reviewed' }),
-        issue('A-2', { statusName: 'Done' }),
-      ],
-      leaving: NO_LEAVING,
-      enteringKeys: NO_KEYS,
-      changedKeys: NO_KEYS,
+      liveIssues: [issue('A-1', { statusName: 'Reviewed' }), issue('A-2', { statusName: 'Done' })],
+      jiraChange: NO_JIRA_CHANGE,
       reviewCards: [reviewCard(301, 'needs-review', 'A-30')],
       searchQuery: '',
     })
@@ -255,13 +242,8 @@ describe('assembleColumns', () => {
         issue('A-1', { statusName: 'Reviewed' }),
         issue('A-2', { statusName: 'Blocked' }),
       ],
-      leaving: NO_LEAVING,
-      enteringKeys: NO_KEYS,
-      changedKeys: NO_KEYS,
-      reviewCards: [
-        reviewCard(401, 'rejected', 'A-40'),
-        reviewCard(402, 'needs-review', 'A-41'),
-      ],
+      jiraChange: NO_JIRA_CHANGE,
+      reviewCards: [reviewCard(401, 'rejected', 'A-40'), reviewCard(402, 'needs-review', 'A-41')],
       searchQuery: '',
     })
     expect(result['TO DO'].map((item) => item.id)).toEqual([
@@ -274,16 +256,61 @@ describe('assembleColumns', () => {
 
   it('sorts Review Accepted review cards to the bottom of Done', () => {
     const result = assembleColumns({
-      liveIssues: [
-        issue('A-1', { statusName: 'Done' }),
-        issue('A-2', { statusName: 'In STG' }),
-      ],
-      leaving: NO_LEAVING,
-      enteringKeys: NO_KEYS,
-      changedKeys: NO_KEYS,
+      liveIssues: [issue('A-1', { statusName: 'Done' }), issue('A-2', { statusName: 'In STG' })],
+      jiraChange: NO_JIRA_CHANGE,
       reviewCards: [reviewCard(501, 'accepted', 'A-50')],
       searchQuery: '',
     })
     expect(result.Done.map((item) => item.id)).toEqual(['A-2', 'A-1', 'review:501'])
+  })
+
+  it('marks a review card in reviewChange.enteringKeys as entering', () => {
+    const result = assembleColumns({
+      liveIssues: [],
+      jiraChange: NO_JIRA_CHANGE,
+      reviewCards: [reviewCard(601, 'needs-review', 'A-60')],
+      reviewChange: reviewChange({ enteringKeys: new Set(['review:601']) }),
+      searchQuery: '',
+    })
+    expect(result['TO DO'][0]?.state).toBe('entering')
+  })
+
+  it('marks a review card in reviewChange.changedKeys as changed', () => {
+    const result = assembleColumns({
+      liveIssues: [],
+      jiraChange: NO_JIRA_CHANGE,
+      reviewCards: [reviewCard(602, 'rejected', 'A-61')],
+      reviewChange: reviewChange({ changedKeys: new Set(['review:602']) }),
+      searchQuery: '',
+    })
+    expect(result['TO DO'][0]?.state).toBe('changed')
+  })
+
+  it('places a leaving review card in the column derived from its snapshot bucket', () => {
+    const result = assembleColumns({
+      liveIssues: [],
+      jiraChange: NO_JIRA_CHANGE,
+      reviewCards: [],
+      reviewChange: reviewChange({
+        leaving: new Map([['review:701', reviewCard(701, 'accepted', 'A-70')]]),
+      }),
+      searchQuery: '',
+    })
+    expect(result.Done.map((item) => item.id)).toEqual(['review:701'])
+    expect(result.Done[0]?.state).toBe('leaving')
+  })
+
+  it('does not cross-contaminate animation state between Jira and review tracks', () => {
+    const result = assembleColumns({
+      liveIssues: [issue('A-1')],
+      jiraChange: jiraChange({ changedKeys: new Set(['review:801']) }),
+      reviewCards: [reviewCard(801, 'needs-review', 'A-80')],
+      reviewChange: reviewChange({ changedKeys: new Set(['A-1']) }),
+      searchQuery: '',
+    })
+    const jiraItem = result['TO DO'].find((item) => item.id === 'A-1')
+    const reviewItem = result['TO DO'].find((item) => item.id === 'review:801')
+    expect(jiraItem?.state).toBe('idle')
+    expect(reviewItem?.state).toBe('idle')
   })
 })

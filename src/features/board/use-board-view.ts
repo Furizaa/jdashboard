@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import type { UseQueryResult } from '@tanstack/react-query'
 import { useBoardData, useMrStatuses, useReviewCards } from '~/dashboard'
 import { usePolling } from '~/lib/use-polling'
-import type { SearchIssuesResult } from '~/server/jira'
+import type { BoardIssue, SearchIssuesResult } from '~/server/jira'
 import type { ReviewCard } from '~/server/gitlab'
 import { useChangeIndication } from './use-change-indication'
 import { assembleColumns, type ColumnItem } from './assemble-columns'
@@ -31,6 +31,21 @@ export type BoardViewState =
   | { phase: 'empty' }
   | (ReadyFields & { phase: 'ready' })
 
+function jiraFingerprint(issue: BoardIssue): string {
+  const labels = issue.labels.toSorted().join('|')
+  return `${issue.statusName}::${issue.summary}::${labels}`
+}
+
+const JIRA_CHANGE_OPTIONS = {
+  id: (issue: BoardIssue) => issue.key,
+  equals: (a: BoardIssue, b: BoardIssue) => jiraFingerprint(a) === jiraFingerprint(b),
+}
+
+const REVIEW_CHANGE_OPTIONS = {
+  id: (card: ReviewCard) => `review:${card.iid}`,
+  equals: (a: ReviewCard, b: ReviewCard) => a.bucket === b.bucket,
+}
+
 export function useBoardView(searchQuery: string): BoardViewState {
   const boardQuery = useBoardData()
   return useBoardViewWithDeps(searchQuery, {
@@ -38,8 +53,7 @@ export function useBoardView(searchQuery: string): BoardViewState {
     subscribeAuxiliary: () => {
       useMrStatuses()
       const review = useReviewCards()
-      const reviewCards =
-        review.data && review.data.ok === true ? review.data.cards : undefined
+      const reviewCards = review.data && review.data.ok === true ? review.data.cards : undefined
       return { reviewCards }
     },
   })
@@ -53,19 +67,19 @@ export function useBoardViewWithDeps(searchQuery: string, deps: BoardViewDeps): 
   }, BOARD_POLL_INTERVAL_MS)
 
   const liveIssues = boardQuery.data?.ok === true ? boardQuery.data.issues : undefined
-  const { enteringKeys, changedKeys, leaving } = useChangeIndication(liveIssues)
+  const jiraChange = useChangeIndication(liveIssues, JIRA_CHANGE_OPTIONS)
+  const reviewChange = useChangeIndication(reviewCards, REVIEW_CHANGE_OPTIONS)
 
   const itemsByColumn = useMemo(() => {
     if (liveIssues === undefined) return null
     return assembleColumns({
       liveIssues,
-      leaving,
-      enteringKeys,
-      changedKeys,
+      jiraChange,
       reviewCards,
+      reviewChange,
       searchQuery,
     })
-  }, [liveIssues, leaving, enteringKeys, changedKeys, reviewCards, searchQuery])
+  }, [liveIssues, jiraChange, reviewCards, reviewChange, searchQuery])
 
   if (boardQuery.isPending) return { phase: 'loading' }
   if (boardQuery.isError && boardQuery.data === undefined) {

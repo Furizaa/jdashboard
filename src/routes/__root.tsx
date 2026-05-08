@@ -35,11 +35,15 @@ function RootComponent() {
   )
 }
 
+const E2E_FLAG_SCRIPT =
+  "if(typeof location!=='undefined'&&/(?:^|[?&])e2e=1(?:&|$)/.test(location.search))document.documentElement.dataset.e2e='1'"
+
 function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="en" className="dark">
       <head>
         <HeadContent />
+        <script dangerouslySetInnerHTML={{ __html: E2E_FLAG_SCRIPT }} />
       </head>
       <body>
         {children}

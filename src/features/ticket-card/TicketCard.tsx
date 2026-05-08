@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { StatusPill, StatusPillSelect } from '~/features/status-pill'
 import { MrSection } from '~/features/mr-status'
 import { cn } from '~/lib/cn'
+import { testIds } from '~/lib/testids'
 import type { TicketCardViewModel } from './build-card-view'
 import { TypeIcon } from './TypeIcon'
 import { colorForLabel } from './hash-color'
@@ -54,6 +55,8 @@ export function TicketCard({
       onClick={handleBodyClick}
       onKeyDown={handleKeyDown}
       aria-label={`Open ${view.keyDisplay}`}
+      data-testid={testIds.ticketCard}
+      data-issue-key={view.keyDisplay}
       data-animation={animationState === 'idle' ? undefined : animationState}
       aria-hidden={isLeaving || undefined}
       className={cn(

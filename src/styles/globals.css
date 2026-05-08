@@ -175,3 +175,16 @@
     animation: none;
   }
 }
+
+/* E2E animation guard: zero out durations under ?e2e=1 so Playwright assertions
+   are stable. Toggled by a tiny inline script in the root document head that
+   sets data-e2e on <html> when the URL carries ?e2e=1. */
+:root[data-e2e='1'],
+:root[data-e2e='1'] *,
+:root[data-e2e='1'] *::before,
+:root[data-e2e='1'] *::after {
+  animation-duration: 0s !important;
+  animation-delay: 0s !important;
+  transition-duration: 0s !important;
+  transition-delay: 0s !important;
+}

@@ -1,4 +1,4 @@
-import { TicketCard } from '~/features/ticket-card'
+import { TicketCard, buildCardView } from '~/features/ticket-card'
 import { useBoardView, BOARD_POLL_INTERVAL_MS } from './use-board-view'
 import type { ColumnItem } from './assemble-columns'
 import { COLUMNS, type Column } from './status-mapping'
@@ -57,9 +57,11 @@ function BoardColumn({
           items.map(({ card, id, state }) => (
             <TicketCard
               key={id}
-              card={card}
-              baseUrl={baseUrl}
-              column={column}
+              view={
+                card.kind === 'jira'
+                  ? buildCardView({ kind: 'jira', issue: card.issue, column, baseUrl })
+                  : buildCardView({ kind: 'review', card: card.card, column, baseUrl })
+              }
               animationState={state}
             />
           ))

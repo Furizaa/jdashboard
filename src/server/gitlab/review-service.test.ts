@@ -363,7 +363,7 @@ describe('createGitlabReviewService — getReviewCards', () => {
     expect(result.baseUrl).toBe(FOUND_BASE_URL)
   })
 
-  it('emits a review-fake card with jira: null when the key is missing from bulkLoadIssues', async () => {
+  it('emits a review-fake card with jiraKeyAttempted set to the title key when the key is missing from bulkLoadIssues', async () => {
     const gateway = fakeGitlab({
       async getCurrentUser() {
         return ok(ME)
@@ -397,11 +397,11 @@ describe('createGitlabReviewService — getReviewCards', () => {
     const card = result.cards[0]!
     expect(card.kind).toBe('review-fake')
     if (card.kind !== 'review-fake') throw new Error('expected review-fake')
-    expect(card.jira).toBeNull()
+    expect(card.jiraKeyAttempted).toBe('HDR-8')
     expect(card.iid).toBe(8)
   })
 
-  it('emits a review-fake card when the title contains no Jira key', async () => {
+  it('emits a review-fake card with jiraKeyAttempted: null when the title contains no Jira key', async () => {
     const gateway = fakeGitlab({
       async getCurrentUser() {
         return ok(ME)
@@ -429,7 +429,96 @@ describe('createGitlabReviewService — getReviewCards', () => {
     )
     const result = await service.getReviewCards()
     if (!result.ok) throw new Error('expected ok')
-    expect(result.cards[0]?.kind).toBe('review-fake')
+    const card = result.cards[0]!
+    expect(card.kind).toBe('review-fake')
+    if (card.kind !== 'review-fake') throw new Error('expected review-fake')
+    expect(card.jiraKeyAttempted).toBeNull()
+  })
+
+  it('falls through to review-fake (preserving the first key) when the title has multiple keys and the first does not resolve', async () => {
+    const gateway = fakeGitlab({
+      async getCurrentUser() {
+        return ok(ME)
+      },
+      async listMrs() {
+        return ok([summary({ iid: 10, title: 'HDR-1 / HDR-2: combined' })])
+      },
+      async getMr(iid) {
+        return ok(detail({ iid, title: 'HDR-1 / HDR-2: combined' }))
+      },
+      async getMrDiscussions() {
+        return ok([])
+      },
+      async getMrApprovals() {
+        return ok(approvals([]))
+      },
+      async getMrReviewers() {
+        return ok([meReviewer('unreviewed')])
+      },
+    })
+    const service = createGitlabReviewService(
+      gateway,
+      fakeJiraService(
+        bulkOk({ ok: true, baseUrl: FOUND_BASE_URL, found: [], missing: ['HDR-1'] }),
+      ),
+      baseConfig,
+    )
+    const result = await service.getReviewCards()
+    if (!result.ok) throw new Error('expected ok')
+    const card = result.cards[0]!
+    expect(card.kind).toBe('review-fake')
+    if (card.kind !== 'review-fake') throw new Error('expected review-fake')
+    expect(card.jiraKeyAttempted).toBe('HDR-1')
+  })
+
+  it('produces a review-real card from the first key when the title has multiple keys and the first resolves', async () => {
+    const gateway = fakeGitlab({
+      async getCurrentUser() {
+        return ok(ME)
+      },
+      async listMrs() {
+        return ok([summary({ iid: 11, title: 'HDR-1 / HDR-2: combined' })])
+      },
+      async getMr(iid) {
+        return ok(detail({ iid, title: 'HDR-1 / HDR-2: combined' }))
+      },
+      async getMrDiscussions() {
+        return ok([])
+      },
+      async getMrApprovals() {
+        return ok(approvals([]))
+      },
+      async getMrReviewers() {
+        return ok([meReviewer('unreviewed')])
+      },
+    })
+    const service = createGitlabReviewService(
+      gateway,
+      fakeJiraService(
+        bulkOk({
+          ok: true,
+          baseUrl: FOUND_BASE_URL,
+          found: [
+            {
+              key: 'HDR-1',
+              summary: 'first',
+              statusName: 'In Code Review',
+              typeName: 'Task',
+              labels: [],
+              epic: null,
+            },
+          ],
+          missing: [],
+        }),
+      ),
+      baseConfig,
+    )
+    const result = await service.getReviewCards()
+    if (!result.ok) throw new Error('expected ok')
+    const card = result.cards[0]!
+    expect(card.kind).toBe('review-real')
+    if (card.kind !== 'review-real') throw new Error('expected review-real')
+    expect(card.jira.key).toBe('HDR-1')
   })
 
   it('wires per-reviewer state from the /reviewers payload into reviewer visual states', async () => {

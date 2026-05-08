@@ -1,13 +1,17 @@
 import type { BoardIssue } from '~/server/jira'
 import type { ReviewCard, ReviewCardReal } from '~/server/gitlab'
-import type { TicketCardAnimationState, TicketCardInput } from '~/features/ticket-card'
+import type { TicketCardAnimationState } from '~/features/ticket-card'
 import { COLUMNS, columnForStatus, type Column } from './status-mapping'
 import { filterIssues } from './filter-issues'
 import { sortColumnIssues } from './sort-column'
 import type { LeavingIssue } from './use-change-indication'
 
+export type CardSource =
+  | { kind: 'jira'; issue: BoardIssue }
+  | { kind: 'review'; card: ReviewCard }
+
 export type ColumnItem = {
-  card: TicketCardInput
+  card: CardSource
   /** Stable id for animation/key purposes (Jira key for jira; review:<iid> for review cards). */
   id: string
   state: TicketCardAnimationState
@@ -29,13 +33,20 @@ function statusNameForItem(item: ColumnItem): string {
   return REVIEW_BUCKET_STATUS_NAME[item.card.card.bucket]
 }
 
-function matchesSearch(card: TicketCardInput, query: string): boolean {
+function reviewSearchHaystack(card: ReviewCard): string {
+  if (card.kind === 'review-real') {
+    return `${card.jira.key} ${card.jira.summary}`.toLowerCase()
+  }
+  return `MR !${card.iid} ${card.title}`.toLowerCase()
+}
+
+function matchesSearch(card: CardSource, query: string): boolean {
   const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
   if (terms.length === 0) return true
   const haystack =
     card.kind === 'jira'
       ? `${card.issue.key} ${card.issue.summary}`.toLowerCase()
-      : `${card.card.jira.key} ${card.card.jira.summary}`.toLowerCase()
+      : reviewSearchHaystack(card.card)
   return terms.every((term) => haystack.includes(term))
 }
 
@@ -75,8 +86,7 @@ export function assembleColumns(input: {
   }
   if (reviewCards !== undefined) {
     for (const rc of reviewCards) {
-      if (rc.kind !== 'review-real') continue
-      const cardInput: TicketCardInput = { kind: 'review-real', card: rc }
+      const cardInput: CardSource = { kind: 'review', card: rc }
       if (!matchesSearch(cardInput, searchQuery)) continue
       result[reviewBucketColumn(rc.bucket)].push({
         card: cardInput,

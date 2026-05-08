@@ -161,4 +161,36 @@ describe('createHttpGitlabGateway — wire shape normalisation', () => {
     if (!result.ok) throw new Error('expected ok')
     expect(Array.from(result.value.approvedUsernames)).toEqual(['alice', 'bob'])
   })
+
+  it('normalises the nested user shape returned by /merge_requests/:iid/reviewers', async () => {
+    const { fetchFn } = makeFetchSpy(
+      jsonResponse([
+        {
+          user: { username: 'alice', name: 'Alice', avatar_url: 'https://avatars/a' },
+          state: 'unreviewed',
+        },
+        {
+          user: { username: 'bob', name: 'Bob' },
+          state: 'approved',
+        },
+      ]),
+    )
+    const gateway = createHttpGitlabGateway({
+      baseUrl: 'https://gitlab.example',
+      token: 't',
+      projectPath: 'g/p',
+      fetch: fetchFn,
+    })
+    const result = await gateway.getMrReviewers(1)
+    if (!result.ok) throw new Error('expected ok')
+    expect(result.value).toEqual([
+      {
+        username: 'alice',
+        displayName: 'Alice',
+        avatarUrl: 'https://avatars/a',
+        state: 'unreviewed',
+      },
+      { username: 'bob', displayName: 'Bob', avatarUrl: null, state: 'approved' },
+    ])
+  })
 })

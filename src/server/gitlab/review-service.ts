@@ -51,7 +51,7 @@ export type ReviewCardReal = ReviewCardCommon & {
 
 export type ReviewCardFake = ReviewCardCommon & {
   kind: 'review-fake'
-  jira: null
+  jiraKeyAttempted: string | null
 }
 
 export type ReviewCard = ReviewCardReal | ReviewCardFake
@@ -295,7 +295,7 @@ export function createGitlabReviewService(
             },
           })
         } else {
-          cards.push({ kind: 'review-fake', ...common, jira: null })
+          cards.push({ kind: 'review-fake', ...common, jiraKeyAttempted: p.firstKey })
         }
       }
 

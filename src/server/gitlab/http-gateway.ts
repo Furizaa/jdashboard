@@ -74,9 +74,11 @@ type WireApprovals = {
 }
 
 type WireReviewerWithState = {
-  username: string
-  name: string
-  avatar_url?: string | null
+  user: {
+    username: string
+    name: string
+    avatar_url?: string | null
+  }
   state: ReviewerEndpointState
 }
 
@@ -247,9 +249,9 @@ export function createHttpGitlabGateway(deps: Deps): GitlabGateway {
           `/api/v4/projects/${projectPath}/merge_requests/${iid}/reviewers`,
         )
         return wire.map((r) => ({
-          username: r.username,
-          displayName: r.name,
-          avatarUrl: r.avatar_url ?? null,
+          username: r.user.username,
+          displayName: r.user.name,
+          avatarUrl: r.user.avatar_url ?? null,
           state: r.state,
         }))
       })

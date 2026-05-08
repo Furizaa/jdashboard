@@ -2,7 +2,7 @@ import { ChevronDown, ChevronUp, ExternalLink, X } from 'lucide-react'
 import { StatusPillSelect } from '~/features/status-pill'
 import { FixasapRibbon, TypeIcon, colorForLabel, hasFixasapLabel } from '~/features/ticket-card'
 import { MrPanelBlock } from '~/features/mr-status'
-import { useMrFor } from '~/dashboard'
+import { useMrFor, useReviewCards } from '~/dashboard'
 import type { DetailIssue } from '~/server/jira'
 import { RenderAdf } from './adf'
 import { Activity } from './Activity'
@@ -90,10 +90,23 @@ function PanelHeader({ panel }: { panel: OpenPanel }) {
 }
 
 function OpenMrLink({ issueKey }: { issueKey: string }) {
-  const result = useMrFor(issueKey)
-  if (result.state !== 'ready') return null
-  if (result.summary === null) return null
-  return <ExternalLinkButton href={result.summary.webUrl}>Open MR</ExternalLinkButton>
+  const authorResult = useMrFor(issueKey)
+  const reviewQuery = useReviewCards()
+  const authorUrl =
+    authorResult.state === 'ready' && authorResult.summary !== null
+      ? authorResult.summary.webUrl
+      : null
+  const reviewUrl = (() => {
+    if (authorUrl !== null) return null
+    if (reviewQuery.data === undefined || reviewQuery.data.ok !== true) return null
+    for (const card of reviewQuery.data.cards) {
+      if (card.kind === 'review-real' && card.jira.key === issueKey) return card.webUrl
+    }
+    return null
+  })()
+  const href = authorUrl ?? reviewUrl
+  if (href === null) return null
+  return <ExternalLinkButton href={href}>Open MR</ExternalLinkButton>
 }
 
 function ExternalLinkButton({ href, children }: { href: string; children: React.ReactNode }) {

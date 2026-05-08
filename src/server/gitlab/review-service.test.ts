@@ -8,10 +8,7 @@ import type {
   RawMrReviewerWithState,
   RawMrSummary,
 } from './gateway'
-import {
-  createGitlabReviewService,
-  type GitlabReviewServiceConfig,
-} from './review-service'
+import { createGitlabReviewService, type GitlabReviewServiceConfig } from './review-service'
 import type { BulkLoadIssuesResult, JiraIssueService } from '~/server/jira/issue-service'
 
 const notImpl = (): never => {
@@ -386,9 +383,7 @@ describe('createGitlabReviewService — getReviewCards', () => {
     })
     const service = createGitlabReviewService(
       gateway,
-      fakeJiraService(
-        bulkOk({ ok: true, baseUrl: FOUND_BASE_URL, found: [], missing: ['HDR-8'] }),
-      ),
+      fakeJiraService(bulkOk({ ok: true, baseUrl: FOUND_BASE_URL, found: [], missing: ['HDR-8'] })),
       baseConfig,
     )
     const result = await service.getReviewCards()
@@ -422,11 +417,7 @@ describe('createGitlabReviewService — getReviewCards', () => {
         return ok([meReviewer('unreviewed')])
       },
     })
-    const service = createGitlabReviewService(
-      gateway,
-      fakeJiraService(bulkEmpty()),
-      baseConfig,
-    )
+    const service = createGitlabReviewService(gateway, fakeJiraService(bulkEmpty()), baseConfig)
     const result = await service.getReviewCards()
     if (!result.ok) throw new Error('expected ok')
     const card = result.cards[0]!
@@ -458,9 +449,7 @@ describe('createGitlabReviewService — getReviewCards', () => {
     })
     const service = createGitlabReviewService(
       gateway,
-      fakeJiraService(
-        bulkOk({ ok: true, baseUrl: FOUND_BASE_URL, found: [], missing: ['HDR-1'] }),
-      ),
+      fakeJiraService(bulkOk({ ok: true, baseUrl: FOUND_BASE_URL, found: [], missing: ['HDR-1'] })),
       baseConfig,
     )
     const result = await service.getReviewCards()

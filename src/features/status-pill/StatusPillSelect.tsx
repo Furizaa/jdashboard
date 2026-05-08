@@ -25,9 +25,7 @@ export function StatusPillSelect({
   if (!clickable) {
     return <StatusPill status={status} />
   }
-  return (
-    <ClickableStatusPill issueKey={issueKey} status={status} align={align} />
-  )
+  return <ClickableStatusPill issueKey={issueKey} status={status} align={align} />
 }
 
 function ClickableStatusPill({

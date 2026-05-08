@@ -1,6 +1,6 @@
 # clashboard issues
 
-Tracer-bullet vertical slices derived from [the clashboard PRD](../prds/clashboard.md), [the GitLab MR status PRD](../prds/gitlab-mr-status.md), [the misc improvements PRD](../prds/misc-improvements.md), [the Quick Create PRD](../prds/quick-create.md), and [the GitLab MR review cards PRD](../prds/gitlab-mr-review-cards.md). Each slice cuts through all layers (server function → query hook → UI → tests where applicable) and is demoable on its own.
+Tracer-bullet vertical slices derived from [the clashboard PRD](../prds/clashboard.md), [the GitLab MR status PRD](../prds/gitlab-mr-status.md), [the misc improvements PRD](../prds/misc-improvements.md), [the Quick Create PRD](../prds/quick-create.md), [the GitLab MR review cards PRD](../prds/gitlab-mr-review-cards.md), and [the e2e harness PRD](../prds/e2e-harness.md). Each slice cuts through all layers (server function → query hook → UI → tests where applicable) and is demoable on its own.
 
 ## Order & dependencies
 
@@ -33,6 +33,12 @@ Tracer-bullet vertical slices derived from [the clashboard PRD](../prds/clashboa
 38 ─┬─→ 39 ─→ 40
     ├─→ 41
     └─→ 42
+
+43 ─┬─→ 44
+    ├─→ 45
+    ├─→ 46 ─→ 50
+    ├─→ 47
+    └─→ 48 ─→ 49
 ```
 
 ## Index
@@ -98,3 +104,16 @@ Tracer-bullet vertical slices derived from [the clashboard PRD](../prds/clashboa
 | 40 | [Card view-model + fake cards for MRs without resolvable Jira keys](./40-fake-review-cards.md) | AFK | 38, 39 |
 | 41 | [Review-card change-indication animations](./41-review-card-change-indication.md) | AFK | 38 |
 | 42 | [Detail panel "Open MR" extension to review-mode tickets](./42-panel-open-mr-review.md) | AFK | 38 |
+
+### E2e harness (PRD: [e2e-harness.md](../prds/e2e-harness.md))
+
+| # | File | Type | Blocked by |
+|---|---|---|---|
+| 43 | [E2e tracer bullet — Playwright + MSW + smoke spec](./43-e2e-tracer-bullet.md) | AFK | — |
+| 44 | [E2e: board folder specs](./44-e2e-board-folder.md) | AFK | 43 |
+| 45 | [E2e: ticket-card folder specs](./45-e2e-ticket-card-folder.md) | AFK | 43 |
+| 46 | [E2e: status-pill folder specs (one-shot overrides + transitions)](./46-e2e-status-pill-folder.md) | AFK | 43 |
+| 47 | [E2e: ticket-detail folder specs](./47-e2e-ticket-detail-folder.md) | AFK | 43 |
+| 48 | [E2e: MR-status folder specs (GitLab World + factories)](./48-e2e-mr-status-folder.md) | AFK | 43 |
+| 49 | [E2e: review-cards folder specs](./49-e2e-review-cards-folder.md) | AFK | 48 |
+| 50 | [E2e: auth-status folder specs](./50-e2e-auth-status-folder.md) | AFK | 46 |

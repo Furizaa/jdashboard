@@ -1,5 +1,5 @@
 import type { BoardIssue } from '~/server/jira'
-import type { ReviewCard } from '~/server/gitlab'
+import type { ReviewCard, ReviewCardReal } from '~/server/gitlab'
 import type { TicketCardAnimationState, TicketCardInput } from '~/features/ticket-card'
 import { COLUMNS, columnForStatus, type Column } from './status-mapping'
 import { filterIssues } from './filter-issues'
@@ -16,6 +16,17 @@ export type ColumnItem = {
 function reviewBucketColumn(bucket: ReviewCard['bucket']): Column {
   if (bucket === 'accepted') return 'Done'
   return 'TO DO'
+}
+
+const REVIEW_BUCKET_STATUS_NAME: Record<ReviewCardReal['bucket'], string> = {
+  'needs-review': 'Needs Review',
+  rejected: 'Review Rejected',
+  accepted: 'Review Accepted',
+}
+
+function statusNameForItem(item: ColumnItem): string {
+  if (item.card.kind === 'jira') return item.card.issue.statusName
+  return REVIEW_BUCKET_STATUS_NAME[item.card.card.bucket]
 }
 
 function matchesSearch(card: TicketCardInput, query: string): boolean {
@@ -76,18 +87,10 @@ export function assembleColumns(input: {
   }
   for (const column of COLUMNS) {
     const items = result[column]
-    const stateById = new Map(items.map((item) => [item.id, item.state]))
-    const jiraOnly: BoardIssue[] = items
-      .filter((item) => item.card.kind === 'jira')
-      .map((item) => (item.card as { kind: 'jira'; issue: BoardIssue }).issue)
-    const sortedJira = sortColumnIssues(jiraOnly, column)
-    const reviewOnly = items.filter((item) => item.card.kind === 'review-real')
-    const sortedJiraItems: ColumnItem[] = sortedJira.map((issue) => ({
-      card: { kind: 'jira', issue },
-      id: issue.key,
-      state: stateById.get(issue.key)!,
-    }))
-    result[column] = [...sortedJiraItems, ...reviewOnly]
+    const sortables = items.map((item) => ({ id: item.id, statusName: statusNameForItem(item) }))
+    const sorted = sortColumnIssues(sortables, column)
+    const itemById = new Map(items.map((item) => [item.id, item]))
+    result[column] = sorted.map((s) => itemById.get(s.id)!)
   }
   return result
 }

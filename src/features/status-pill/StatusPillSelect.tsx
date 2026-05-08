@@ -5,6 +5,7 @@ import { useTransitionAction, useTransitions } from '~/dashboard'
 import { StatusPill } from './StatusPill'
 import { StatusIcon } from './StatusIcon'
 import { styleForStatus } from './status-color'
+import { displayNameForStatus } from './status-display-name'
 
 function stopBubble(event: MouseEvent) {
   event.stopPropagation()
@@ -153,7 +154,9 @@ function DropdownContents({
               className="hover:bg-muted/60 flex w-full items-center gap-2 px-2.5 py-1.5 text-left disabled:cursor-default disabled:opacity-50 disabled:hover:bg-transparent"
             >
               <StatusIcon shape={style.shape} color={style.color} />
-              <span className="text-foreground flex-1 truncate">{t.toStatusName}</span>
+              <span className="text-foreground flex-1 truncate">
+                {displayNameForStatus(t.toStatusName)}
+              </span>
               {isCurrent && <Check size={12} className="text-muted-foreground" />}
             </button>
           </li>

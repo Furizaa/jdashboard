@@ -246,6 +246,44 @@ describe('assembleColumns', () => {
     })
     expect(result['TO DO'].filter((i) => i.card.kind === 'jira').map(jiraKeyOf)).toEqual(['A-1'])
     expect(result.Done.filter((i) => i.card.kind === 'jira').map(jiraKeyOf)).toEqual(['A-2'])
-    expect(result['TO DO'].map((item) => item.id)).toEqual(['A-1', 'review:301'])
+    expect(result['TO DO'].map((item) => item.id)).toEqual(['review:301', 'A-1'])
+  })
+
+  it('sorts review cards and Jira cards together by review-state tiers in TO DO', () => {
+    const result = assembleColumns({
+      liveIssues: [
+        issue('A-1', { statusName: 'Reviewed' }),
+        issue('A-2', { statusName: 'Blocked' }),
+      ],
+      leaving: NO_LEAVING,
+      enteringKeys: NO_KEYS,
+      changedKeys: NO_KEYS,
+      reviewCards: [
+        reviewCard(401, 'rejected', 'A-40'),
+        reviewCard(402, 'needs-review', 'A-41'),
+      ],
+      searchQuery: '',
+    })
+    expect(result['TO DO'].map((item) => item.id)).toEqual([
+      'review:402',
+      'A-1',
+      'review:401',
+      'A-2',
+    ])
+  })
+
+  it('sorts Review Accepted review cards to the bottom of Done', () => {
+    const result = assembleColumns({
+      liveIssues: [
+        issue('A-1', { statusName: 'Done' }),
+        issue('A-2', { statusName: 'In STG' }),
+      ],
+      leaving: NO_LEAVING,
+      enteringKeys: NO_KEYS,
+      changedKeys: NO_KEYS,
+      reviewCards: [reviewCard(501, 'accepted', 'A-50')],
+      searchQuery: '',
+    })
+    expect(result.Done.map((item) => item.id)).toEqual(['A-2', 'A-1', 'review:501'])
   })
 })

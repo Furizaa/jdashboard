@@ -3,8 +3,19 @@ import type { Column } from './status-mapping'
 
 type Sortable = Pick<BoardIssue, 'statusName'>
 
-const TODO_TIER_ORDER: readonly string[] = ['reviewed']
-const DONE_STATUS_ORDER: readonly string[] = ['in stg', 'in qa', 'in uat', 'done']
+const TODO_TIER_ORDER: readonly string[] = [
+  'needs review',
+  'reviewed',
+  'review rejected',
+  'blocked',
+]
+const DONE_STATUS_ORDER: readonly string[] = [
+  'in stg',
+  'in qa',
+  'in uat',
+  'done',
+  'review accepted',
+]
 
 function tierIndex(status: string, order: readonly string[]): number {
   const idx = order.indexOf(status.toLowerCase())

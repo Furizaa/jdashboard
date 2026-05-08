@@ -3,6 +3,11 @@ import { defineConfig, devices } from '@playwright/test'
 const PORT = 4004
 const MOCK_PORT = 9999
 
+const JIRA_LABEL_FILTER = 'Frontend'
+// Surface the configured filter to the runner process so specs can read it
+// via `process.env.JIRA_LABEL_FILTER` instead of hardcoding the literal.
+process.env.JIRA_LABEL_FILTER = JIRA_LABEL_FILTER
+
 const baseEnv: Record<string, string> = {
   // Point Atlassian and GitLab traffic at the MSW sidecar so the built server
   // dials 127.0.0.1:9999 instead of any real upstream.
@@ -13,7 +18,11 @@ const baseEnv: Record<string, string> = {
   JIRA_EMAIL: 'e2e@test.local',
   JIRA_API_TOKEN: 'e2e-jira-token',
   JIRA_PROJECT_KEY: 'HDR',
-  JIRA_LABEL_FILTER: 'Frontend',
+  JIRA_LABEL_FILTER,
+  // Hide the filter label from cards — every issue has it (it's the JQL
+  // filter), so showing it on every card is redundant. Mirrors a real-world
+  // setup where JIRA_HIDE_LABELS includes JIRA_LABEL_FILTER's value.
+  JIRA_HIDE_LABELS: JIRA_LABEL_FILTER,
   JIRA_DONE_WINDOW_DAYS: '14',
   GITLAB_TOKEN: 'e2e-gitlab-token',
   GITLAB_PROJECT_PATH: 'e2e/test-project',

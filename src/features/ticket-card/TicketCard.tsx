@@ -105,7 +105,12 @@ export function TicketCard({
         <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1" onClick={stopPropagation}>
           {view.epic !== null && <EpicChip epic={view.epic} />}
           {visible.map((label) => (
-            <span key={label} className="inline-flex items-center gap-1.5">
+            <span
+              key={label}
+              data-testid={testIds.labelDot}
+              title={label}
+              className="inline-flex items-center gap-1.5"
+            >
               <span
                 aria-hidden
                 className="h-1.5 w-1.5 shrink-0 rounded-full"
@@ -115,7 +120,10 @@ export function TicketCard({
             </span>
           ))}
           {overflow > 0 && (
-            <span className="border-border/60 text-muted-foreground rounded-full border px-1.5 py-0.5 text-[10px] leading-none">
+            <span
+              data-testid={testIds.labelOverflowChip}
+              className="border-border/60 text-muted-foreground rounded-full border px-1.5 py-0.5 text-[10px] leading-none"
+            >
               +{overflow}
             </span>
           )}

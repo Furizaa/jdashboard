@@ -1,21 +1,38 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
-import { getResponse, type HttpHandler } from 'msw'
+import { getResponse, http, HttpResponse, type HttpHandler } from 'msw'
 import { World, seedBaselineWorld } from '../world/World'
 import { buildHandlers } from './handlers'
+
+export type RequestLogEntry = {
+  method: string
+  /** URL pathname (no host, no query string). */
+  path: string
+}
+
+export type FailNextResponse = {
+  status: number
+  body?: unknown
+}
 
 export type MockServer = {
   start: (port: number) => Promise<void>
   stop: () => Promise<void>
   setWorld: (world: World) => void
   getWorld: () => World
-  /** Register one-shot handler overrides. Call `reset()` to clear them. */
+  /** Register handler overrides for the current test. Call `reset()` to clear them. */
   use: (...overrides: HttpHandler[]) => void
+  /** Register a one-shot override that fires for the next matching request and is then dropped. */
+  failNext: (method: 'GET' | 'POST' | 'PUT' | 'DELETE', pattern: string, response: FailNextResponse) => void
+  /** Snapshot of all requests served since the last `reset()`. */
+  requests: () => readonly RequestLogEntry[]
   reset: () => void
 }
 
 export function createMockServer(): MockServer {
   let currentWorld: World | null = null
   let overrides: HttpHandler[] = []
+  let oneShots: HttpHandler[] = []
+  let requestLog: RequestLogEntry[] = []
   const baseHandlers = buildHandlers(() => {
     if (currentWorld === null) {
       throw new Error('MockServer: no World has been set. Call setWorld() before serving.')
@@ -42,8 +59,26 @@ export function createMockServer(): MockServer {
       }
       const request = new Request(url, init)
 
-      const handlers = [...overrides, ...baseHandlers]
-      const matched = await getResponse(handlers, request)
+      try {
+        const parsed = new URL(url)
+        requestLog.push({ method: init.method ?? 'GET', path: parsed.pathname })
+      } catch {
+        requestLog.push({ method: init.method ?? 'GET', path: incoming.url ?? '/' })
+      }
+
+      // One-shots are matched first; the first that matches is consumed.
+      const oneShotMatches = await Promise.all(
+        oneShots.map((h) => getResponse([h], request)),
+      )
+      const oneShotIdx = oneShotMatches.findIndex((m): m is Response => m != null)
+      let matched: Response | undefined
+      if (oneShotIdx !== -1) {
+        matched = oneShotMatches[oneShotIdx]
+        oneShots.splice(oneShotIdx, 1)
+      } else {
+        const handlers = [...overrides, ...baseHandlers]
+        matched = await getResponse(handlers, request)
+      }
 
       if (!matched) {
         response.statusCode = 501
@@ -102,8 +137,23 @@ export function createMockServer(): MockServer {
     use(...handlers) {
       overrides = [...handlers, ...overrides]
     },
+    failNext(method, pattern, fail) {
+      const resolver = () =>
+        new HttpResponse(fail.body === undefined ? null : JSON.stringify(fail.body), {
+          status: fail.status,
+          headers: fail.body === undefined ? undefined : { 'content-type': 'application/json' },
+        })
+      const m = method.toLowerCase() as Lowercase<typeof method>
+      const handler = http[m](pattern, resolver)
+      oneShots.push(handler)
+    },
+    requests() {
+      return requestLog
+    },
     reset() {
       overrides = []
+      oneShots = []
+      requestLog = []
     },
   }
 }

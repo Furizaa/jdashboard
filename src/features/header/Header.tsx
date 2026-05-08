@@ -3,6 +3,7 @@ import { formatDistanceToNow } from 'date-fns'
 import { RefreshCw } from 'lucide-react'
 import { useBoardData, useRefreshAll } from '~/dashboard'
 import { QuickCreateButton } from '~/features/quick-create'
+import { testIds } from '~/lib/testids'
 import { GitlabIndicator } from './GitlabIndicator'
 import { Logo } from './Logo'
 import { SearchInput } from './SearchInput'
@@ -44,6 +45,7 @@ export function Header({
             type="button"
             onClick={refresh}
             title={errorMessage}
+            data-testid={testIds.syncIndicator}
             className="text-destructive hover:text-destructive/80 focus-visible:ring-ring rounded px-2 py-1 text-xs transition-colors focus-visible:ring-1 focus-visible:outline-none"
           >
             Sync failed · Retry
@@ -52,6 +54,7 @@ export function Header({
           <button
             type="button"
             onClick={refresh}
+            data-testid={testIds.syncIndicator}
             className="text-muted-foreground hover:text-foreground focus-visible:ring-ring rounded px-2 py-1 text-xs transition-colors focus-visible:ring-1 focus-visible:outline-none"
           >
             {syncedLabel(query.dataUpdatedAt, query.isFetching)}
@@ -61,6 +64,7 @@ export function Header({
           type="button"
           onClick={refresh}
           aria-label="Refresh"
+          data-testid={testIds.refreshButton}
           className="text-muted-foreground hover:text-foreground hover:bg-muted focus-visible:ring-ring inline-flex h-7 w-7 items-center justify-center rounded transition-colors focus-visible:ring-1 focus-visible:outline-none"
         >
           <RefreshCw size={14} className={query.isFetching ? 'animate-spin' : undefined} />

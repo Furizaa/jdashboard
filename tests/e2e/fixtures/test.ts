@@ -1,11 +1,24 @@
 import { test as base, type Page } from '@playwright/test'
-import { mockServer, type MockServer } from '../mocks/server'
+import {
+  mockServer,
+  type MockServer,
+  type RequestLogEntry,
+  type FailNextResponse,
+} from '../mocks/server'
 import { World, seedBaselineWorld } from '../world/World'
 import type { HttpHandler } from 'msw'
 
 export type MocksHandle = {
-  /** Register one-shot handler overrides for the current test. Cleared automatically between tests. */
+  /** Register handler overrides for the current test. Cleared automatically between tests. */
   use: (...handlers: HttpHandler[]) => void
+  /** Register a one-shot override; fires once for the next matching request and is then dropped. */
+  failNext: (
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+    pattern: string,
+    response: FailNextResponse,
+  ) => void
+  /** Snapshot of all requests the sidecar has served since this test started. */
+  requests: () => readonly RequestLogEntry[]
 }
 
 type TestFixtures = {
@@ -50,6 +63,9 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
   mocks: async ({ mockServerHandle, world: _world }, use) => {
     await use({
       use: (...handlers) => mockServerHandle.use(...handlers),
+      failNext: (method, pattern, response) =>
+        mockServerHandle.failNext(method, pattern, response),
+      requests: () => mockServerHandle.requests(),
     })
   },
 })

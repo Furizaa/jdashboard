@@ -26,6 +26,11 @@ export class World {
     }
   }
 
+  removeIssue(key: string): void {
+    const idx = this.issues.findIndex((i) => i.key === key)
+    if (idx !== -1) this.issues.splice(idx, 1)
+  }
+
   setMyself(user: WorldUser): void {
     this.myself = user
   }

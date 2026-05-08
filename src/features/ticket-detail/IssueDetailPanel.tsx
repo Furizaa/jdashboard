@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import { ChevronDown, ChevronUp, ExternalLink, X } from 'lucide-react'
 import { StatusPillSelect } from '~/features/status-pill'
 import { FixasapRibbon, TypeIcon, colorForLabel, hasFixasapLabel } from '~/features/ticket-card'
@@ -51,6 +52,7 @@ function Panel({ panel }: { panel: OpenPanel }) {
 
 function PanelHeader({ panel }: { panel: OpenPanel }) {
   const jiraUrl = panel.phase === 'ready' ? panel.jiraUrl : null
+  const copyJiraLink = panel.phase === 'ready' ? panel.copyJiraLink : null
   const prevKey = panel.phase === 'ready' ? panel.prevKey : null
   const nextKey = panel.phase === 'ready' ? panel.nextKey : null
   return (
@@ -62,7 +64,7 @@ function PanelHeader({ panel }: { panel: OpenPanel }) {
             <span className="px-1.5">·</span>
           </>
         )}
-        <span className="text-foreground">{panel.issueKey}</span>
+        <CopyableIssueKey issueKey={panel.issueKey} onCopy={copyJiraLink} />
       </nav>
       <div className="ml-auto flex items-center gap-1">
         <IconButton
@@ -86,6 +88,48 @@ function PanelHeader({ panel }: { panel: OpenPanel }) {
         </IconButton>
       </div>
     </header>
+  )
+}
+
+const COPIED_INDICATOR_MS = 1500
+
+function CopyableIssueKey({
+  issueKey,
+  onCopy,
+}: {
+  issueKey: string
+  onCopy: (() => void) | null
+}) {
+  const [copied, setCopied] = useState(false)
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(
+    () => () => {
+      if (timeoutRef.current !== null) clearTimeout(timeoutRef.current)
+    },
+    [],
+  )
+
+  if (onCopy === null) {
+    return <span className="text-foreground">{issueKey}</span>
+  }
+
+  const handleClick = () => {
+    onCopy()
+    setCopied(true)
+    if (timeoutRef.current !== null) clearTimeout(timeoutRef.current)
+    timeoutRef.current = setTimeout(() => setCopied(false), COPIED_INDICATOR_MS)
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      aria-label={`Copy Jira URL for ${issueKey}`}
+      className="text-foreground decoration-muted-foreground/60 focus-visible:ring-ring rounded underline decoration-dotted underline-offset-[3px] transition-colors hover:decoration-solid focus-visible:ring-1 focus-visible:outline-none"
+    >
+      {copied ? 'Copied' : issueKey}
+    </button>
   )
 }
 

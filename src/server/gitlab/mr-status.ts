@@ -39,6 +39,7 @@ function commonFields(mr: RawMrSummary): CommonMrFields {
 function hasNotesFromUser(discussions: readonly RawDiscussion[], username: string): boolean {
   for (const discussion of discussions) {
     for (const note of discussion.notes) {
+      if (note.system) continue
       if (note.authorUsername === username) return true
     }
   }
@@ -48,9 +49,11 @@ function hasNotesFromUser(discussions: readonly RawDiscussion[], username: strin
 function deriveApprovalStatus(
   username: string,
   approvedUsernames: ReadonlySet<string>,
+  requestedChangesUsernames: ReadonlySet<string>,
   hasNotes: boolean,
 ): ReviewerApprovalStatus {
   if (approvedUsernames.has(username)) return 'approved'
+  if (requestedChangesUsernames.has(username)) return 'requested_changes'
   if (hasNotes) return 'reviewed'
   return 'unreviewed'
 }
@@ -59,7 +62,7 @@ export function summarizeMr(
   detail: RawMrDetail,
   discussions: readonly RawDiscussion[],
   approvedUsernames: ReadonlySet<string>,
-  currentUsername: string,
+  requestedChangesUsernames: ReadonlySet<string>,
 ): MrSummary {
   const common = commonFields(detail)
 
@@ -73,11 +76,16 @@ export function summarizeMr(
     return { kind: 'no-reviewers', ...common }
   }
 
-  const unresolvedCount = countUnresolvedThreads(discussions, currentUsername)
+  const unresolvedCount = countUnresolvedThreads(discussions)
 
   const reviewers: MrReviewerState[] = detail.reviewers.map((reviewer) => {
     const hasNotes = hasNotesFromUser(discussions, reviewer.username)
-    const approvalStatus = deriveApprovalStatus(reviewer.username, approvedUsernames, hasNotes)
+    const approvalStatus = deriveApprovalStatus(
+      reviewer.username,
+      approvedUsernames,
+      requestedChangesUsernames,
+      hasNotes,
+    )
     const visualState = reviewerVisualState(approvalStatus, hasNotes, unresolvedCount)
     return {
       username: reviewer.username,

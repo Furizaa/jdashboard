@@ -64,6 +64,10 @@
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
   }
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']) {
+    cursor: pointer;
+  }
 
   * {
     scrollbar-width: thin;

@@ -34,6 +34,7 @@ export type RawNote = {
   authorUsername: string
   resolvable: boolean
   resolved: boolean
+  system: boolean
 }
 
 export type RawDiscussion = {

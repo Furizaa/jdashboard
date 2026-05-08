@@ -62,6 +62,7 @@ type WireNote = {
   author: { username: string }
   resolvable: boolean
   resolved: boolean
+  system: boolean
 }
 
 type WireDiscussion = {
@@ -113,6 +114,7 @@ function toRawDiscussion(wire: WireDiscussion): RawDiscussion {
       authorUsername: n.author.username,
       resolvable: n.resolvable,
       resolved: n.resolved,
+      system: n.system,
     })),
   }
 }

@@ -16,6 +16,8 @@ import { DASHBOARD_QUERY_KEYS, DASHBOARD_STALE_TIMES } from './tanstack-cache'
 import type { CreateIssueResultWithTimeout } from './service'
 
 const MR_POLL_INTERVAL_MS = 60_000
+const GITLAB_QUERY_RETRY = 2
+const GITLAB_QUERY_RETRY_DELAY_MS = (attempt: number) => Math.min(1000 * 2 ** attempt, 5000)
 
 export function useBoardData(): UseQueryResult<SearchIssuesResult> {
   return useQuery({
@@ -57,7 +59,9 @@ export function useMrStatuses(): UseQueryResult<GetMrStatusesResult> {
     queryKey: DASHBOARD_QUERY_KEYS.mrStatuses,
     queryFn: () => getMrStatuses(),
     enabled: jiraReady,
-    retry: false,
+    retry: GITLAB_QUERY_RETRY,
+    retryDelay: GITLAB_QUERY_RETRY_DELAY_MS,
+    refetchOnWindowFocus: true,
     staleTime: DASHBOARD_STALE_TIMES.mrStatuses,
   })
   useEffect(() => {
@@ -79,7 +83,9 @@ export function useReviewCards(): UseQueryResult<GetReviewCardsResult> {
     queryKey: DASHBOARD_QUERY_KEYS.reviewCards,
     queryFn: () => getReviewCards(),
     enabled: jiraReady,
-    retry: false,
+    retry: GITLAB_QUERY_RETRY,
+    retryDelay: GITLAB_QUERY_RETRY_DELAY_MS,
+    refetchOnWindowFocus: true,
     staleTime: DASHBOARD_STALE_TIMES.reviewCards,
   })
   useEffect(() => {
@@ -108,7 +114,9 @@ export function useMrFor(jiraKey: string): MrStatusResult {
     queryKey: DASHBOARD_QUERY_KEYS.mrStatuses,
     queryFn: () => getMrStatuses(),
     enabled: jiraReady,
-    retry: false,
+    retry: GITLAB_QUERY_RETRY,
+    retryDelay: GITLAB_QUERY_RETRY_DELAY_MS,
+    refetchOnWindowFocus: true,
     staleTime: DASHBOARD_STALE_TIMES.mrStatuses,
     select: (data): SelectedSlice => {
       if (data.ok !== true) return { available: false }

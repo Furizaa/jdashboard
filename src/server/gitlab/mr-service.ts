@@ -4,6 +4,7 @@ import type {
   RawApprovals,
   RawDiscussion,
   RawMrDetail,
+  RawMrReviewerWithState,
   RawMrSummary,
 } from './gateway'
 import { buildMrKeyMap } from './mr-key-map'
@@ -42,6 +43,7 @@ type FanOut = {
   detail: GitlabResult<RawMrDetail>
   discussions: GitlabResult<RawDiscussion[]>
   approvals: GitlabResult<RawApprovals>
+  reviewers: GitlabResult<RawMrReviewerWithState[]>
 }
 
 function isUnauthorized(result: GitlabResult<unknown>): boolean {
@@ -106,12 +108,13 @@ export function createGitlabMrService(
       const matched = buildMrKeyMap(listResult.value, config.jiraProjectKey)
       const fanOuts: FanOut[] = await Promise.all(
         Object.entries(matched).map(async ([key, mr]: [string, RawMrSummary]) => {
-          const [detail, discussions, approvals] = await Promise.all([
+          const [detail, discussions, approvals, reviewers] = await Promise.all([
             gateway.getMr(mr.iid),
             gateway.getMrDiscussions(mr.iid),
             gateway.getMrApprovals(mr.iid),
+            gateway.getMrReviewers(mr.iid),
           ])
-          return { key, iid: mr.iid, detail, discussions, approvals }
+          return { key, iid: mr.iid, detail, discussions, approvals, reviewers }
         }),
       )
 
@@ -119,7 +122,8 @@ export function createGitlabMrService(
         if (
           isUnauthorized(fo.detail) ||
           isUnauthorized(fo.discussions) ||
-          isUnauthorized(fo.approvals)
+          isUnauthorized(fo.approvals) ||
+          isUnauthorized(fo.reviewers)
         ) {
           return { ok: false, reason: 'unauthorized' }
         }
@@ -127,33 +131,20 @@ export function createGitlabMrService(
 
       const byKey: Record<string, MrSummary> = {}
       for (const fo of fanOuts) {
-        if (!fo.detail.ok) {
-          throw unexpectedReason(
-            `getMrStatuses (getMr ${fo.iid})`,
-            fo.detail.reason,
-            fo.detail.reason === 'rejected' ? fo.detail.message : undefined,
-          )
-        }
-        if (!fo.discussions.ok) {
-          throw unexpectedReason(
-            `getMrStatuses (getMrDiscussions ${fo.iid})`,
-            fo.discussions.reason,
-            fo.discussions.reason === 'rejected' ? fo.discussions.message : undefined,
-          )
-        }
-        if (!fo.approvals.ok) {
-          throw unexpectedReason(
-            `getMrStatuses (getMrApprovals ${fo.iid})`,
-            fo.approvals.reason,
-            fo.approvals.reason === 'rejected' ? fo.approvals.message : undefined,
-          )
+        if (!fo.detail.ok || !fo.discussions.ok || !fo.approvals.ok || !fo.reviewers.ok) {
+          continue
         }
         const approvedUsernames = new Set(fo.approvals.value.approvedUsernames)
+        const requestedChangesUsernames = new Set(
+          fo.reviewers.value
+            .filter((r) => r.state === 'requested_changes')
+            .map((r) => r.username),
+        )
         byKey[fo.key] = summarizeMr(
           fo.detail.value,
           fo.discussions.value,
           approvedUsernames,
-          currentUsername,
+          requestedChangesUsernames,
         )
       }
       return { ok: true, byKey }

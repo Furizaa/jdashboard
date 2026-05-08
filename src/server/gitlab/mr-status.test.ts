@@ -11,6 +11,7 @@ function reviewer(username: string): RawReviewer {
 }
 
 const NO_APPROVALS: ReadonlySet<string> = new Set()
+const NO_REQUESTED_CHANGES: ReadonlySet<string> = new Set()
 
 function detail(overrides: Partial<RawMrDetail> = {}): RawMrDetail {
   return {
@@ -34,7 +35,7 @@ describe('summarizeMr', () => {
       detail({ state: 'merged', draft: true, reviewers: [reviewer('alice')] }),
       NO_DISCUSSIONS,
       new Set(['alice']),
-      'me',
+      NO_REQUESTED_CHANGES,
     )
     expect(result.kind).toBe('merged')
   })
@@ -44,7 +45,7 @@ describe('summarizeMr', () => {
       detail({ state: 'opened', draft: true, reviewers: [reviewer('alice')] }),
       NO_DISCUSSIONS,
       new Set(['alice']),
-      'me',
+      NO_REQUESTED_CHANGES,
     )
     expect(result.kind).toBe('draft')
   })
@@ -54,7 +55,7 @@ describe('summarizeMr', () => {
       detail({ state: 'opened', draft: false, reviewers: [] }),
       NO_DISCUSSIONS,
       NO_APPROVALS,
-      'me',
+      NO_REQUESTED_CHANGES,
     )
     expect(result.kind).toBe('no-reviewers')
   })
@@ -67,7 +68,7 @@ describe('summarizeMr', () => {
       }),
       NO_DISCUSSIONS,
       new Set(['alice']),
-      'me',
+      NO_REQUESTED_CHANGES,
     )
     if (result.kind !== 'review') throw new Error('expected review')
     expect(result.reviewers.map((r) => [r.username, r.visualState])).toEqual([
@@ -84,7 +85,7 @@ describe('summarizeMr', () => {
       detail({ state: 'opened', reviewers: [reviewer('alice'), reviewer('bob')] }),
       NO_DISCUSSIONS,
       new Set(['alice', 'bob']),
-      'me',
+      NO_REQUESTED_CHANGES,
     )
     if (result.kind !== 'review') throw new Error('expected review')
     expect(result.allApprovedAndClean).toBe(true)
@@ -100,6 +101,7 @@ describe('summarizeMr', () => {
             authorUsername: 'carol',
             resolvable: true,
             resolved: false,
+            system: false,
           },
         ],
       },
@@ -108,7 +110,7 @@ describe('summarizeMr', () => {
       detail({ state: 'opened', reviewers: [reviewer('carol'), reviewer('alice')] }),
       discussions,
       new Set(['alice']),
-      'me',
+      NO_REQUESTED_CHANGES,
     )
     if (result.kind !== 'review') throw new Error('expected review')
     expect(result.unresolvedCount).toBe(1)
@@ -125,10 +127,25 @@ describe('summarizeMr', () => {
       detail({ state: 'opened', reviewers: [reviewer('alice')] }),
       NO_DISCUSSIONS,
       NO_APPROVALS,
-      'me',
+      NO_REQUESTED_CHANGES,
     )
     if (result.kind !== 'review') throw new Error('expected review')
     expect(result.reviewers[0]?.visualState).toBe('gray-dashed')
     expect(result.ciState).toBe('none')
+  })
+
+  it('marks reviewer red-solid when in requestedChangesUsernames', () => {
+    const result = summarizeMr(
+      detail({ state: 'opened', reviewers: [reviewer('alice'), reviewer('bob')] }),
+      NO_DISCUSSIONS,
+      NO_APPROVALS,
+      new Set(['bob']),
+    )
+    if (result.kind !== 'review') throw new Error('expected review')
+    expect(result.reviewers.map((r) => [r.username, r.visualState])).toEqual([
+      ['alice', 'gray-dashed'],
+      ['bob', 'red-solid'],
+    ])
+    expect(result.allApprovedAndClean).toBe(false)
   })
 })

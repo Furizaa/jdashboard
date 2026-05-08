@@ -89,6 +89,7 @@ function endpointStateToApprovalStatus(state: ReviewerEndpointState): ReviewerAp
 function hasNotesFromUser(discussions: readonly RawDiscussion[], username: string): boolean {
   for (const d of discussions) {
     for (const n of d.notes) {
+      if (n.system) continue
       if (n.authorUsername === username) return true
     }
   }
@@ -193,33 +194,8 @@ export function createGitlabReviewService(
 
       const pre: Pre[] = []
       for (const fo of fanOuts) {
-        if (!fo.detail.ok) {
-          throw unexpectedReason(
-            `getReviewCards (getMr ${fo.mr.iid})`,
-            fo.detail.reason,
-            fo.detail.reason === 'rejected' ? fo.detail.message : undefined,
-          )
-        }
-        if (!fo.discussions.ok) {
-          throw unexpectedReason(
-            `getReviewCards (getMrDiscussions ${fo.mr.iid})`,
-            fo.discussions.reason,
-            fo.discussions.reason === 'rejected' ? fo.discussions.message : undefined,
-          )
-        }
-        if (!fo.approvals.ok) {
-          throw unexpectedReason(
-            `getReviewCards (getMrApprovals ${fo.mr.iid})`,
-            fo.approvals.reason,
-            fo.approvals.reason === 'rejected' ? fo.approvals.message : undefined,
-          )
-        }
-        if (!fo.reviewers.ok) {
-          throw unexpectedReason(
-            `getReviewCards (getMrReviewers ${fo.mr.iid})`,
-            fo.reviewers.reason,
-            fo.reviewers.reason === 'rejected' ? fo.reviewers.message : undefined,
-          )
+        if (!fo.detail.ok || !fo.discussions.ok || !fo.approvals.ok || !fo.reviewers.ok) {
+          continue
         }
 
         const myEntry = fo.reviewers.value.find((r) => r.username === currentUsername)
@@ -232,7 +208,7 @@ export function createGitlabReviewService(
         if (bucket === 'drop') continue
         if (!isOpenedOrMerged(detailState)) continue
 
-        const unresolvedCount = countUnresolvedThreads(fo.discussions.value, currentUsername)
+        const unresolvedCount = countUnresolvedThreads(fo.discussions.value)
         const reviewersVisual = buildReviewers(
           fo.reviewers.value,
           fo.discussions.value,

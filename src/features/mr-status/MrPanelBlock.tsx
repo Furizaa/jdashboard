@@ -21,6 +21,9 @@ export function MrPanelBlock({ issueKey }: { issueKey: string }) {
   const issue = board.data?.ok ? board.data.issues.find((i) => i.key === issueKey) : null
   const column = issue ? columnForStatus(issue.statusName) : null
   const isDoneDesync = column === 'Done' && summary.kind !== 'merged'
+  const isMergedAndAdvanced = summary.kind === 'merged' && column === 'Done'
+
+  if (isMergedAndAdvanced) return null
 
   return (
     <BlockShell ciState={summary.kind === 'review' ? summary.ciState : null}>

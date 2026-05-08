@@ -7,6 +7,7 @@ import type {
   RawApprovals,
   RawDiscussion,
   RawMrDetail,
+  RawMrReviewerWithState,
   RawMrSummary,
   RawReviewer,
 } from './gateway'
@@ -23,6 +24,7 @@ function fakeGateway(overrides: Partial<GitlabGateway>): GitlabGateway {
     getMr: notImpl,
     getMrDiscussions: notImpl,
     getMrApprovals: notImpl,
+    getMrReviewers: notImpl,
     ...overrides,
   } as GitlabGateway
 }
@@ -73,6 +75,13 @@ function detail(overrides: Partial<RawMrDetail> & { iid: number; title: string }
 
 function approvals(usernames: readonly string[]): RawApprovals {
   return { approvedUsernames: usernames }
+}
+
+function reviewersWithState(
+  reviewers: readonly RawReviewer[],
+  states: Record<string, RawMrReviewerWithState['state']> = {},
+): RawMrReviewerWithState[] {
+  return reviewers.map((r) => ({ ...r, state: states[r.username] ?? 'unreviewed' }))
 }
 
 describe('createGitlabMrService — getCurrentUser', () => {
@@ -163,6 +172,9 @@ describe('createGitlabMrService — getMrStatuses', () => {
       async getMrApprovals() {
         return ok(approvals([]))
       },
+      async getMrReviewers() {
+        return ok([])
+      },
     })
     const service = createGitlabMrService(gateway, baseConfig)
     const result = await service.getMrStatuses()
@@ -172,12 +184,13 @@ describe('createGitlabMrService — getMrStatuses', () => {
     expect(detailCalls).toEqual([2])
   })
 
-  it('does not call getMr / getMrDiscussions / getMrApprovals for losers in the dedup', async () => {
+  it('does not call getMr / getMrDiscussions / getMrApprovals / getMrReviewers for losers in the dedup', async () => {
     const older = mr({ iid: 1, title: 'HDR-5: first', updatedAt: '2026-05-01T00:00:00Z' })
     const newer = mr({ iid: 2, title: 'HDR-5: second', updatedAt: '2026-05-02T00:00:00Z' })
     const detailCalls: number[] = []
     const discussionCalls: number[] = []
     const approvalCalls: number[] = []
+    const reviewerCalls: number[] = []
     const gateway = fakeGateway({
       async getCurrentUser() {
         return ok(ME)
@@ -197,12 +210,17 @@ describe('createGitlabMrService — getMrStatuses', () => {
         approvalCalls.push(iid)
         return ok(approvals([]))
       },
+      async getMrReviewers(iid) {
+        reviewerCalls.push(iid)
+        return ok([])
+      },
     })
     const service = createGitlabMrService(gateway, baseConfig)
     await service.getMrStatuses()
     expect(detailCalls).toEqual([2])
     expect(discussionCalls).toEqual([2])
     expect(approvalCalls).toEqual([2])
+    expect(reviewerCalls).toEqual([2])
   })
 
   it('shapes a merged MR end-to-end', async () => {
@@ -221,6 +239,9 @@ describe('createGitlabMrService — getMrStatuses', () => {
       },
       async getMrApprovals() {
         return ok(approvals([]))
+      },
+      async getMrReviewers() {
+        return ok([])
       },
     })
     const service = createGitlabMrService(gateway, baseConfig)
@@ -246,6 +267,9 @@ describe('createGitlabMrService — getMrStatuses', () => {
       async getMrApprovals() {
         return ok(approvals([]))
       },
+      async getMrReviewers() {
+        return ok(reviewersWithState([reviewer('alice')]))
+      },
     })
     const service = createGitlabMrService(gateway, baseConfig)
     const result = await service.getMrStatuses()
@@ -270,6 +294,9 @@ describe('createGitlabMrService — getMrStatuses', () => {
       async getMrApprovals() {
         return ok(approvals([]))
       },
+      async getMrReviewers() {
+        return ok([])
+      },
     })
     const service = createGitlabMrService(gateway, baseConfig)
     const result = await service.getMrStatuses()
@@ -281,7 +308,7 @@ describe('createGitlabMrService — getMrStatuses', () => {
     const discussions: RawDiscussion[] = [
       {
         id: 'd1',
-        notes: [{ authorUsername: 'bob', resolvable: true, resolved: false }],
+        notes: [{ authorUsername: 'bob', resolvable: true, resolved: false, system: false }],
       },
     ]
     const gateway = fakeGateway({
@@ -306,6 +333,9 @@ describe('createGitlabMrService — getMrStatuses', () => {
       async getMrApprovals() {
         return ok(approvals(['alice']))
       },
+      async getMrReviewers() {
+        return ok(reviewersWithState([reviewer('alice'), reviewer('bob')]))
+      },
     })
     const service = createGitlabMrService(gateway, baseConfig)
     const result = await service.getMrStatuses()
@@ -316,6 +346,42 @@ describe('createGitlabMrService — getMrStatuses', () => {
     expect(summary.reviewers.map((r) => [r.username, r.visualState])).toEqual([
       ['alice', 'green-dashed'],
       ['bob', 'blue-dashed'],
+    ])
+  })
+
+  it('marks reviewer red-solid when getMrReviewers reports requested_changes', async () => {
+    const gateway = fakeGateway({
+      async getCurrentUser() {
+        return ok(ME)
+      },
+      async listMrs() {
+        return ok([mr({ iid: 1, title: 'HDR-1: review' })])
+      },
+      async getMr() {
+        return ok(
+          detail({ iid: 1, title: 'HDR-1', reviewers: [reviewer('alice'), reviewer('bob')] }),
+        )
+      },
+      async getMrDiscussions() {
+        return ok([])
+      },
+      async getMrApprovals() {
+        return ok(approvals([]))
+      },
+      async getMrReviewers() {
+        return ok(
+          reviewersWithState([reviewer('alice'), reviewer('bob')], { bob: 'requested_changes' }),
+        )
+      },
+    })
+    const service = createGitlabMrService(gateway, baseConfig)
+    const result = await service.getMrStatuses()
+    if (!result.ok) throw new Error('expected ok')
+    const summary = result.byKey['HDR-1']
+    if (summary?.kind !== 'review') throw new Error('expected review')
+    expect(summary.reviewers.map((r) => [r.username, r.visualState])).toEqual([
+      ['alice', 'gray-dashed'],
+      ['bob', 'red-solid'],
     ])
   })
 
@@ -350,16 +416,17 @@ describe('createGitlabMrService — getMrStatuses', () => {
     expect(result).toEqual({ ok: false, reason: 'unauthorized' })
   })
 
-  it('throws when a per-MR fan-out call returns not-found', async () => {
+  it('skips MRs whose per-MR fan-out call returns not-found, keeping the rest', async () => {
     const gateway = fakeGateway({
       async getCurrentUser() {
         return ok(ME)
       },
       async listMrs() {
-        return ok([mr({ iid: 1, title: 'HDR-1' })])
+        return ok([mr({ iid: 1, title: 'HDR-1' }), mr({ iid: 2, title: 'HDR-2' })])
       },
-      async getMr() {
-        return { ok: false, reason: 'not-found' }
+      async getMr(iid) {
+        if (iid === 1) return { ok: false, reason: 'not-found' }
+        return ok(detail({ iid, title: `HDR-${iid}`, state: 'merged' }))
       },
       async getMrDiscussions() {
         return ok([])
@@ -367,31 +434,43 @@ describe('createGitlabMrService — getMrStatuses', () => {
       async getMrApprovals() {
         return ok(approvals([]))
       },
+      async getMrReviewers() {
+        return ok([])
+      },
     })
     const service = createGitlabMrService(gateway, baseConfig)
-    await expect(service.getMrStatuses()).rejects.toThrow(/unexpected not-found/)
+    const result = await service.getMrStatuses()
+    if (!result.ok) throw new Error('expected ok')
+    expect(Object.keys(result.byKey)).toEqual(['HDR-2'])
+    expect(result.byKey['HDR-2']?.kind).toBe('merged')
   })
 
-  it('throws when a per-MR fan-out call returns rejected', async () => {
+  it('skips MRs whose per-MR fan-out call returns rejected, keeping the rest', async () => {
     const gateway = fakeGateway({
       async getCurrentUser() {
         return ok(ME)
       },
       async listMrs() {
-        return ok([mr({ iid: 1, title: 'HDR-1' })])
+        return ok([mr({ iid: 1, title: 'HDR-1' }), mr({ iid: 2, title: 'HDR-2' })])
       },
-      async getMr() {
-        return ok(detail({ iid: 1, title: 'HDR-1' }))
+      async getMr(iid) {
+        return ok(detail({ iid, title: `HDR-${iid}`, state: 'merged' }))
       },
-      async getMrDiscussions() {
-        return { ok: false, reason: 'rejected', message: 'boom' }
+      async getMrDiscussions(iid) {
+        if (iid === 1) return { ok: false, reason: 'rejected', message: 'boom' }
+        return ok([])
       },
       async getMrApprovals() {
         return ok(approvals([]))
       },
+      async getMrReviewers() {
+        return ok([])
+      },
     })
     const service = createGitlabMrService(gateway, baseConfig)
-    await expect(service.getMrStatuses()).rejects.toThrow(/unexpected rejected: boom/)
+    const result = await service.getMrStatuses()
+    if (!result.ok) throw new Error('expected ok')
+    expect(Object.keys(result.byKey)).toEqual(['HDR-2'])
   })
 
   it('builds approvedUsernames from getMrApprovals and passes it to summarizeMr correctly', async () => {
@@ -413,11 +492,22 @@ describe('createGitlabMrService — getMrStatuses', () => {
       },
       async getMrDiscussions() {
         return ok([
-          { id: 'd1', notes: [{ authorUsername: 'bob', resolvable: true, resolved: true }] },
+          {
+            id: 'd1',
+            notes: [{ authorUsername: 'bob', resolvable: true, resolved: true, system: false }],
+          },
         ])
       },
       async getMrApprovals() {
         return ok(approvals(['alice', 'bob']))
+      },
+      async getMrReviewers() {
+        return ok(
+          reviewersWithState([reviewer('alice'), reviewer('bob')], {
+            alice: 'approved',
+            bob: 'approved',
+          }),
+        )
       },
     })
     const service = createGitlabMrService(gateway, baseConfig)

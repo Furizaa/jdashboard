@@ -4,6 +4,8 @@ export const testIds = Object.freeze({
   labelOverflowChip: 'label-overflow-chip',
   syncIndicator: 'sync-indicator',
   refreshButton: 'refresh-button',
+  subIssueRow: 'sub-issue-row',
+  linkedIssueRow: 'linked-issue-row',
 } as const)
 
 /**

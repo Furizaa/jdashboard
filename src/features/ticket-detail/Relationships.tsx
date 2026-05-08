@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import type { IssueLink, LinkedIssueRef } from '~/server/jira'
 import { TypeIcon } from '~/features/ticket-card'
 import { StatusPill } from '~/features/status-pill'
+import { testIds } from '~/lib/testids'
 
 export function Relationships({
   parent,
@@ -35,14 +36,19 @@ export function Relationships({
           trailing={<ProgressChip done={subProgress.done} total={subProgress.total} />}
         >
           {subIssues.map((s) => (
-            <RelationshipRow key={s.key} issue={s} onOpen={onOpen} />
+            <RelationshipRow key={s.key} issue={s} onOpen={onOpen} testId={testIds.subIssueRow} />
           ))}
         </Section>
       )}
       {linkGroups.map((group) => (
         <Section key={group.label} title={group.label}>
           {group.items.map((link) => (
-            <RelationshipRow key={link.id} issue={link.issue} onOpen={onOpen} />
+            <RelationshipRow
+              key={link.id}
+              issue={link.issue}
+              onOpen={onOpen}
+              testId={testIds.linkedIssueRow}
+            />
           ))}
         </Section>
       ))}
@@ -73,14 +79,17 @@ function Section({
 function RelationshipRow({
   issue,
   onOpen,
+  testId,
 }: {
   issue: LinkedIssueRef
   onOpen: (key: string) => void
+  testId?: string
 }) {
   return (
     <button
       type="button"
       onClick={() => onOpen(issue.key)}
+      data-testid={testId}
       className="hover:bg-muted/50 focus-visible:ring-ring -mx-2 flex w-[calc(100%+1rem)] items-center gap-2 rounded px-2 py-1.5 text-left transition-colors focus-visible:ring-1 focus-visible:outline-none"
     >
       <TypeIcon type={issue.typeName} />

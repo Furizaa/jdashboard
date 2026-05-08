@@ -36,6 +36,21 @@ export function buildHandlers(getWorld: () => World): HttpHandler[] {
       return new HttpResponse(null, { status: 204 })
     }),
 
+    // Single-issue GET — serves the detail-panel fetch. Returns the issue's
+    // shape regardless of the `expand` / `fields` query string. World.getIssueDetail
+    // merges any seeded detail extras (description, comments, parent, issuelinks)
+    // onto the base RawIssue.
+    http.get('*/rest/api/3/issue/:key', ({ params }) => {
+      const detail = getWorld().getIssueDetail(String(params.key))
+      if (detail === null) {
+        return HttpResponse.json(
+          { errorMessages: [`Issue not found: ${String(params.key)}`] },
+          { status: 404 },
+        )
+      }
+      return HttpResponse.json(detail)
+    }),
+
     // GitLab — minimal stubs that return empty results so the smoke board
     // doesn't error out while loading MR/review data. Specs that exercise
     // GitLab features should add overrides via `mocks.use(...)`.

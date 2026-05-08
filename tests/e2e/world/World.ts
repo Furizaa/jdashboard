@@ -1,4 +1,10 @@
-import type { RawIssue, RawSearchResponse } from '~/server/jira/gateway'
+import type {
+  AdfNode,
+  RawDetailedIssue,
+  RawIssue,
+  RawLinkedRef,
+  RawSearchResponse,
+} from '~/server/jira/gateway'
 
 export type WorldUser = {
   accountId: string
@@ -12,8 +18,42 @@ export type WorldTransition = {
   toStatusName: string
 }
 
+export type WorldComment = {
+  id: string
+  authorName?: string | null
+  authorAvatarUrl?: string | null
+  created: string
+  body: AdfNode | null
+}
+
+export type WorldIssueLink = {
+  id: string
+  type: { name: string; inward: string; outward: string }
+  inwardIssue?: RawLinkedRef
+  outwardIssue?: RawLinkedRef
+}
+
+export type WorldSubtask = {
+  key: string
+  summary?: string
+  statusName?: string
+  /** Drives the n-done/m-total chip; default 'indeterminate' (not done). */
+  statusCategory?: 'new' | 'indeterminate' | 'done'
+  typeName?: string
+}
+
+export type IssueDetailExtras = {
+  description?: AdfNode | null
+  parent?: RawLinkedRef | null
+  comments?: WorldComment[]
+  issuelinks?: WorldIssueLink[]
+  /** Convenience: also seeded as RawIssues with parent.key set to the issue key. */
+  subtasks?: WorldSubtask[]
+}
+
 export class World {
   private readonly issues: RawIssue[] = []
+  private readonly issueDetail = new Map<string, IssueDetailExtras>()
   private readonly transitions = new Map<string, WorldTransition[]>()
   private myself: WorldUser = {
     accountId: 'e2e-account',
@@ -71,6 +111,77 @@ export class World {
       name: transition.toStatusName,
     }
     return transition.toStatusName
+  }
+
+  seedIssueDetail(key: string, extras: IssueDetailExtras): void {
+    const existing = this.issueDetail.get(key) ?? {}
+    this.issueDetail.set(key, { ...existing, ...extras })
+    if (extras.subtasks) {
+      const parent = this.issues.find((i) => i.key === key)
+      const parentSummary = parent?.fields.summary ?? key
+      const parentType = parent?.fields.issuetype?.name ?? 'Task'
+      const subIssues: RawIssue[] = extras.subtasks.map((s, idx) => ({
+        id: `sub-${key}-${idx}`,
+        key: s.key,
+        fields: {
+          summary: s.summary ?? `${s.key} sub-issue`,
+          status: {
+            name: s.statusName ?? 'In Implementation',
+            statusCategory: {
+              key: s.statusCategory ?? 'indeterminate',
+              name: s.statusCategory === 'done' ? 'Done' : 'In Progress',
+            },
+          },
+          labels: [],
+          issuetype: { name: s.typeName ?? 'Task' },
+          parent: {
+            key,
+            fields: {
+              summary: parentSummary,
+              issuetype: { name: parentType },
+            },
+          },
+        },
+      }))
+      this.seedIssues(subIssues)
+    }
+  }
+
+  getIssueDetail(key: string): RawDetailedIssue | null {
+    const issue = this.issues.find((i) => i.key === key)
+    if (issue === undefined) return null
+    const extras = this.issueDetail.get(key) ?? {}
+    return {
+      id: issue.id,
+      key: issue.key,
+      fields: {
+        summary: issue.fields.summary,
+        status: { name: issue.fields.status.name },
+        issuetype: issue.fields.issuetype,
+        labels: issue.fields.labels ?? [],
+        priority: null,
+        assignee: null,
+        reporter: null,
+        description: extras.description ?? null,
+        parent: extras.parent !== undefined ? extras.parent : (issue.fields.parent ?? null),
+        issuelinks: extras.issuelinks ?? [],
+        comment: {
+          comments: (extras.comments ?? []).map((c) => ({
+            id: c.id,
+            author:
+              c.authorName != null
+                ? {
+                    displayName: c.authorName,
+                    avatarUrls:
+                      c.authorAvatarUrl != null ? { '48x48': c.authorAvatarUrl } : undefined,
+                  }
+                : null,
+            created: c.created,
+            body: c.body,
+          })),
+        },
+      },
+    }
   }
 
   searchIssues(jql: string): RawSearchResponse {

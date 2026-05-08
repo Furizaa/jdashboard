@@ -1,5 +1,5 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
-import { getResponse, http, HttpResponse, type HttpHandler } from 'msw'
+import { delay, getResponse, http, HttpResponse, type HttpHandler } from 'msw'
 import { World, seedBaselineWorld } from '../world/World'
 import { buildHandlers } from './handlers'
 
@@ -12,6 +12,12 @@ export type RequestLogEntry = {
 export type FailNextResponse = {
   status: number
   body?: unknown
+  /**
+   * Hold the response for this many real-time milliseconds before resolving.
+   * Lets specs observe in-flight UI states (e.g. an optimistic update) before
+   * the failure response triggers a rollback.
+   */
+  delayMs?: number
 }
 
 export type MockServer = {
@@ -138,11 +144,13 @@ export function createMockServer(): MockServer {
       overrides = [...handlers, ...overrides]
     },
     failNext(method, pattern, fail) {
-      const resolver = () =>
-        new HttpResponse(fail.body === undefined ? null : JSON.stringify(fail.body), {
+      const resolver = async () => {
+        if (fail.delayMs !== undefined) await delay(fail.delayMs)
+        return new HttpResponse(fail.body === undefined ? null : JSON.stringify(fail.body), {
           status: fail.status,
           headers: fail.body === undefined ? undefined : { 'content-type': 'application/json' },
         })
+      }
       const m = method.toLowerCase() as Lowercase<typeof method>
       const handler = http[m](pattern, resolver)
       oneShots.push(handler)

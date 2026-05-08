@@ -68,6 +68,35 @@ tests/e2e/
 5. If it needs a transient response, register it inside the spec via
    `mocks.use(http.get(..., ...))`.
 
+## Failing a single request: `mocks.failNext`
+
+Register a one-shot override that fires for the next matching request and is
+then dropped — subsequent requests fall through to the default world-backed
+handlers. Use it to assert error-handling paths without leaving stub state
+behind for the rest of the test.
+
+```ts
+mocks.failNext('POST', '*/rest/api/3/issue/HDR-1/transitions', {
+  status: 400,
+  body: { errorMessages: ['Workflow violation'] },
+})
+```
+
+Pass `delayMs` to hold the response open long enough to observe an in-flight
+UI state — for example, an optimistic update that should be rolled back when
+the failure lands:
+
+```ts
+mocks.failNext('POST', '*/rest/api/3/issue/HDR-1/transitions', {
+  status: 400,
+  body: { errorMessages: ['Workflow violation'] },
+  delayMs: 400,
+})
+```
+
+After the override fires, repeating the action exercises the default handler
+and is the cleanest way to prove the override was a one-shot.
+
 ## Selector preference
 
 Prefer `page.getByRole(...)` and accessible names. Reach for testids

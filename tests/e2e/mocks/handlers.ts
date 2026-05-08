@@ -18,6 +18,24 @@ export function buildHandlers(getWorld: () => World): HttpHandler[] {
       return HttpResponse.json(getWorld().searchIssues(jql))
     }),
 
+    http.get('*/rest/api/3/issue/:key/transitions', ({ params }) => {
+      const transitions = getWorld().getTransitions(String(params.key))
+      return HttpResponse.json({
+        transitions: transitions.map((t) => ({
+          id: t.id,
+          name: t.name,
+          to: { name: t.toStatusName },
+        })),
+      })
+    }),
+
+    http.post('*/rest/api/3/issue/:key/transitions', async ({ params, request }) => {
+      const body = (await request.json()) as { transition?: { id?: string } }
+      const transitionId = body.transition?.id ?? ''
+      getWorld().transitionIssue(String(params.key), transitionId)
+      return new HttpResponse(null, { status: 204 })
+    }),
+
     // GitLab — minimal stubs that return empty results so the smoke board
     // doesn't error out while loading MR/review data. Specs that exercise
     // GitLab features should add overrides via `mocks.use(...)`.

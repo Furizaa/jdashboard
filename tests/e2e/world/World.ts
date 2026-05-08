@@ -6,8 +6,15 @@ export type WorldUser = {
   avatarUrls: Record<string, string>
 }
 
+export type WorldTransition = {
+  id: string
+  name: string
+  toStatusName: string
+}
+
 export class World {
   private readonly issues: RawIssue[] = []
+  private readonly transitions = new Map<string, WorldTransition[]>()
   private myself: WorldUser = {
     accountId: 'e2e-account',
     displayName: 'E2E User',
@@ -37,6 +44,33 @@ export class World {
 
   getMyself(): WorldUser {
     return this.myself
+  }
+
+  seedTransitions(issueKey: string, transitions: readonly WorldTransition[]): void {
+    this.transitions.set(issueKey, transitions.map((t) => ({ ...t })))
+  }
+
+  getTransitions(issueKey: string): WorldTransition[] {
+    return this.transitions.get(issueKey) ?? []
+  }
+
+  transitionIssue(issueKey: string, transitionId: string): string {
+    const allowed = this.transitions.get(issueKey) ?? []
+    const transition = allowed.find((t) => t.id === transitionId)
+    if (transition === undefined) {
+      throw new Error(
+        `World.transitionIssue: no transition '${transitionId}' seeded for ${issueKey}`,
+      )
+    }
+    const issue = this.issues.find((i) => i.key === issueKey)
+    if (issue === undefined) {
+      throw new Error(`World.transitionIssue: no issue seeded with key ${issueKey}`)
+    }
+    issue.fields.status = {
+      ...issue.fields.status,
+      name: transition.toStatusName,
+    }
+    return transition.toStatusName
   }
 
   searchIssues(jql: string): RawSearchResponse {

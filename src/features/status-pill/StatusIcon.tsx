@@ -68,6 +68,42 @@ export function StatusIcon({
     )
   }
 
+  if (shape === 'review-needs' || shape === 'review-rejected') {
+    return (
+      <svg
+        width={size}
+        height={size}
+        viewBox="0 0 16 16"
+        aria-hidden
+        style={{ color, flexShrink: 0 }}
+      >
+        <circle
+          cx="8"
+          cy="8"
+          r="6"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={stroke}
+          strokeDasharray="2.5 1.8"
+        />
+      </svg>
+    )
+  }
+
+  if (shape === 'review-accepted') {
+    return (
+      <svg
+        width={size}
+        height={size}
+        viewBox="0 0 16 16"
+        aria-hidden
+        style={{ color, flexShrink: 0 }}
+      >
+        <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth={stroke} />
+      </svg>
+    )
+  }
+
   const fraction = PROGRESS_FRACTION[shape]
   return (
     <svg

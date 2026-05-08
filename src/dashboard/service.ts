@@ -189,6 +189,7 @@ export function createDashboardService(deps: DashboardServiceDeps): DashboardSer
     cache.invalidateBoard()
     cache.invalidateAllIssues()
     cache.invalidateMrStatuses()
+    cache.invalidateReviewCards()
   }
 
   function notifyUnauthorizedOnce(service: 'gitlab') {

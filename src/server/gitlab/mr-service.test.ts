@@ -115,7 +115,11 @@ describe('createGitlabMrService — getMrStatuses', () => {
     const result = await service.getMrStatuses()
     expect(result).toEqual({ ok: true, byKey: {} })
     expect(captured).toBeDefined()
-    expect(captured!.authorUsername).toBe('me')
+    if (captured && 'authorUsername' in captured) {
+      expect(captured.authorUsername).toBe('me')
+    } else {
+      throw new Error('expected authorUsername in query')
+    }
     expect(captured!.states).toEqual(['opened', 'merged'])
     const expected = new Date(FIXED_NOW.getTime() - 14 * 24 * 60 * 60 * 1000)
     expect(captured!.updatedAfter.toISOString()).toBe(expected.toISOString())

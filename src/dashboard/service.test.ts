@@ -26,6 +26,7 @@ function fakeCache(overrides: CacheOverrides, calls: Calls = []): DashboardCache
     readIssue: notImpl('readIssue'),
     readTransitions: notImpl('readTransitions'),
     readMrStatuses: notImpl('readMrStatuses'),
+    readReviewCards: notImpl('readReviewCards'),
     fetchTransitions: notImpl('fetchTransitions'),
     patchBoard: () => () => {
       calls.push('rollback:board')
@@ -53,6 +54,9 @@ function fakeCache(overrides: CacheOverrides, calls: Calls = []): DashboardCache
     },
     invalidateMrStatuses: () => {
       calls.push('invalidateMrStatuses')
+    },
+    invalidateReviewCards: () => {
+      calls.push('invalidateReviewCards')
     },
     ...overrides,
   } as DashboardCache
@@ -548,20 +552,26 @@ describe('handleMrMerged', () => {
 })
 
 describe('refreshAll', () => {
-  it('invalidates board, all issues, and mr-statuses (in that order) and not transitions', () => {
+  it('invalidates board, all issues, mr-statuses, and review-cards (in that order) and not transitions', () => {
     const calls: Calls = []
     const cache = fakeCache(
       {
         invalidateBoard: () => calls.push('invalidateBoard'),
         invalidateAllIssues: () => calls.push('invalidateAllIssues'),
         invalidateMrStatuses: () => calls.push('invalidateMrStatuses'),
+        invalidateReviewCards: () => calls.push('invalidateReviewCards'),
         invalidateTransitions: () => calls.push('invalidateTransitions'),
       },
       calls,
     )
     const service = createDashboardService(makeDeps({ cache }))
     service.refreshAll()
-    expect(calls).toEqual(['invalidateBoard', 'invalidateAllIssues', 'invalidateMrStatuses'])
+    expect(calls).toEqual([
+      'invalidateBoard',
+      'invalidateAllIssues',
+      'invalidateMrStatuses',
+      'invalidateReviewCards',
+    ])
   })
 })
 

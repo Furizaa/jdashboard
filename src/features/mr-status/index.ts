@@ -8,3 +8,5 @@ export type { ReviewerVisualState, ReviewerApprovalStatus } from './reviewer-sta
 export { countUnresolvedThreads } from './count-unresolved'
 export { ciVisualState } from './ci-state'
 export type { CiVisualState } from './ci-state'
+export { reviewBucket } from './review-state'
+export type { MyReviewerState, MrState, ReviewBucket } from './review-state'

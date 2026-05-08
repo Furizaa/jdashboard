@@ -6,7 +6,9 @@ import type {
   RawApprovals,
   RawDiscussion,
   RawMrDetail,
+  RawMrReviewerWithState,
   RawMrSummary,
+  ReviewerEndpointState,
 } from './gateway'
 
 class GitlabAuthError extends Error {
@@ -69,6 +71,13 @@ type WireDiscussion = {
 
 type WireApprovals = {
   approved_by: Array<{ user: { username: string } }>
+}
+
+type WireReviewerWithState = {
+  username: string
+  name: string
+  avatar_url?: string | null
+  state: ReviewerEndpointState
 }
 
 function toRawMrSummary(wire: WireMrSummary): RawMrSummary {
@@ -182,10 +191,14 @@ export function createHttpGitlabGateway(deps: Deps): GitlabGateway {
     listMrs(query: ListMrsQuery) {
       return call<RawMrSummary[]>(async () => {
         const updatedAfterIso = query.updatedAfter.toISOString()
+        const userParam: [string, string] =
+          'reviewerUsername' in query
+            ? ['reviewer_username', query.reviewerUsername]
+            : ['author_username', query.authorUsername]
         const requests = query.states.map((state) => {
           const params = new URLSearchParams({
             state,
-            author_username: query.authorUsername,
+            [userParam[0]]: userParam[1],
             updated_after: updatedAfterIso,
             per_page: '100',
             order_by: 'updated_at',
@@ -225,6 +238,20 @@ export function createHttpGitlabGateway(deps: Deps): GitlabGateway {
           `/api/v4/projects/${projectPath}/merge_requests/${iid}/approvals`,
         )
         return { approvedUsernames: wire.approved_by.map((a) => a.user.username) }
+      })
+    },
+
+    getMrReviewers(iid) {
+      return call<RawMrReviewerWithState[]>(async () => {
+        const wire = await request<WireReviewerWithState[]>(
+          `/api/v4/projects/${projectPath}/merge_requests/${iid}/reviewers`,
+        )
+        return wire.map((r) => ({
+          username: r.username,
+          displayName: r.name,
+          avatarUrl: r.avatar_url ?? null,
+          state: r.state,
+        }))
       })
     },
   }

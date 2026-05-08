@@ -1,5 +1,5 @@
 import type { GetIssueResult, GetTransitionsResult, SearchIssuesResult } from '~/server/jira'
-import type { GetMrStatusesResult } from '~/server/gitlab'
+import type { GetMrStatusesResult, GetReviewCardsResult } from '~/server/gitlab'
 
 export type Patch<T> = (prev: T | undefined) => T | undefined
 export type Rollback = () => void
@@ -9,6 +9,7 @@ export type DashboardCache = {
   readIssue(key: string): GetIssueResult | undefined
   readTransitions(key: string): GetTransitionsResult | undefined
   readMrStatuses(): GetMrStatusesResult | undefined
+  readReviewCards(): GetReviewCardsResult | undefined
 
   fetchTransitions(key: string): Promise<GetTransitionsResult>
 
@@ -23,4 +24,5 @@ export type DashboardCache = {
   invalidateAllIssues(): void
   invalidateTransitions(key: string): void
   invalidateMrStatuses(): void
+  invalidateReviewCards(): void
 }

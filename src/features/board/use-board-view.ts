@@ -1,8 +1,9 @@
 import { useMemo } from 'react'
 import type { UseQueryResult } from '@tanstack/react-query'
-import { useBoardData, useMrStatuses } from '~/dashboard'
+import { useBoardData, useMrStatuses, useReviewCards } from '~/dashboard'
 import { usePolling } from '~/lib/use-polling'
 import type { SearchIssuesResult } from '~/server/jira'
+import type { ReviewCard } from '~/server/gitlab'
 import { useChangeIndication } from './use-change-indication'
 import { assembleColumns, type ColumnItem } from './assemble-columns'
 import type { Column } from './status-mapping'
@@ -11,8 +12,8 @@ export const BOARD_POLL_INTERVAL_MS = 60_000
 
 export type BoardViewDeps = {
   boardQuery: UseQueryResult<SearchIssuesResult>
-  /** Called once per render. Production wires `useMrStatuses`; tests pass a no-op. */
-  subscribeMrStatuses: () => void
+  /** Called once per render. Production wires `useMrStatuses` and `useReviewCards`; tests pass a no-op. */
+  subscribeAuxiliary: () => { reviewCards: readonly ReviewCard[] | undefined }
 }
 
 type ReadyFields = {
@@ -34,15 +35,19 @@ export function useBoardView(searchQuery: string): BoardViewState {
   const boardQuery = useBoardData()
   return useBoardViewWithDeps(searchQuery, {
     boardQuery,
-    subscribeMrStatuses: () => {
+    subscribeAuxiliary: () => {
       useMrStatuses()
+      const review = useReviewCards()
+      const reviewCards =
+        review.data && review.data.ok === true ? review.data.cards : undefined
+      return { reviewCards }
     },
   })
 }
 
 export function useBoardViewWithDeps(searchQuery: string, deps: BoardViewDeps): BoardViewState {
   const { boardQuery } = deps
-  deps.subscribeMrStatuses()
+  const { reviewCards } = deps.subscribeAuxiliary()
   usePolling(() => {
     boardQuery.refetch()
   }, BOARD_POLL_INTERVAL_MS)
@@ -52,8 +57,15 @@ export function useBoardViewWithDeps(searchQuery: string, deps: BoardViewDeps): 
 
   const itemsByColumn = useMemo(() => {
     if (liveIssues === undefined) return null
-    return assembleColumns({ liveIssues, leaving, enteringKeys, changedKeys, searchQuery })
-  }, [liveIssues, leaving, enteringKeys, changedKeys, searchQuery])
+    return assembleColumns({
+      liveIssues,
+      leaving,
+      enteringKeys,
+      changedKeys,
+      reviewCards,
+      searchQuery,
+    })
+  }, [liveIssues, leaving, enteringKeys, changedKeys, reviewCards, searchQuery])
 
   if (boardQuery.isPending) return { phase: 'loading' }
   if (boardQuery.isError && boardQuery.data === undefined) {

@@ -564,6 +564,170 @@ describe('createJiraIssueService — quickCreate', () => {
   })
 })
 
+describe('createJiraIssueService — bulkLoadIssues', () => {
+  it('short-circuits on empty input — no API call, returns empty found/missing', async () => {
+    let calls = 0
+    const gateway = fakeGateway({
+      async searchIssues() {
+        calls++
+        return ok(emptySearchResponse())
+      },
+    })
+    const service = createJiraIssueService(gateway, baseConfig)
+    const result = await service.bulkLoadIssues([])
+    expect(calls).toBe(0)
+    expect(result).toEqual({
+      ok: true,
+      baseUrl: baseConfig.baseUrl,
+      found: [],
+      missing: [],
+    })
+  })
+
+  it('builds JQL with key in (...) for one key', async () => {
+    let capturedJql: string | undefined
+    const gateway = fakeGateway({
+      async searchIssues(jql) {
+        capturedJql = jql
+        return ok(emptySearchResponse())
+      },
+    })
+    const service = createJiraIssueService(gateway, baseConfig)
+    await service.bulkLoadIssues(['HDR-1'])
+    expect(capturedJql).toBe('key in ("HDR-1")')
+  })
+
+  it('builds JQL with comma-separated keys for many keys', async () => {
+    let capturedJql: string | undefined
+    const gateway = fakeGateway({
+      async searchIssues(jql) {
+        capturedJql = jql
+        return ok(emptySearchResponse())
+      },
+    })
+    const service = createJiraIssueService(gateway, baseConfig)
+    await service.bulkLoadIssues(['HDR-1', 'HDR-2', 'HDR-3'])
+    expect(capturedJql).toBe('key in ("HDR-1", "HDR-2", "HDR-3")')
+  })
+
+  it('escapes embedded double quotes and backslashes in keys', async () => {
+    let capturedJql: string | undefined
+    const gateway = fakeGateway({
+      async searchIssues(jql) {
+        capturedJql = jql
+        return ok(emptySearchResponse())
+      },
+    })
+    const service = createJiraIssueService(gateway, baseConfig)
+    await service.bulkLoadIssues(['HDR-1', 'a"b\\c'])
+    expect(capturedJql).toBe('key in ("HDR-1", "a\\"b\\\\c")')
+  })
+
+  it('dedupes input keys before calling the gateway', async () => {
+    let capturedJql: string | undefined
+    const gateway = fakeGateway({
+      async searchIssues(jql) {
+        capturedJql = jql
+        return ok(emptySearchResponse())
+      },
+    })
+    const service = createJiraIssueService(gateway, baseConfig)
+    await service.bulkLoadIssues(['HDR-1', 'HDR-2', 'HDR-1'])
+    expect(capturedJql).toBe('key in ("HDR-1", "HDR-2")')
+  })
+
+  it('splits the result into found and missing', async () => {
+    const gateway = fakeGateway({
+      async searchIssues() {
+        return ok({
+          issues: [
+            {
+              id: '1',
+              key: 'HDR-1',
+              fields: { summary: 'one', status: { name: 'To Do' } },
+            },
+            {
+              id: '3',
+              key: 'HDR-3',
+              fields: { summary: 'three', status: { name: 'Done' } },
+            },
+          ],
+        })
+      },
+    })
+    const service = createJiraIssueService(gateway, baseConfig)
+    const result = await service.bulkLoadIssues(['HDR-1', 'HDR-2', 'HDR-3'])
+    if (!result.ok) throw new Error('expected ok')
+    expect(result.found.map((i) => i.key)).toEqual(['HDR-1', 'HDR-3'])
+    expect(result.missing).toEqual(['HDR-2'])
+  })
+
+  it('shapes parent epic on bulk-loaded issues', async () => {
+    const gateway = fakeGateway({
+      async searchIssues() {
+        return ok({
+          issues: [
+            {
+              id: '1',
+              key: 'HDR-1',
+              fields: {
+                summary: 's',
+                status: { name: 'To Do' },
+                parent: {
+                  key: 'HDR-100',
+                  fields: { summary: 'My Epic', issuetype: { name: 'Epic' } },
+                },
+              },
+            },
+          ],
+        })
+      },
+    })
+    const service = createJiraIssueService(gateway, baseConfig)
+    const result = await service.bulkLoadIssues(['HDR-1'])
+    if (!result.ok) throw new Error('expected ok')
+    expect(result.found[0]?.epic).toEqual({ key: 'HDR-100', summary: 'My Epic' })
+  })
+
+  it('applies hideLabels filter on bulk-loaded issues', async () => {
+    const gateway = fakeGateway({
+      async searchIssues() {
+        return ok({
+          issues: [
+            {
+              id: '1',
+              key: 'HDR-1',
+              fields: {
+                summary: 's',
+                status: { name: 'To Do' },
+                labels: ['Frontend', 'Internal'],
+              },
+            },
+          ],
+        })
+      },
+    })
+    const service = createJiraIssueService(gateway, {
+      ...baseConfig,
+      hideLabels: ['internal'],
+    })
+    const result = await service.bulkLoadIssues(['HDR-1'])
+    if (!result.ok) throw new Error('expected ok')
+    expect(result.found[0]?.labels).toEqual(['Frontend'])
+  })
+
+  it('propagates unauthorized', async () => {
+    const gateway = fakeGateway({
+      async searchIssues() {
+        return { ok: false, reason: 'unauthorized' }
+      },
+    })
+    const service = createJiraIssueService(gateway, baseConfig)
+    const result = await service.bulkLoadIssues(['HDR-1'])
+    expect(result).toEqual({ ok: false, reason: 'unauthorized' })
+  })
+})
+
 describe('createJiraIssueService — loadMyEpics', () => {
   it('builds JQL containing the configured statuses, not a hardcoded "In Progress"', async () => {
     let capturedJql: string | undefined

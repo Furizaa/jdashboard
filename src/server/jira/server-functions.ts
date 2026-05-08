@@ -7,7 +7,7 @@ import { getServerEnv } from '~/server/env'
 
 let cached: JiraIssueService | null = null
 
-function service(): JiraIssueService {
+export function getJiraService(): JiraIssueService {
   if (cached === null) {
     const env = getServerEnv()
     const gateway = createHttpJiraGateway({
@@ -26,6 +26,10 @@ function service(): JiraIssueService {
     })
   }
   return cached
+}
+
+function service(): JiraIssueService {
+  return getJiraService()
 }
 
 function requireKey(label: string, value: unknown): string {

@@ -45,11 +45,24 @@ export type RawApprovals = {
   approvedUsernames: readonly string[]
 }
 
+export type ReviewerEndpointState =
+  | 'unreviewed'
+  | 'review_started'
+  | 'reviewed'
+  | 'requested_changes'
+  | 'approved'
+
+export type RawMrReviewerWithState = {
+  username: string
+  displayName: string
+  avatarUrl: string | null
+  state: ReviewerEndpointState
+}
+
 export type ListMrsQuery = {
   states: ReadonlyArray<'opened' | 'merged'>
-  authorUsername: string
   updatedAfter: Date
-}
+} & ({ authorUsername: string } | { reviewerUsername: string })
 
 export interface GitlabGateway {
   getCurrentUser(): Promise<GitlabResult<GatewayUser>>
@@ -57,4 +70,5 @@ export interface GitlabGateway {
   getMr(iid: number): Promise<GitlabResult<RawMrDetail>>
   getMrDiscussions(iid: number): Promise<GitlabResult<RawDiscussion[]>>
   getMrApprovals(iid: number): Promise<GitlabResult<RawApprovals>>
+  getMrReviewers(iid: number): Promise<GitlabResult<RawMrReviewerWithState[]>>
 }

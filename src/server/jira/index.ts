@@ -11,6 +11,7 @@ export type {
   AdfNode,
   AllowedTransition,
   BoardIssue,
+  BulkLoadIssuesResult,
   DetailIssue,
   EpicRef,
   GetMyselfResult,

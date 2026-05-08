@@ -1,4 +1,4 @@
-export { TicketCard, type TicketCardAnimationState } from './TicketCard'
+export { TicketCard, type TicketCardAnimationState, type TicketCardInput } from './TicketCard'
 export { TypeIcon } from './TypeIcon'
 export { colorForLabel, LABEL_COLOR_PALETTE } from './hash-color'
 export { hasFixasapLabel } from './fixasap'

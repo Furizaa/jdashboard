@@ -5,9 +5,28 @@ import { useMrFor, useMrMergedAction } from '~/dashboard'
 import { MrCiIndicator } from './MrCiIndicator'
 import { MrWarning } from './MrWarning'
 import { ReviewerAvatar } from './ReviewerAvatar'
+import type { CiVisualState } from './ci-state'
+import type { ReviewerVisualState } from './reviewer-state'
 
 const MAX_VISIBLE_REVIEWERS = 4
 const MERGED_TARGET_STATUS = 'In STG'
+
+type ReviewerVisual = {
+  username: string
+  displayName: string
+  avatarUrl: string | null
+  visualState: ReviewerVisualState
+}
+
+export type MrSectionProps =
+  | { mode: 'jira'; issueKey: string; column: Column }
+  | {
+      mode: 'review'
+      mrState: 'opened' | 'merged'
+      reviewers: readonly ReviewerVisual[]
+      unresolvedCount: number
+      ciState: CiVisualState
+    }
 
 function openInNewTab(url: string) {
   return () => {
@@ -15,10 +34,21 @@ function openInNewTab(url: string) {
   }
 }
 
-export function MrSection({ issueKey, column }: { issueKey: string; column: Column }) {
-  if (column === 'In Code Review') return <CodeReviewSection issueKey={issueKey} />
-  if (column === 'Done') return <DoneSection issueKey={issueKey} />
-  return null
+export function MrSection(props: MrSectionProps) {
+  if (props.mode === 'jira') {
+    if (props.column === 'In Code Review') return <CodeReviewSection issueKey={props.issueKey} />
+    if (props.column === 'Done') return <DoneSection issueKey={props.issueKey} />
+    return null
+  }
+  if (props.mrState === 'merged') return null
+  return (
+    <ReviewerRow
+      reviewers={props.reviewers}
+      unresolvedCount={props.unresolvedCount}
+      ciState={props.ciState}
+      allApprovedAndClean={false}
+    />
+  )
 }
 
 function DoneSection({ issueKey }: { issueKey: string }) {
@@ -62,16 +92,35 @@ function CodeReviewSection({ issueKey }: { issueKey: string }) {
   }
   if (summary.kind !== 'review') return null
 
-  const visible = summary.reviewers.slice(0, MAX_VISIBLE_REVIEWERS)
-  const overflow = summary.reviewers.length - visible.length
+  return (
+    <ReviewerRow
+      reviewers={summary.reviewers}
+      unresolvedCount={summary.unresolvedCount}
+      ciState={summary.ciState}
+      allApprovedAndClean={summary.allApprovedAndClean}
+    />
+  )
+}
 
+function ReviewerRow({
+  reviewers,
+  unresolvedCount,
+  ciState,
+  allApprovedAndClean,
+}: {
+  reviewers: readonly ReviewerVisual[]
+  unresolvedCount: number
+  ciState: CiVisualState
+  allApprovedAndClean: boolean
+}) {
+  const visible = reviewers.slice(0, MAX_VISIBLE_REVIEWERS)
+  const overflow = reviewers.length - visible.length
   return (
     <div className="border-border/50 -mx-3 mt-2 -mb-2.5 border-t">
       <div
         className={cn(
           'flex items-center gap-2 px-3 py-1.5',
-          summary.allApprovedAndClean &&
-            'rounded-b-md border-l-2 border-green-500/40 bg-green-500/10',
+          allApprovedAndClean && 'rounded-b-md border-l-2 border-green-500/40 bg-green-500/10',
         )}
       >
         {visible.map((reviewer) => (
@@ -87,17 +136,17 @@ function CodeReviewSection({ issueKey }: { issueKey: string }) {
             +{overflow}
           </span>
         )}
-        <MrCiIndicator state={summary.ciState} className="ml-auto" />
-        {summary.unresolvedCount > 0 && (
+        <MrCiIndicator state={ciState} className="ml-auto" />
+        {unresolvedCount > 0 && (
           <span
-            title={`${summary.unresolvedCount} unresolved comment thread${summary.unresolvedCount === 1 ? '' : 's'}`}
+            title={`${unresolvedCount} unresolved comment thread${unresolvedCount === 1 ? '' : 's'}`}
             className={cn(
               'text-muted-foreground inline-flex items-center gap-1 text-[11px] tabular-nums',
-              summary.ciState === 'none' && 'ml-auto',
+              ciState === 'none' && 'ml-auto',
             )}
           >
             <MessageSquare className="h-3 w-3" aria-hidden />
-            {summary.unresolvedCount}
+            {unresolvedCount}
           </span>
         )}
       </div>

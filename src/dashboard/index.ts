@@ -4,6 +4,7 @@ export {
   useTicket,
   useTransitions,
   useMrStatuses,
+  useReviewCards,
   useMrFor,
   useTransitionAction,
   useCreateAction,

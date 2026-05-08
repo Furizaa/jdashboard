@@ -14,10 +14,29 @@ export function StatusPillSelect({
   issueKey,
   status,
   align = 'start',
+  clickable = true,
 }: {
   issueKey: string
   status: string
   align?: 'start' | 'end'
+  clickable?: boolean
+}) {
+  if (!clickable) {
+    return <StatusPill status={status} />
+  }
+  return (
+    <ClickableStatusPill issueKey={issueKey} status={status} align={align} />
+  )
+}
+
+function ClickableStatusPill({
+  issueKey,
+  status,
+  align,
+}: {
+  issueKey: string
+  status: string
+  align: 'start' | 'end'
 }) {
   const [open, setOpen] = useState(false)
   const wrapperRef = useRef<HTMLDivElement>(null)

@@ -1,6 +1,6 @@
 # clashboard issues
 
-Tracer-bullet vertical slices derived from [the clashboard PRD](../prds/clashboard.md), [the GitLab MR status PRD](../prds/gitlab-mr-status.md), [the misc improvements PRD](../prds/misc-improvements.md), and [the Quick Create PRD](../prds/quick-create.md). Each slice cuts through all layers (server function → query hook → UI → tests where applicable) and is demoable on its own.
+Tracer-bullet vertical slices derived from [the clashboard PRD](../prds/clashboard.md), [the GitLab MR status PRD](../prds/gitlab-mr-status.md), [the misc improvements PRD](../prds/misc-improvements.md), [the Quick Create PRD](../prds/quick-create.md), and [the GitLab MR review cards PRD](../prds/gitlab-mr-review-cards.md). Each slice cuts through all layers (server function → query hook → UI → tests where applicable) and is demoable on its own.
 
 ## Order & dependencies
 
@@ -29,6 +29,10 @@ Tracer-bullet vertical slices derived from [the clashboard PRD](../prds/clashboa
     ├─→ 30
     ├─→ 31
     └─→ 32
+
+38 ─┬─→ 39 ─→ 40
+    ├─→ 41
+    └─→ 42
 ```
 
 ## Index
@@ -84,3 +88,13 @@ Tracer-bullet vertical slices derived from [the clashboard PRD](../prds/clashboa
 | 30 | [Quick Create in-flight spinner, 10s timeout, locked modal](./30-quick-create-spinner-timeout.md) | AFK | 26 |
 | 31 | [Quick Create toast actions + parsed Jira error messages](./31-quick-create-toast-actions.md) | AFK | 26 |
 | 32 | [Quick Create `c` keyboard shortcut](./32-quick-create-shortcut.md) | AFK | 26 |
+
+### GitLab MR review cards (PRD: [gitlab-mr-review-cards.md](../prds/gitlab-mr-review-cards.md))
+
+| # | File | Type | Blocked by |
+|---|---|---|---|
+| 38 | [Review-mode cards end-to-end (spine)](./38-review-cards-spine.md) | AFK | — |
+| 39 | [Review-state sort tiers + Review Rejected deemphasis + READY TO PICK rename](./39-review-state-tiers.md) | AFK | 38 |
+| 40 | [Card view-model + fake cards for MRs without resolvable Jira keys](./40-fake-review-cards.md) | AFK | 38, 39 |
+| 41 | [Review-card change-indication animations](./41-review-card-change-indication.md) | AFK | 38 |
+| 42 | [Detail panel "Open MR" extension to review-mode tickets](./42-panel-open-mr-review.md) | AFK | 38 |

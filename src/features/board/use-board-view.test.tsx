@@ -35,8 +35,15 @@ function fakeQuery(opts: {
 function fakeDeps(overrides: Partial<BoardViewDeps> = {}): BoardViewDeps {
   return {
     boardQuery: overrides.boardQuery ?? fakeQuery({ isPending: true }),
-    subscribeMrStatuses: overrides.subscribeMrStatuses ?? vi.fn(),
+    subscribeAuxiliary: overrides.subscribeAuxiliary ?? (() => ({ reviewCards: undefined })),
   }
+}
+
+function jiraKeyOf(item: { card: { kind: string; issue?: { key: string } } }): string {
+  if (item.card.kind !== 'jira' || item.card.issue === undefined) {
+    throw new Error('expected jira card')
+  }
+  return item.card.issue.key
 }
 
 describe('useBoardViewWithDeps — phase resolution', () => {
@@ -133,16 +140,16 @@ describe('useBoardViewWithDeps — phase resolution', () => {
 })
 
 describe('useBoardViewWithDeps — side effects', () => {
-  it('calls subscribeMrStatuses on every render', () => {
-    const subscribeMrStatuses = vi.fn()
+  it('calls subscribeAuxiliary on every render', () => {
+    const subscribeAuxiliary = vi.fn(() => ({ reviewCards: undefined }))
     const { rerender } = renderHook(
-      ({ q }: { q: string }) => useBoardViewWithDeps(q, fakeDeps({ subscribeMrStatuses })),
+      ({ q }: { q: string }) => useBoardViewWithDeps(q, fakeDeps({ subscribeAuxiliary })),
       { initialProps: { q: '' } },
     )
-    const before = subscribeMrStatuses.mock.calls.length
+    const before = subscribeAuxiliary.mock.calls.length
     expect(before).toBeGreaterThan(0)
     rerender({ q: 'login' })
-    expect(subscribeMrStatuses.mock.calls.length).toBeGreaterThan(before)
+    expect(subscribeAuxiliary.mock.calls.length).toBeGreaterThan(before)
   })
 
   it('retry() calls boardQuery.refetch()', () => {
@@ -229,7 +236,7 @@ describe('useBoardViewWithDeps — change-indication wiring', () => {
 
     if (result.current.phase !== 'ready') throw new Error('expected ready')
     const doneItems = result.current.itemsByColumn.Done
-    const item = doneItems.find((entry) => entry.issue.key === 'A-1')
+    const item = doneItems.find((entry) => jiraKeyOf(entry) === 'A-1')
     expect(item?.state).toBe('changed')
   })
 })
@@ -256,7 +263,7 @@ describe('useBoardViewWithDeps — search query', () => {
     if (result.current.phase !== 'ready') throw new Error('expected ready')
     const allKeys: string[] = []
     for (const col of Object.values(result.current.itemsByColumn)) {
-      for (const entry of col) allKeys.push(entry.issue.key)
+      for (const entry of col) allKeys.push(jiraKeyOf(entry))
     }
     expect(allKeys).toEqual(['A-1'])
   })

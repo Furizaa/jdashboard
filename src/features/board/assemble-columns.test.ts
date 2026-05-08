@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { BoardIssue } from '~/server/jira'
-import { assembleColumns } from './assemble-columns'
+import type { ReviewCardReal } from '~/server/gitlab'
+import { assembleColumns, type ColumnItem } from './assemble-columns'
 import type { LeavingIssue } from './use-change-indication'
 
 function issue(key: string, overrides: Partial<BoardIssue> = {}): BoardIssue {
@@ -25,6 +26,38 @@ function leavingIssue(
 
 const NO_LEAVING: ReadonlyMap<string, LeavingIssue> = new Map()
 const NO_KEYS: ReadonlySet<string> = new Set()
+
+function jiraKeyOf(item: ColumnItem): string {
+  if (item.card.kind !== 'jira') throw new Error('expected jira card')
+  return item.card.issue.key
+}
+
+function reviewCard(
+  iid: number,
+  bucket: ReviewCardReal['bucket'],
+  jiraKey: string,
+  overrides: Partial<ReviewCardReal['jira']> = {},
+): ReviewCardReal {
+  return {
+    kind: 'review-real',
+    iid,
+    webUrl: `https://gitlab/p/-/merge_requests/${iid}`,
+    title: `${jiraKey}: title`,
+    bucket,
+    mrState: bucket === 'accepted' ? 'merged' : 'opened',
+    reviewers: [],
+    unresolvedCount: 0,
+    ciState: 'none',
+    jira: {
+      key: jiraKey,
+      summary: `summary for ${jiraKey}`,
+      typeName: 'Task',
+      labels: [],
+      epic: null,
+      ...overrides,
+    },
+  }
+}
 
 describe('assembleColumns', () => {
   it('returns four empty columns when there are no live or leaving issues', () => {
@@ -54,16 +87,11 @@ describe('assembleColumns', () => {
       changedKeys: NO_KEYS,
       searchQuery: '',
     })
-    expect(result['TO DO']).toEqual([
-      { issue: expect.objectContaining({ key: 'A-1' }), state: 'idle' },
-    ])
-    expect(result['In Implementation']).toEqual([
-      { issue: expect.objectContaining({ key: 'A-2' }), state: 'idle' },
-    ])
-    expect(result['In Code Review']).toEqual([
-      { issue: expect.objectContaining({ key: 'A-3' }), state: 'idle' },
-    ])
-    expect(result.Done).toEqual([{ issue: expect.objectContaining({ key: 'A-4' }), state: 'idle' }])
+    expect(result['TO DO'].map(jiraKeyOf)).toEqual(['A-1'])
+    expect(result['In Implementation'].map(jiraKeyOf)).toEqual(['A-2'])
+    expect(result['In Code Review'].map(jiraKeyOf)).toEqual(['A-3'])
+    expect(result.Done.map(jiraKeyOf)).toEqual(['A-4'])
+    expect(result['TO DO'][0]?.state).toBe('idle')
   })
 
   it('marks an issue in enteringKeys as entering', () => {
@@ -101,7 +129,6 @@ describe('assembleColumns', () => {
 
   it('appends a leaving issue to its frozen column, not its current statusName column', () => {
     const leaving = new Map<string, LeavingIssue>([
-      // Issue's statusName says Reviewed (TO DO column) but its frozen column is Done.
       ['A-1', leavingIssue('A-1', 'Done', { statusName: 'Reviewed' })],
     ])
     const result = assembleColumns({
@@ -112,9 +139,8 @@ describe('assembleColumns', () => {
       searchQuery: '',
     })
     expect(result['TO DO']).toEqual([])
-    expect(result.Done).toEqual([
-      { issue: expect.objectContaining({ key: 'A-1' }), state: 'leaving' },
-    ])
+    expect(result.Done.map(jiraKeyOf)).toEqual(['A-1'])
+    expect(result.Done[0]?.state).toBe('leaving')
   })
 
   it('searchQuery filters live issues', () => {
@@ -128,7 +154,7 @@ describe('assembleColumns', () => {
       changedKeys: NO_KEYS,
       searchQuery: 'login',
     })
-    expect(result['TO DO'].map((item) => item.issue.key)).toEqual(['A-1'])
+    expect(result['TO DO'].map(jiraKeyOf)).toEqual(['A-1'])
   })
 
   it('searchQuery filters leaving issues', () => {
@@ -143,12 +169,10 @@ describe('assembleColumns', () => {
       changedKeys: NO_KEYS,
       searchQuery: 'login',
     })
-    expect(result['TO DO'].map((item) => item.issue.key)).toEqual(['A-1'])
+    expect(result['TO DO'].map(jiraKeyOf)).toEqual(['A-1'])
   })
 
   it('preserves animation state across the Done-column sort', () => {
-    // sortColumnIssues for Done sorts by tier: STG → QA → UAT → Done.
-    // Input order is intentionally inverse, so sort moves things around.
     const liveIssues = [
       issue('A-1', { statusName: 'Done' }),
       issue('A-2', { statusName: 'In STG' }),
@@ -161,7 +185,7 @@ describe('assembleColumns', () => {
       changedKeys: new Set(['A-2']),
       searchQuery: '',
     })
-    expect(result.Done.map((item) => item.issue.key)).toEqual(['A-2', 'A-3', 'A-1'])
+    expect(result.Done.map(jiraKeyOf)).toEqual(['A-2', 'A-3', 'A-1'])
     expect(result.Done.map((item) => item.state)).toEqual(['changed', 'idle', 'idle'])
   })
 
@@ -173,6 +197,55 @@ describe('assembleColumns', () => {
       changedKeys: NO_KEYS,
       searchQuery: '',
     })
-    expect(result.Done.map((item) => item.issue.key).toSorted()).toEqual(['A-1', 'A-2'])
+    expect(result.Done.map(jiraKeyOf).toSorted()).toEqual(['A-1', 'A-2'])
+  })
+
+  it('places needs-review and rejected review cards in TO DO and accepted in Done', () => {
+    const result = assembleColumns({
+      liveIssues: [],
+      leaving: NO_LEAVING,
+      enteringKeys: NO_KEYS,
+      changedKeys: NO_KEYS,
+      reviewCards: [
+        reviewCard(101, 'needs-review', 'A-10'),
+        reviewCard(102, 'rejected', 'A-11'),
+        reviewCard(103, 'accepted', 'A-12'),
+      ],
+      searchQuery: '',
+    })
+    expect(result['TO DO'].map((item) => item.id)).toEqual(['review:101', 'review:102'])
+    expect(result.Done.map((item) => item.id)).toEqual(['review:103'])
+  })
+
+  it('searchQuery also filters review cards by jira key/summary', () => {
+    const result = assembleColumns({
+      liveIssues: [],
+      leaving: NO_LEAVING,
+      enteringKeys: NO_KEYS,
+      changedKeys: NO_KEYS,
+      reviewCards: [
+        reviewCard(201, 'needs-review', 'A-20', { summary: 'Add login flow' }),
+        reviewCard(202, 'needs-review', 'A-21', { summary: 'Refactor auth' }),
+      ],
+      searchQuery: 'login',
+    })
+    expect(result['TO DO'].map((item) => item.id)).toEqual(['review:201'])
+  })
+
+  it('does not affect Jira card placement when review cards are present', () => {
+    const result = assembleColumns({
+      liveIssues: [
+        issue('A-1', { statusName: 'Reviewed' }),
+        issue('A-2', { statusName: 'Done' }),
+      ],
+      leaving: NO_LEAVING,
+      enteringKeys: NO_KEYS,
+      changedKeys: NO_KEYS,
+      reviewCards: [reviewCard(301, 'needs-review', 'A-30')],
+      searchQuery: '',
+    })
+    expect(result['TO DO'].filter((i) => i.card.kind === 'jira').map(jiraKeyOf)).toEqual(['A-1'])
+    expect(result.Done.filter((i) => i.card.kind === 'jira').map(jiraKeyOf)).toEqual(['A-2'])
+    expect(result['TO DO'].map((item) => item.id)).toEqual(['A-1', 'review:301'])
   })
 })

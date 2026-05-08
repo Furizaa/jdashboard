@@ -54,10 +54,10 @@ function BoardColumn({
         {items.length === 0 ? (
           <p className="text-muted-foreground px-2 py-1 text-xs">No tickets</p>
         ) : (
-          items.map(({ issue, state }) => (
+          items.map(({ card, id, state }) => (
             <TicketCard
-              key={issue.key}
-              issue={issue}
+              key={id}
+              card={card}
               baseUrl={baseUrl}
               column={column}
               animationState={state}

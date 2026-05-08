@@ -5,7 +5,7 @@ import {
   type GetTransitionsResult,
   type SearchIssuesResult,
 } from '~/server/jira'
-import type { GetMrStatusesResult } from '~/server/gitlab'
+import type { GetMrStatusesResult, GetReviewCardsResult } from '~/server/gitlab'
 import type { DashboardCache, Patch, Rollback } from './cache'
 
 const KEY_BOARD = ['jira', 'board', 'issues'] as const
@@ -13,12 +13,14 @@ const KEY_ISSUE = (k: string) => ['jira', 'issue', k] as const
 const KEY_ISSUE_PREFIX = ['jira', 'issue'] as const
 const KEY_TRANSITIONS = (k: string) => ['jira', 'transitions', k] as const
 const KEY_MR = ['mr-statuses'] as const
+const KEY_REVIEW_CARDS = ['review-cards'] as const
 
 export const DASHBOARD_QUERY_KEYS = {
   board: KEY_BOARD,
   issue: KEY_ISSUE,
   transitions: KEY_TRANSITIONS,
   mrStatuses: KEY_MR,
+  reviewCards: KEY_REVIEW_CARDS,
 } as const
 
 export const DASHBOARD_STALE_TIMES = {
@@ -26,6 +28,7 @@ export const DASHBOARD_STALE_TIMES = {
   issue: 30_000,
   transitions: 0,
   mrStatuses: 30_000,
+  reviewCards: 30_000,
   myself: 60_000,
 } as const
 
@@ -44,6 +47,7 @@ export function createTanstackDashboardCache(queryClient: QueryClient): Dashboar
     readIssue: (key) => queryClient.getQueryData<GetIssueResult>(KEY_ISSUE(key)),
     readTransitions: (key) => queryClient.getQueryData<GetTransitionsResult>(KEY_TRANSITIONS(key)),
     readMrStatuses: () => queryClient.getQueryData<GetMrStatusesResult>(KEY_MR),
+    readReviewCards: () => queryClient.getQueryData<GetReviewCardsResult>(KEY_REVIEW_CARDS),
 
     fetchTransitions: (key) =>
       queryClient.fetchQuery({
@@ -71,6 +75,9 @@ export function createTanstackDashboardCache(queryClient: QueryClient): Dashboar
     },
     invalidateMrStatuses: () => {
       queryClient.invalidateQueries({ queryKey: KEY_MR })
+    },
+    invalidateReviewCards: () => {
+      queryClient.invalidateQueries({ queryKey: KEY_REVIEW_CARDS })
     },
   }
 }

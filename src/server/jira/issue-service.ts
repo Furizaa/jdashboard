@@ -69,6 +69,10 @@ export type LoadBoardResult =
   | { ok: true; baseUrl: string; issues: BoardIssue[] }
   | { ok: false; reason: 'unauthorized' }
 
+export type BulkLoadIssuesResult =
+  | { ok: true; baseUrl: string; found: BoardIssue[]; missing: string[] }
+  | { ok: false; reason: 'unauthorized' }
+
 export type LoadIssueResult =
   | { ok: true; baseUrl: string; issue: DetailIssue }
   | { ok: false; reason: 'unauthorized' | 'not-found' }
@@ -107,6 +111,7 @@ export type JiraIssueService = {
   performTransition(key: string, transitionId: string): Promise<PerformTransitionResult>
   quickCreate(input: QuickCreateInput): Promise<QuickCreateResult>
   loadMyEpics(): Promise<LoadMyEpicsResult>
+  bulkLoadIssues(keys: readonly string[]): Promise<BulkLoadIssuesResult>
 }
 
 const DETAIL_ISSUE_FIELDS = [
@@ -147,6 +152,11 @@ function buildBoardJql(input: {
       `(statusCategory != Done OR status changed to Done after -${doneWindowDays}d)`,
     ].join(' AND ') + ' ORDER BY rank'
   )
+}
+
+function buildBulkIssuesJql(keys: readonly string[]): string {
+  const quoted = keys.map(quoteJqlString).join(', ')
+  return `key in (${quoted})`
 }
 
 function buildEpicJql(input: { projectKey: string; statuses: readonly string[] }): string {
@@ -434,6 +444,44 @@ export function createJiraIssueService(
         summary: issue.fields.summary,
       }))
       return { ok: true, epics }
+    },
+
+    async bulkLoadIssues(keys) {
+      const requested = [...new Set(keys)]
+      if (requested.length === 0) {
+        return { ok: true, baseUrl: config.baseUrl, found: [], missing: [] }
+      }
+      const jql = buildBulkIssuesJql(requested)
+      const result = await gateway.searchIssues(jql, BOARD_FIELDS)
+      if (!result.ok) {
+        if (result.reason === 'unauthorized') {
+          return { ok: false, reason: 'unauthorized' }
+        }
+        throw unexpectedReason(
+          'bulkLoadIssues',
+          result.reason,
+          result.reason === 'rejected' ? result.message : undefined,
+        )
+      }
+      const hideSet = new Set(config.hideLabels.map((l) => l.toLowerCase()))
+      const found: BoardIssue[] = result.value.issues.map((issue) => {
+        const parent = issue.fields.parent
+        const parentIsEpic = parent?.fields?.issuetype?.name?.toLowerCase() === 'epic'
+        return {
+          key: issue.key,
+          summary: issue.fields.summary,
+          statusName: issue.fields.status.name,
+          typeName: issue.fields.issuetype?.name ?? 'Task',
+          labels: (issue.fields.labels ?? []).filter((label) => !hideSet.has(label.toLowerCase())),
+          epic:
+            parentIsEpic && parent
+              ? { key: parent.key, summary: parent.fields?.summary ?? parent.key }
+              : null,
+        }
+      })
+      const foundKeys = new Set(found.map((i) => i.key))
+      const missing = requested.filter((k) => !foundKeys.has(k))
+      return { ok: true, baseUrl: config.baseUrl, found, missing }
     },
   }
 }

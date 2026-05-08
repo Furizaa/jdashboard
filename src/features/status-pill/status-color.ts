@@ -5,6 +5,9 @@ export type StatusShape =
   | 'progress-50'
   | 'progress-75'
   | 'done'
+  | 'review-needs'
+  | 'review-rejected'
+  | 'review-accepted'
 
 export type StatusStyle = {
   shape: StatusShape
@@ -21,6 +24,9 @@ const STATUS_STYLES: Record<string, StatusStyle> = {
   'in qa': { shape: 'progress-75', color: '#8b5cf6', label: '#a78bfa' },
   'in uat': { shape: 'progress-75', color: '#ec4899', label: '#f472b6' },
   done: { shape: 'done', color: '#22c55e', label: '#4ade80' },
+  'needs review': { shape: 'review-needs', color: '#22d3ee', label: '#67e8f9' },
+  'review rejected': { shape: 'review-rejected', color: '#ef4444', label: '#f87171' },
+  'review accepted': { shape: 'review-accepted', color: '#10b981', label: '#34d399' },
 }
 
 const FALLBACK: StatusStyle = { shape: 'todo', color: '#94a3b8', label: '#cbd5e1' }

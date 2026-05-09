@@ -4,7 +4,7 @@ import type {
   RawIssue,
   RawLinkedRef,
   RawSearchResponse,
-} from '~/server/jira/gateway'
+} from '~/server/gateways/jira'
 
 export type WorldUser = {
   accountId: string
@@ -147,7 +147,10 @@ export class World {
   }
 
   seedTransitions(issueKey: string, transitions: readonly WorldTransition[]): void {
-    this.transitions.set(issueKey, transitions.map((t) => ({ ...t })))
+    this.transitions.set(
+      issueKey,
+      transitions.map((t) => ({ ...t })),
+    )
   }
 
   getTransitions(issueKey: string): WorldTransition[] {
@@ -261,7 +264,10 @@ export class World {
   }
 
   seedMrReviewers(iid: number, reviewers: readonly GitlabMrReviewer[]): void {
-    this.mrReviewers.set(iid, reviewers.map((r) => ({ ...r })))
+    this.mrReviewers.set(
+      iid,
+      reviewers.map((r) => ({ ...r })),
+    )
   }
 
   seedMrDiscussions(iid: number, discussions: readonly GitlabDiscussion[]): void {

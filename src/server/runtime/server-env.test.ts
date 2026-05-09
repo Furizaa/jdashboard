@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { readServerEnv } from './server-env'
 
 const REQUIRED = [
   'JIRA_BASE_URL',
@@ -27,57 +28,51 @@ const VALID_ENV = {
 const originalEnv = { ...process.env }
 
 beforeEach(() => {
-  vi.resetModules()
   vi.spyOn(console, 'error').mockImplementation(() => {})
   for (const key of REQUIRED) delete process.env[key]
+  delete process.env.JIRA_HIDE_LABELS
 })
 
 afterEach(() => {
   vi.restoreAllMocks()
   for (const key of REQUIRED) delete process.env[key]
+  delete process.env.JIRA_HIDE_LABELS
   Object.assign(process.env, originalEnv)
 })
 
-async function loadEnv() {
-  const mod = await import('./env')
-  return mod.getServerEnv()
-}
-
-describe('getServerEnv', () => {
-  it('parses a complete valid environment', async () => {
+describe('readServerEnv', () => {
+  it('parses a complete valid environment', () => {
     Object.assign(process.env, VALID_ENV)
-    const env = await loadEnv()
+    const env = readServerEnv()
     expect(env.JIRA_BASE_URL).toBe('https://example.atlassian.net')
     expect(env.JIRA_DONE_WINDOW_DAYS).toBe(14)
   })
 
-  it('strips a trailing slash from JIRA_BASE_URL', async () => {
+  it('strips a trailing slash from JIRA_BASE_URL', () => {
     Object.assign(process.env, VALID_ENV, { JIRA_BASE_URL: 'https://example.atlassian.net/' })
-    const env = await loadEnv()
-    expect(env.JIRA_BASE_URL).toBe('https://example.atlassian.net')
+    expect(readServerEnv().JIRA_BASE_URL).toBe('https://example.atlassian.net')
   })
 
-  it('strips a trailing slash from GITLAB_BASE_URL', async () => {
+  it('strips a trailing slash from GITLAB_BASE_URL', () => {
     Object.assign(process.env, VALID_ENV, { GITLAB_BASE_URL: 'https://gitlab.com/' })
-    const env = await loadEnv()
-    expect(env.GITLAB_BASE_URL).toBe('https://gitlab.com')
+    expect(readServerEnv().GITLAB_BASE_URL).toBe('https://gitlab.com')
   })
 
   for (const key of REQUIRED) {
-    it(`throws when ${key} is missing`, async () => {
+    it(`throws when ${key} is missing`, () => {
       Object.assign(process.env, VALID_ENV)
       delete process.env[key]
-      await expect(loadEnv()).rejects.toThrow(/Missing or empty/)
+      expect(() => readServerEnv()).toThrow(/Missing or empty/)
     })
 
-    it(`throws when ${key} is empty`, async () => {
+    it(`throws when ${key} is empty`, () => {
       Object.assign(process.env, VALID_ENV, { [key]: '   ' })
-      await expect(loadEnv()).rejects.toThrow(/Missing or empty/)
+      expect(() => readServerEnv()).toThrow(/Missing or empty/)
     })
   }
 
-  it('throws when JIRA_DONE_WINDOW_DAYS is not a number', async () => {
+  it('throws when JIRA_DONE_WINDOW_DAYS is not a number', () => {
     Object.assign(process.env, VALID_ENV, { JIRA_DONE_WINDOW_DAYS: 'foo' })
-    await expect(loadEnv()).rejects.toThrow(/non-negative integer/)
+    expect(() => readServerEnv()).toThrow(/non-negative integer/)
   })
 })

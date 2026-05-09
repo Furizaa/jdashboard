@@ -1,4 +1,4 @@
-import type { RawIssue } from '~/server/jira/gateway'
+import type { RawIssue } from '~/server/gateways/jira'
 import type {
   GitlabApprovals,
   GitlabDiscussion,

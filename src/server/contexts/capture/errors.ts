@@ -1,8 +1,6 @@
 import { Schema } from 'effect'
 import { Rejected, Unauthorized } from '../../gateways/jira/errors'
 
-export { Rejected, Unauthorized }
-
 export const QuickCreateError = Schema.Union(Unauthorized, Rejected)
 export type QuickCreateError = Schema.Schema.Type<typeof QuickCreateError>
 

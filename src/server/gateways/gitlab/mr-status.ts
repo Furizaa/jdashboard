@@ -6,8 +6,6 @@ import {
 } from './mr'
 import type { MrReviewerState, MrSummary, RawDiscussion, RawMrDetail, RawMrSummary } from './types'
 
-export type { MrReviewerState, MrSummary }
-
 type CommonMrFields = {
   iid: number
   title: string

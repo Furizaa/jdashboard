@@ -1,8 +1,7 @@
 import { HttpClient, HttpClientResponse } from '@effect/platform'
 import { describe, expect, it } from '@effect/vitest'
 import { Effect, Layer } from 'effect'
-import type { ServerEnv as ServerEnvShape } from '../../env'
-import { ServerEnv } from '../../runtime/server-env'
+import { ServerEnv, type ServerEnvShape } from '../../runtime/server-env'
 import { JiraGatewayLive } from './http-adapter'
 import { JiraGateway } from './port'
 

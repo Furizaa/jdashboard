@@ -1,8 +1,6 @@
 import { Schema } from 'effect'
 import { NotFound, Rejected, Unauthorized } from '../../gateways/jira/errors'
 
-export { NotFound, Rejected, Unauthorized }
-
 export const LoadIssueError = Schema.Union(Unauthorized, NotFound)
 export type LoadIssueError = Schema.Schema.Type<typeof LoadIssueError>
 

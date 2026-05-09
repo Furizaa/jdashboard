@@ -3,18 +3,9 @@ import { Effect, type Schema } from 'effect'
 import type { EpicRef, GatewayUser } from '../gateways/jira/types'
 import { CaptureConfigLive } from '../contexts/capture/config'
 import { GetMyselfError, LoadMyEpicsError, QuickCreateError } from '../contexts/capture/errors'
-import {
-  getMyself as getMyselfProgram,
-  type GetMyselfOk,
-} from '../contexts/capture/application/get-myself'
-import {
-  loadMyEpics as loadMyEpicsProgram,
-  type LoadMyEpicsOk,
-} from '../contexts/capture/application/load-my-epics'
-import {
-  quickCreate as quickCreateProgram,
-  type QuickCreateOk,
-} from '../contexts/capture/application/quick-create'
+import { getMyself as getMyselfProgram } from '../contexts/capture/application/get-myself'
+import { loadMyEpics as loadMyEpicsProgram } from '../contexts/capture/application/load-my-epics'
+import { quickCreate as quickCreateProgram } from '../contexts/capture/application/quick-create'
 import {
   quickCreateSchema,
   type QuickCreateInput,
@@ -75,5 +66,3 @@ export const getMyEpics = createServerFn({ method: 'GET' }).handler(
     return wire as GetMyEpicsResult
   },
 )
-
-export type { GetMyselfOk, LoadMyEpicsOk, QuickCreateOk }

@@ -14,7 +14,7 @@ const baseEnv: Record<string, string> = {
   JIRA_BASE_URL: `http://127.0.0.1:${MOCK_PORT}`,
   GITLAB_BASE_URL: `http://127.0.0.1:${MOCK_PORT}`,
   // Test-only stubs for required env vars; values are not consumed by the
-  // mock sidecar but must pass the boot-time `getServerEnv()` validation.
+  // mock sidecar but must pass the boot-time `readServerEnv()` validation.
   JIRA_EMAIL: 'e2e@test.local',
   JIRA_API_TOKEN: 'e2e-jira-token',
   JIRA_PROJECT_KEY: 'HDR',

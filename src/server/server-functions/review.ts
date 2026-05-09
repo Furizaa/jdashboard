@@ -3,10 +3,7 @@ import { Effect, Schema } from 'effect'
 import { Unauthorized } from '../gateways/gitlab/errors'
 import { GitlabGateway } from '../gateways/gitlab/port'
 import type { ReviewCard } from '../gateways/gitlab/types'
-import {
-  getReviewCards as getReviewCardsProgram,
-  type GetReviewCardsOk,
-} from '../contexts/review/application/get-review-cards'
+import { getReviewCards as getReviewCardsProgram } from '../contexts/review/application/get-review-cards'
 import { ReviewConfigLive } from '../contexts/review/config'
 import { GetReviewCardsError } from '../contexts/review/errors'
 import { appRuntime } from '../runtime/app-runtime'
@@ -60,5 +57,3 @@ export const getGitlabUser = createServerFn({ method: 'GET' }).handler(
     return { ok: false, reason: 'unauthorized' }
   },
 )
-
-export type { GetReviewCardsOk }

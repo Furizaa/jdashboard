@@ -4,11 +4,8 @@ import type { BoardIssue } from '../gateways/jira/types'
 import type { MrSummary } from '../gateways/gitlab/types'
 import { BoardConfigLive } from '../contexts/board/config'
 import { LoadBoardError, LoadMrStatusesError } from '../contexts/board/errors'
-import { loadBoard, type LoadBoardOk } from '../contexts/board/application/load-board'
-import {
-  loadMrStatuses,
-  type LoadMrStatusesOk,
-} from '../contexts/board/application/load-mr-statuses'
+import { loadBoard } from '../contexts/board/application/load-board'
+import { loadMrStatuses } from '../contexts/board/application/load-mr-statuses'
 import { appRuntime } from '../runtime/app-runtime'
 import { toWire, type WireResult } from '../wire/to-wire'
 
@@ -50,5 +47,3 @@ export const getMrStatuses = createServerFn({ method: 'GET' }).handler(
     return wire as GetMrStatusesResult
   },
 )
-
-export type { LoadBoardOk, LoadMrStatusesOk }

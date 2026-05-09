@@ -11,7 +11,7 @@ No real upstream traffic ever leaves your machine during a run.
 
 A `.env` at the repo root with the keys listed in `.env.example`. The values
 don't need to be real — they only need to pass the boot-time
-`getServerEnv()` validation. Playwright's `webServer.env` overrides
+`readServerEnv()` validation. Playwright's `webServer.env` overrides
 `JIRA_BASE_URL` and `GITLAB_BASE_URL` at runtime.
 
 ## Run

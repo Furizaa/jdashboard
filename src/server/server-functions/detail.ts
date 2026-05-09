@@ -7,15 +7,9 @@ import {
   LoadTransitionsError,
   PerformTransitionError,
 } from '../contexts/detail/errors'
-import { loadIssue, type LoadIssueOk } from '../contexts/detail/application/load-issue'
-import {
-  loadTransitions,
-  type LoadTransitionsOk,
-} from '../contexts/detail/application/load-transitions'
-import {
-  performTransition,
-  type PerformTransitionOk,
-} from '../contexts/detail/application/perform-transition'
+import { loadIssue } from '../contexts/detail/application/load-issue'
+import { loadTransitions } from '../contexts/detail/application/load-transitions'
+import { performTransition } from '../contexts/detail/application/perform-transition'
 import { appRuntime } from '../runtime/app-runtime'
 import { toWire, type WireResult } from '../wire/to-wire'
 
@@ -81,5 +75,3 @@ export const transitionIssue = createServerFn({ method: 'POST' })
     }
     return wire as TransitionIssueResult
   })
-
-export type { LoadIssueOk, LoadTransitionsOk, PerformTransitionOk }

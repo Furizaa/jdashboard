@@ -1,7 +1,8 @@
 import { useEffect, type RefObject } from 'react'
 import { useForm } from '@tanstack/react-form'
+import type { Result } from 'neverthrow'
 import { quickCreateSchema, type QuickCreateInput } from '~/kernel'
-import type { CreateIssueResultWithTimeout } from '~/coordinator/service'
+import type { CreateIssueError, CreateIssueSnapshot } from '~/coordinator'
 import { ParentSelect } from './ParentSelect'
 import { SummaryInput } from './SummaryInput'
 import { TypeSegmented } from './TypeSegmented'
@@ -34,7 +35,7 @@ export function QuickCreateForm({
   open: boolean
   isPending: boolean
   onCancel: () => void
-  onSubmit: (input: QuickCreateInput) => Promise<CreateIssueResultWithTimeout>
+  onSubmit: (input: QuickCreateInput) => Promise<Result<CreateIssueSnapshot, CreateIssueError>>
   registerReset: (reset: () => void) => void
 }) {
   const form = useForm({

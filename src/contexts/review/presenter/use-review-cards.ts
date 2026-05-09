@@ -1,8 +1,11 @@
 import { useEffect } from 'react'
 import { useQuery, type UseQueryResult } from '@tanstack/react-query'
-import { useDashboardService } from '~/coordinator/context'
-import { useBoardData } from '~/coordinator/hooks'
-import { DASHBOARD_QUERY_KEYS, DASHBOARD_STALE_TIMES } from '~/coordinator/tanstack-cache'
+import {
+  DASHBOARD_QUERY_KEYS,
+  DASHBOARD_STALE_TIMES,
+  useBoardData,
+  useCoordinator,
+} from '~/coordinator'
 import type { GetReviewCardsResult } from '~/kernel'
 import { usePolling } from '~/lib/use-polling'
 import { getReviewCards } from '~/server/gitlab'
@@ -12,7 +15,7 @@ const GITLAB_QUERY_RETRY = 2
 const GITLAB_QUERY_RETRY_DELAY_MS = (attempt: number) => Math.min(1000 * 2 ** attempt, 5000)
 
 export function useReviewCards(): UseQueryResult<GetReviewCardsResult> {
-  const service = useDashboardService()
+  const coord = useCoordinator()
   const board = useBoardData()
   const jiraReady = board.data !== undefined
   const query = useQuery({
@@ -26,9 +29,9 @@ export function useReviewCards(): UseQueryResult<GetReviewCardsResult> {
   })
   useEffect(() => {
     if (query.data && query.data.ok === false && query.data.reason === 'unauthorized') {
-      service.notifyUnauthorizedOnce('gitlab')
+      coord.notifyUnauthorizedOnce('gitlab')
     }
-  }, [query.data, service])
+  }, [query.data, coord])
   usePolling(() => {
     if (jiraReady) query.refetch()
   }, REVIEW_POLL_INTERVAL_MS)

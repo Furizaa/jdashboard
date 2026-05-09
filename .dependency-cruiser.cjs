@@ -221,6 +221,40 @@ module.exports = {
       to: { path: '^src/contexts/' },
     },
     {
+      name: 'coordinator-cant-import-context-presenter-or-view',
+      comment:
+        "coordinator orchestrates contexts via their public ports — it must not reach into a context's view, presenter, or view-model. Cross-context wiring goes through ports + application services.",
+      severity: 'error',
+      from: { path: '^src/coordinator/' },
+      to: { path: '^src/contexts/[^/]+/(view|presenter|view-model)/' },
+    },
+    {
+      name: 'coordinator-react-deps-stay-at-the-boundary',
+      comment:
+        'inside coordinator/, react / @tanstack/react-* / sonner live only at the framework boundary: adapters/, provider.tsx, and hooks.ts (presenter-helper hooks). The coordinator factory itself (coordinator.ts, ports.ts, errors.ts) stays framework-free.',
+      severity: 'error',
+      from: {
+        path: '^src/coordinator/',
+        pathNot: [
+          '^src/coordinator/adapters/',
+          '^src/coordinator/provider\\.tsx$',
+          '^src/coordinator/hooks\\.ts$',
+        ],
+      },
+      to: {
+        path: '^(react|react-dom|@tanstack/react-[^/]+|sonner)($|/)',
+        dependencyTypes: ['npm', 'npm-dev', 'npm-peer'],
+      },
+    },
+    {
+      name: 'context-inner-layers-cant-import-coordinator-adapters-or-provider',
+      comment:
+        'a context\'s domain / application / view-model layers can only see coordinator ports + the useCoordinator hook (via presenter). They must not depend on the runtime adapters or the provider composition root.',
+      severity: 'error',
+      from: { path: '^src/contexts/[^/]+/(domain|application|view-model)/' },
+      to: { path: '^src/coordinator/(adapters/|provider\\.tsx$)' },
+    },
+    {
       name: 'no-tanstack-query-in-widgets-outside-presenter',
       comment:
         'inside widgets/, @tanstack/react-query lives only in presenter/ — view, view-model, and domain receive query data via the coordinator hooks or as plain values.',

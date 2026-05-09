@@ -220,7 +220,7 @@ type WarningInfo = {
 
 function pickWarning(
   ctx: CtxValue,
-  triggerMerge: (input: { key: string; targetStatusName: string }) => Promise<void>,
+  triggerMerge: (input: { key: string; targetStatusName: string }) => Promise<unknown>,
 ): WarningInfo | null {
   const { summary, column, issueKey } = ctx
   if (summary === null) {

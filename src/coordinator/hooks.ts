@@ -1,19 +1,16 @@
 import { useEffect } from 'react'
 import { useMutation, useQuery, type UseQueryResult } from '@tanstack/react-query'
+import type { Result } from 'neverthrow'
 import { getIssue, searchIssues, getTransitions } from '~/server/jira'
-import type {
-  GetIssueResult,
-  GetTransitionsResult,
-  SearchIssuesResult,
-  TransitionIssueResult,
-} from '~/server/jira'
+import type { GetIssueResult, GetTransitionsResult, SearchIssuesResult } from '~/server/jira'
 import type { QuickCreateInput } from '~/server/jira/quick-create-schema'
 import { getMrStatuses } from '~/server/gitlab'
 import type { GetMrStatusesResult, MrSummary } from '~/server/gitlab'
 import { usePolling } from '~/lib/use-polling'
-import { useDashboardService } from './context'
-import { DASHBOARD_QUERY_KEYS, DASHBOARD_STALE_TIMES } from './tanstack-cache'
-import type { CreateIssueResultWithTimeout } from './service'
+import { useCoordinator } from './provider'
+import { DASHBOARD_QUERY_KEYS, DASHBOARD_STALE_TIMES } from './adapters/tanstack-cache'
+import type { ApplyTransitionError, CreateIssueError, HandleMrMergedError } from './errors'
+import type { CreateIssueSnapshot, MrMergedSnapshot } from './coordinator'
 
 const MR_POLL_INTERVAL_MS = 60_000
 const GITLAB_QUERY_RETRY = 2
@@ -52,7 +49,7 @@ export function useTransitions(
 }
 
 export function useMrStatuses(): UseQueryResult<GetMrStatusesResult> {
-  const service = useDashboardService()
+  const coord = useCoordinator()
   const board = useBoardData()
   const jiraReady = board.data !== undefined
   const query = useQuery({
@@ -66,9 +63,9 @@ export function useMrStatuses(): UseQueryResult<GetMrStatusesResult> {
   })
   useEffect(() => {
     if (query.data && query.data.ok === false && query.data.reason === 'unauthorized') {
-      service.notifyUnauthorizedOnce('gitlab')
+      coord.notifyUnauthorizedOnce('gitlab')
     }
-  }, [query.data, service])
+  }, [query.data, coord])
   usePolling(() => {
     if (jiraReady) query.refetch()
   }, MR_POLL_INTERVAL_MS)
@@ -113,19 +110,23 @@ export function useTransitionAction(): {
   mutate: (vars: TransitionVars) => void
   isPending: boolean
 } {
-  const service = useDashboardService()
-  const mutation = useMutation<TransitionIssueResult, Error, TransitionVars>({
-    mutationFn: (vars) => service.applyTransition(vars),
+  const coord = useCoordinator()
+  const mutation = useMutation<Result<void, ApplyTransitionError>, Error, TransitionVars>({
+    mutationFn: async (vars) => coord.applyTransition(vars),
   })
   return { mutate: mutation.mutate, isPending: mutation.isPending }
 }
 
 export function useCreateAction(): {
-  mutateAsync: (form: QuickCreateInput) => Promise<CreateIssueResultWithTimeout>
+  mutateAsync: (form: QuickCreateInput) => Promise<Result<CreateIssueSnapshot, CreateIssueError>>
 } {
-  const service = useDashboardService()
-  const mutation = useMutation<CreateIssueResultWithTimeout, Error, QuickCreateInput>({
-    mutationFn: (form) => service.createIssue(form),
+  const coord = useCoordinator()
+  const mutation = useMutation<
+    Result<CreateIssueSnapshot, CreateIssueError>,
+    Error,
+    QuickCreateInput
+  >({
+    mutationFn: async (form) => coord.createIssue(form),
   })
   return { mutateAsync: mutation.mutateAsync }
 }
@@ -133,14 +134,12 @@ export function useCreateAction(): {
 export function useMrMergedAction(): (input: {
   key: string
   targetStatusName: string
-}) => Promise<void> {
-  const service = useDashboardService()
-  return async (input) => {
-    await service.handleMrMerged(input)
-  }
+}) => Promise<Result<MrMergedSnapshot, HandleMrMergedError>> {
+  const coord = useCoordinator()
+  return async (input) => coord.handleMrMerged(input)
 }
 
 export function useRefreshAll(): () => void {
-  const service = useDashboardService()
-  return () => service.refreshAll()
+  const coord = useCoordinator()
+  return () => coord.refreshAll()
 }

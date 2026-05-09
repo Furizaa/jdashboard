@@ -6,7 +6,7 @@ import {
   type SearchIssuesResult,
 } from '~/server/jira'
 import type { GetMrStatusesResult, GetReviewCardsResult } from '~/server/gitlab'
-import type { DashboardCache, Patch, Rollback } from './cache'
+import type { Cache, Patch, Rollback } from '../ports'
 
 const KEY_BOARD = ['jira', 'board', 'issues'] as const
 const KEY_ISSUE = (k: string) => ['jira', 'issue', k] as const
@@ -32,7 +32,7 @@ export const DASHBOARD_STALE_TIMES = {
   myself: 60_000,
 } as const
 
-export function createTanstackDashboardCache(queryClient: QueryClient): DashboardCache {
+export function createTanstackCacheAdapter(queryClient: QueryClient): Cache {
   function patch<T>(key: readonly unknown[], fn: Patch<T>): Rollback {
     const prev = queryClient.getQueryData<T>(key)
     const next = fn(prev)

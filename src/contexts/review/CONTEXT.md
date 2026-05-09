@@ -40,7 +40,7 @@ If a future change introduces a Review-only surface (e.g. a standalone "review q
 ## Cross-context dependencies
 
 - `~/kernel` — `Column`, `ReviewCard`, `ReviewCardReal`, `GetReviewCardsResult`.
-- `~/coordinator` — `useBoardData`, `useDashboardService`, `DASHBOARD_QUERY_KEYS`, `DASHBOARD_STALE_TIMES` (presenter only).
+- `~/coordinator` — `useBoardData`, `useCoordinator`, `DASHBOARD_QUERY_KEYS`, `DASHBOARD_STALE_TIMES` (presenter only).
 - `~/server/gitlab` — `getReviewCards` server function (presenter only).
 - `~/lib/use-polling` — visibility-aware refetch interval (presenter only).
 

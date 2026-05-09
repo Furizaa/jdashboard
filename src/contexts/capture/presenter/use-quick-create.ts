@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react'
+import type { Result } from 'neverthrow'
 import { match, P } from 'ts-pattern'
-import { useCreateAction } from '~/coordinator'
-import type { CreateIssueResultWithTimeout } from '~/coordinator/service'
+import { useCreateAction, type CreateIssueError, type CreateIssueSnapshot } from '~/coordinator'
 import type { QuickCreateInput } from '~/kernel'
 import {
   initialState,
@@ -11,7 +11,9 @@ import {
   type State,
 } from '../view-model'
 
-export type SubmitFn = (input: QuickCreateInput) => Promise<CreateIssueResultWithTimeout>
+export type SubmitFn = (
+  input: QuickCreateInput,
+) => Promise<Result<CreateIssueSnapshot, CreateIssueError>>
 
 export type QuickCreateApi = {
   /** True for `open-idle | open-pending | open-error`. Bind to Dialog.Root open prop. */
@@ -74,18 +76,28 @@ export function useQuickCreateWithDeps(deps: QuickCreateDeps): QuickCreateApi {
     async (input) => {
       dispatch({ type: 'formSubmitted' })
       const result = await submitDep(input)
-      match(result)
-        .with({ ok: true }, () => {
+      result.match(
+        () => {
           dispatch({ type: 'submitResolved' })
           resetRef.current?.()
-        })
-        .with({ ok: false, reason: 'timed-out' }, () => {
-          dispatch({ type: 'timedOut' })
-        })
-        .with({ ok: false, reason: P.union('unauthorized', 'rejected') }, ({ message }) => {
-          dispatch({ type: 'submitRejected', message })
-        })
-        .exhaustive()
+        },
+        (error) => {
+          match(error)
+            .with({ _tag: 'CreateIssueTimeout' }, () => {
+              dispatch({ type: 'timedOut' })
+            })
+            .with(
+              { _tag: P.union('CreateIssueRejected', 'CreateIssueUnauthorized') },
+              ({ message }) => {
+                dispatch({ type: 'submitRejected', message })
+              },
+            )
+            .with({ _tag: 'CreateIssueNetworkError' }, ({ message }) => {
+              dispatch({ type: 'submitRejected', message })
+            })
+            .exhaustive()
+        },
+      )
       return result
     },
     [submitDep],

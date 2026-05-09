@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
+import { err, ok } from 'neverthrow'
+import { CreateIssueRejected, CreateIssueTimeout } from '~/coordinator'
 import { useQuickCreateWithDeps, type QuickCreateDeps } from './use-quick-create'
 
 function fakeDeps(overrides: Partial<QuickCreateDeps> = {}): QuickCreateDeps {
   return {
-    submit: vi.fn(() =>
-      Promise.resolve({ ok: true as const, key: 'HDR-1', baseUrl: 'https://j.example' }),
-    ),
+    submit: vi.fn(() => Promise.resolve(ok({ key: 'HDR-1', baseUrl: 'https://j.example' }))),
     ...overrides,
   }
 }
@@ -52,9 +52,7 @@ describe('useQuickCreateWithDeps — openModal / closeModal', () => {
 describe('useQuickCreateWithDeps — submit drives state machine', () => {
   it('flows open-idle → open-pending → closed on success and resets the form', async () => {
     const reset = vi.fn()
-    const submit = vi.fn(() =>
-      Promise.resolve({ ok: true as const, key: 'HDR-9', baseUrl: 'https://j.example' }),
-    )
+    const submit = vi.fn(() => Promise.resolve(ok({ key: 'HDR-9', baseUrl: 'https://j.example' })))
     const { result } = renderQuickCreate(fakeDeps({ submit }))
     act(() => result.current.openModal())
     act(() => result.current.registerReset(reset))
@@ -70,7 +68,8 @@ describe('useQuickCreateWithDeps — submit drives state machine', () => {
       resolved = await result.current.submit(input)
     })
     expect(submit).toHaveBeenCalledWith(input)
-    expect(resolved).toEqual({ ok: true, key: 'HDR-9', baseUrl: 'https://j.example' })
+    expect(resolved?.isOk()).toBe(true)
+    expect(resolved?._unsafeUnwrap()).toEqual({ key: 'HDR-9', baseUrl: 'https://j.example' })
     expect(reset).toHaveBeenCalledTimes(1)
     expect(result.current.open).toBe(false)
     expect(result.current.isPending).toBe(false)
@@ -78,9 +77,7 @@ describe('useQuickCreateWithDeps — submit drives state machine', () => {
 
   it('lands in open-error on rejected; does not reset the form; closeModal still works', async () => {
     const reset = vi.fn()
-    const submit = vi.fn(() =>
-      Promise.resolve({ ok: false as const, reason: 'rejected' as const, message: 'no' }),
-    )
+    const submit = vi.fn(() => Promise.resolve(err(new CreateIssueRejected('no'))))
     const { result } = renderQuickCreate(fakeDeps({ submit }))
     act(() => result.current.openModal())
     act(() => result.current.registerReset(reset))
@@ -102,13 +99,7 @@ describe('useQuickCreateWithDeps — submit drives state machine', () => {
   })
 
   it('lands in open-error on timed-out', async () => {
-    const submit = vi.fn(() =>
-      Promise.resolve({
-        ok: false as const,
-        reason: 'timed-out' as const,
-        message: 'Request timed out',
-      }),
-    )
+    const submit = vi.fn(() => Promise.resolve(err(new CreateIssueTimeout())))
     const { result } = renderQuickCreate(fakeDeps({ submit }))
     act(() => result.current.openModal())
     await act(async () => {

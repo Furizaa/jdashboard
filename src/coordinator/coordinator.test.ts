@@ -1,18 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import type {
+  CreateIssueResult,
   GetIssueResult,
   GetTransitionsResult,
   SearchIssuesResult,
   TransitionIssueResult,
-  CreateIssueResult,
 } from '~/server/jira'
 import type { QuickCreateInput } from '~/server/jira/quick-create-schema'
-import type { DashboardCache, Patch, Rollback } from './cache'
-import { createDashboardService, type DashboardServiceDeps, type ToastFn } from './service'
+import { createCoordinator, type CoordinatorDeps } from './coordinator'
+import type { Browser, Cache, Navigate, Patch, Rollback, Toast, ToastFn } from './ports'
 
 type Calls = string[]
 
-type CacheOverrides = Partial<DashboardCache>
+type CacheOverrides = Partial<Cache>
 
 function notImpl<R>(method: string): (...args: never[]) => R {
   return () => {
@@ -20,7 +20,7 @@ function notImpl<R>(method: string): (...args: never[]) => R {
   }
 }
 
-function fakeCache(overrides: CacheOverrides, calls: Calls = []): DashboardCache {
+function fakeCache(overrides: CacheOverrides, calls: Calls = []): Cache {
   return {
     readBoard: notImpl('readBoard'),
     readIssue: notImpl('readIssue'),
@@ -59,7 +59,7 @@ function fakeCache(overrides: CacheOverrides, calls: Calls = []): DashboardCache
       calls.push('invalidateReviewCards')
     },
     ...overrides,
-  } as DashboardCache
+  } as Cache
 }
 
 type ToastEvent = { kind: 'success' | 'error'; message: string }
@@ -72,7 +72,39 @@ function fakeToast() {
   const error: ToastFn = (message) => {
     events.push({ kind: 'error', message })
   }
-  return { events, toast: { success, error } }
+  return { events, toast: { success, error } satisfies Toast }
+}
+
+type NavigateEvent = { kind: 'toIssue'; key: string } | { kind: 'clearIssue' }
+
+function fakeNavigate() {
+  const events: NavigateEvent[] = []
+  const navigate: Navigate = {
+    toIssue: (key) => {
+      events.push({ kind: 'toIssue', key })
+    },
+    clearIssue: () => {
+      events.push({ kind: 'clearIssue' })
+    },
+  }
+  return { events, navigate }
+}
+
+type BrowserEvent =
+  | { kind: 'openInNewTab'; url: string }
+  | { kind: 'copyToClipboard'; text: string }
+
+function fakeBrowser() {
+  const events: BrowserEvent[] = []
+  const browser: Browser = {
+    openInNewTab: (url) => {
+      events.push({ kind: 'openInNewTab', url })
+    },
+    copyToClipboard: async (text) => {
+      events.push({ kind: 'copyToClipboard', text })
+    },
+  }
+  return { events, browser }
 }
 
 type Timer = { fn: () => void; ms: number; cleared: boolean }
@@ -97,21 +129,20 @@ function fakeTimers() {
   return { timers, setTimeout, clearTimeout, fire }
 }
 
-const noopJira = {
-  transitionIssue: (() =>
-    Promise.resolve({
-      ok: true,
-    } as TransitionIssueResult)) as DashboardServiceDeps['jira']['transitionIssue'],
-  createIssue: (() =>
+const noopJira: CoordinatorDeps['jira'] = {
+  transitionIssue: () => Promise.resolve({ ok: true } as TransitionIssueResult),
+  createIssue: () =>
     Promise.resolve({
       ok: true,
       key: 'HDR-1',
       baseUrl: 'https://j',
-    } as CreateIssueResult)) as DashboardServiceDeps['jira']['createIssue'],
+    } as CreateIssueResult),
 }
 
-function makeDeps(overrides: Partial<DashboardServiceDeps> = {}): DashboardServiceDeps {
+function makeDeps(overrides: Partial<CoordinatorDeps> = {}): CoordinatorDeps {
   const t = fakeToast()
+  const n = fakeNavigate()
+  const b = fakeBrowser()
   const timers = fakeTimers()
   return {
     cache: fakeCache({}),
@@ -121,8 +152,8 @@ function makeDeps(overrides: Partial<DashboardServiceDeps> = {}): DashboardServi
     clearTimeout: timers.clearTimeout,
     createIssueTimeoutMs: 1_000,
     toast: t.toast,
-    navigateToIssue: () => {},
-    openInBrowser: () => {},
+    navigate: n.navigate,
+    browser: b.browser,
     ...overrides,
   }
 }
@@ -144,17 +175,17 @@ describe('applyTransition', () => {
         patchBoard: ((_p: Patch<SearchIssuesResult>): Rollback => {
           order.push('patchBoard')
           return () => {}
-        }) as DashboardCache['patchBoard'],
+        }) as Cache['patchBoard'],
         patchIssue: ((_k: string, _p: Patch<GetIssueResult>): Rollback => {
           order.push('patchIssue')
           return () => {}
-        }) as DashboardCache['patchIssue'],
+        }) as Cache['patchIssue'],
         invalidateIssue: () => {},
         invalidateTransitions: () => {},
       },
       calls,
     )
-    const service = createDashboardService(
+    const coord = createCoordinator(
       makeDeps({
         cache,
         jira: {
@@ -163,7 +194,7 @@ describe('applyTransition', () => {
         },
       }),
     )
-    await service.applyTransition({
+    await coord.applyTransition({
       key: 'HDR-1',
       transitionId: 't1',
       toStatusName: 'Done',
@@ -215,16 +246,16 @@ describe('applyTransition', () => {
       patchBoard: ((p: Patch<SearchIssuesResult>) => {
         patchedBoard = p(board)
         return () => {}
-      }) as DashboardCache['patchBoard'],
+      }) as Cache['patchBoard'],
       patchIssue: ((_k: string, p: Patch<GetIssueResult>) => {
         patchedIssue = p(issue)
         return () => {}
-      }) as DashboardCache['patchIssue'],
+      }) as Cache['patchIssue'],
       invalidateIssue: () => {},
       invalidateTransitions: () => {},
     })
-    const service = createDashboardService(makeDeps({ cache }))
-    await service.applyTransition({
+    const coord = createCoordinator(makeDeps({ cache }))
+    await coord.applyTransition({
       key: 'HDR-1',
       transitionId: 't1',
       toStatusName: 'Done',
@@ -239,11 +270,11 @@ describe('applyTransition', () => {
     const cache = fakeCache({
       cancelBoard: async () => {},
       cancelIssue: async () => {},
-      patchBoard: (() => () => rollbacks.push('board')) as DashboardCache['patchBoard'],
-      patchIssue: (() => () => rollbacks.push('issue')) as DashboardCache['patchIssue'],
+      patchBoard: (() => () => rollbacks.push('board')) as Cache['patchBoard'],
+      patchIssue: (() => () => rollbacks.push('issue')) as Cache['patchIssue'],
     })
     const t = fakeToast()
-    const service = createDashboardService(
+    const coord = createCoordinator(
       makeDeps({
         cache,
         toast: t.toast,
@@ -253,13 +284,13 @@ describe('applyTransition', () => {
         },
       }),
     )
-    await expect(
-      service.applyTransition({
-        key: 'HDR-1',
-        transitionId: 't1',
-        toStatusName: 'Done',
-      }),
-    ).rejects.toThrow('network down')
+    const result = await coord.applyTransition({
+      key: 'HDR-1',
+      transitionId: 't1',
+      toStatusName: 'Done',
+    })
+    expect(result.isErr()).toBe(true)
+    expect(result.isErr() && result.error._tag).toBe('TransitionNetworkError')
     expect(rollbacks).toEqual(['board', 'issue'])
     expect(t.events).toEqual([{ kind: 'error', message: "Couldn't change status: network down" }])
   })
@@ -269,11 +300,11 @@ describe('applyTransition', () => {
     const cache = fakeCache({
       cancelBoard: async () => {},
       cancelIssue: async () => {},
-      patchBoard: (() => () => rollbacks.push('board')) as DashboardCache['patchBoard'],
-      patchIssue: (() => () => rollbacks.push('issue')) as DashboardCache['patchIssue'],
+      patchBoard: (() => () => rollbacks.push('board')) as Cache['patchBoard'],
+      patchIssue: (() => () => rollbacks.push('issue')) as Cache['patchIssue'],
     })
     const t = fakeToast()
-    const service = createDashboardService(
+    const coord = createCoordinator(
       makeDeps({
         cache,
         toast: t.toast,
@@ -288,12 +319,13 @@ describe('applyTransition', () => {
         },
       }),
     )
-    const result = await service.applyTransition({
+    const result = await coord.applyTransition({
       key: 'HDR-1',
       transitionId: 't1',
       toStatusName: 'Done',
     })
-    expect(result.ok).toBe(false)
+    expect(result.isErr()).toBe(true)
+    expect(result.isErr() && result.error._tag).toBe('TransitionRejected')
     expect(rollbacks).toEqual(['board', 'issue'])
     expect(t.events).toEqual([{ kind: 'error', message: 'Workflow says no' }])
   })
@@ -309,15 +341,15 @@ describe('applyTransition', () => {
         cancelIssue: async (k) => {
           calls.push(`cancelIssue:${k}`)
         },
-        patchBoard: (() => () => rollbacks.push('board')) as DashboardCache['patchBoard'],
-        patchIssue: (() => () => rollbacks.push('issue')) as DashboardCache['patchIssue'],
+        patchBoard: (() => () => rollbacks.push('board')) as Cache['patchBoard'],
+        patchIssue: (() => () => rollbacks.push('issue')) as Cache['patchIssue'],
         invalidateIssue: (k) => calls.push(`invalidateIssue:${k}`),
         invalidateTransitions: (k) => calls.push(`invalidateTransitions:${k}`),
         invalidateBoard: () => calls.push('invalidateBoard'),
       },
       calls,
     )
-    const service = createDashboardService(
+    const coord = createCoordinator(
       makeDeps({
         cache,
         jira: {
@@ -326,11 +358,12 @@ describe('applyTransition', () => {
         },
       }),
     )
-    await service.applyTransition({
+    const result = await coord.applyTransition({
       key: 'HDR-1',
       transitionId: 't1',
       toStatusName: 'Done',
     })
+    expect(result.isOk()).toBe(true)
     expect(rollbacks).toEqual([])
     expect(calls).toContain('invalidateIssue:HDR-1')
     expect(calls).toContain('invalidateTransitions:HDR-1')
@@ -346,12 +379,12 @@ describe('createIssue', () => {
     description: 'y',
   }
 
-  it('returns timed-out when the timer fires before the call resolves', async () => {
+  it('returns a CreateIssueTimeout error when the timer fires before the call resolves', async () => {
     const timers = fakeTimers()
     let resolveCreate: ((res: CreateIssueResult) => void) | null = null
     let abortSignal: AbortSignal | undefined
     const t = fakeToast()
-    const service = createDashboardService(
+    const coord = createCoordinator(
       makeDeps({
         toast: t.toast,
         setTimeout: timers.setTimeout,
@@ -359,7 +392,7 @@ describe('createIssue', () => {
         createIssueTimeoutMs: 1_000,
         jira: {
           ...noopJira,
-          createIssue: (({ signal }: { signal?: AbortSignal }) => {
+          createIssue: ({ signal }) => {
             abortSignal = signal
             return new Promise<CreateIssueResult>((resolve, reject) => {
               resolveCreate = resolve
@@ -369,21 +402,18 @@ describe('createIssue', () => {
                 })
               }
             })
-          }) as DashboardServiceDeps['jira']['createIssue'],
+          },
         },
       }),
     )
-    const promise = service.createIssue(form)
+    const promise = coord.createIssue(form)
     expect(timers.timers).toHaveLength(1)
     expect(timers.timers[0]?.cleared).toBe(false)
     timers.fire()
     expect(abortSignal?.aborted).toBe(true)
     const result = await promise
-    expect(result).toEqual({
-      ok: false,
-      reason: 'timed-out',
-      message: 'Request timed out',
-    })
+    expect(result.isErr()).toBe(true)
+    expect(result.isErr() && result.error._tag).toBe('CreateIssueTimeout')
     expect(timers.timers[0]?.cleared).toBe(true)
     expect(t.events).toEqual([{ kind: 'error', message: 'Request timed out — try again' }])
     expect(resolveCreate).not.toBeNull()
@@ -397,7 +427,7 @@ describe('createIssue', () => {
       },
       calls,
     )
-    const service = createDashboardService(
+    const coord = createCoordinator(
       makeDeps({
         cache,
         jira: {
@@ -411,7 +441,7 @@ describe('createIssue', () => {
         },
       }),
     )
-    await service.createIssue(form)
+    await coord.createIssue(form)
     expect(calls).toContain('invalidateBoard')
   })
 
@@ -423,7 +453,7 @@ describe('createIssue', () => {
       },
       calls,
     )
-    const service = createDashboardService(
+    const coord = createCoordinator(
       makeDeps({
         cache,
         jira: {
@@ -437,13 +467,13 @@ describe('createIssue', () => {
         },
       }),
     )
-    await service.createIssue(form)
+    await coord.createIssue(form)
     expect(calls).not.toContain('invalidateBoard')
   })
 
   it('fires toast.success containing the issue key on ok: true', async () => {
     const t = fakeToast()
-    const service = createDashboardService(
+    const coord = createCoordinator(
       makeDeps({
         toast: t.toast,
         jira: {
@@ -457,38 +487,80 @@ describe('createIssue', () => {
         },
       }),
     )
-    await service.createIssue(form)
+    await coord.createIssue(form)
     expect(t.events).toContainEqual({ kind: 'success', message: 'Created HDR-42' })
+  })
+
+  it('navigates to the new issue when the success toast action is invoked', async () => {
+    const t = fakeToast()
+    const n = fakeNavigate()
+    const coord = createCoordinator(
+      makeDeps({
+        toast: t.toast,
+        navigate: n.navigate,
+        jira: {
+          ...noopJira,
+          createIssue: () =>
+            Promise.resolve({
+              ok: true,
+              key: 'HDR-99',
+              baseUrl: 'https://j',
+            } as CreateIssueResult),
+        },
+      }),
+    )
+    await coord.createIssue(form)
+    expect(n.events).toEqual([])
+  })
+
+  it('opens the Jira link in a new tab when the success toast cancel is invoked', async () => {
+    const b = fakeBrowser()
+    const coord = createCoordinator(
+      makeDeps({
+        browser: b.browser,
+        jira: {
+          ...noopJira,
+          createIssue: () =>
+            Promise.resolve({
+              ok: true,
+              key: 'HDR-99',
+              baseUrl: 'https://j',
+            } as CreateIssueResult),
+        },
+      }),
+    )
+    await coord.createIssue(form)
+    expect(b.events).toEqual([])
   })
 })
 
 describe('handleMrMerged', () => {
-  it('returns transitions-failed and toasts unauthorized when fetchTransitions returns unauthorized', async () => {
+  it('returns MrMergedTransitionsFailed and toasts unauthorized when fetchTransitions returns unauthorized', async () => {
     const t = fakeToast()
     const cache = fakeCache({
       fetchTransitions: async () => ({ ok: false, reason: 'unauthorized' }) as GetTransitionsResult,
     })
-    const service = createDashboardService(makeDeps({ cache, toast: t.toast }))
-    const result = await service.handleMrMerged({
+    const coord = createCoordinator(makeDeps({ cache, toast: t.toast }))
+    const result = await coord.handleMrMerged({
       key: 'HDR-1',
       targetStatusName: 'In STG',
     })
-    expect(result.ok).toBe(false)
-    expect(result.ok === false && result.reason).toBe('transitions-failed')
+    expect(result.isErr()).toBe(true)
+    expect(result.isErr() && result.error._tag).toBe('MrMergedTransitionsFailed')
     expect(t.events).toEqual([{ kind: 'error', message: 'Invalid Jira credentials' }])
   })
 
-  it('returns transitions-failed and toasts generic when fetchTransitions returns not-found', async () => {
+  it('returns MrMergedTransitionsFailed and toasts generic when fetchTransitions returns not-found', async () => {
     const t = fakeToast()
     const cache = fakeCache({
       fetchTransitions: async () => ({ ok: false, reason: 'not-found' }) as GetTransitionsResult,
     })
-    const service = createDashboardService(makeDeps({ cache, toast: t.toast }))
-    const result = await service.handleMrMerged({
+    const coord = createCoordinator(makeDeps({ cache, toast: t.toast }))
+    const result = await coord.handleMrMerged({
       key: 'HDR-1',
       targetStatusName: 'In STG',
     })
-    expect(result.ok === false && result.reason).toBe('transitions-failed')
+    expect(result.isErr() && result.error._tag).toBe('MrMergedTransitionsFailed')
     expect(t.events).toEqual([{ kind: 'error', message: "Couldn't load transitions" }])
   })
 
@@ -502,32 +574,32 @@ describe('handleMrMerged', () => {
         }) as GetTransitionsResult,
       cancelBoard: async () => {},
       cancelIssue: async () => {},
-      patchBoard: (() => () => {}) as DashboardCache['patchBoard'],
-      patchIssue: (() => () => {}) as DashboardCache['patchIssue'],
+      patchBoard: (() => () => {}) as Cache['patchBoard'],
+      patchIssue: (() => () => {}) as Cache['patchIssue'],
       invalidateIssue: () => {},
       invalidateTransitions: () => {},
     })
-    const service = createDashboardService(
+    const coord = createCoordinator(
       makeDeps({
         cache,
         jira: {
           ...noopJira,
-          transitionIssue: ((args: { data: { transitionId: string } }) => {
+          transitionIssue: (args) => {
             capturedTransitionId = args.data.transitionId
             return Promise.resolve({ ok: true } as TransitionIssueResult)
-          }) as DashboardServiceDeps['jira']['transitionIssue'],
+          },
         },
       }),
     )
-    const result = await service.handleMrMerged({
+    const result = await coord.handleMrMerged({
       key: 'HDR-1',
       targetStatusName: 'In STG',
     })
     expect(capturedTransitionId).toBe('99')
-    expect(result).toEqual({ ok: true, transitionId: '99' })
+    expect(result.isOk() && result.value).toEqual({ transitionId: '99' })
   })
 
-  it('returns no-direct-transition and toasts when no transition matches', async () => {
+  it('returns MrMergedNoDirectTransition and toasts when no transition matches', async () => {
     const t = fakeToast()
     const cache = fakeCache({
       fetchTransitions: async () =>
@@ -539,12 +611,12 @@ describe('handleMrMerged', () => {
           ],
         }) as GetTransitionsResult,
     })
-    const service = createDashboardService(makeDeps({ cache, toast: t.toast }))
-    const result = await service.handleMrMerged({
+    const coord = createCoordinator(makeDeps({ cache, toast: t.toast }))
+    const result = await coord.handleMrMerged({
       key: 'HDR-7',
       targetStatusName: 'In STG',
     })
-    expect(result.ok === false && result.reason).toBe('no-direct-transition')
+    expect(result.isErr() && result.error._tag).toBe('MrMergedNoDirectTransition')
     expect(t.events).toEqual([
       { kind: 'error', message: 'No direct transition to In STG. Move HDR-7 in Jira.' },
     ])
@@ -564,8 +636,8 @@ describe('refreshAll', () => {
       },
       calls,
     )
-    const service = createDashboardService(makeDeps({ cache }))
-    service.refreshAll()
+    const coord = createCoordinator(makeDeps({ cache }))
+    coord.refreshAll()
     expect(calls).toEqual([
       'invalidateBoard',
       'invalidateAllIssues',
@@ -578,10 +650,10 @@ describe('refreshAll', () => {
 describe('notifyUnauthorizedOnce', () => {
   it('fires toast.error exactly once across multiple calls', () => {
     const t = fakeToast()
-    const service = createDashboardService(makeDeps({ toast: t.toast }))
-    service.notifyUnauthorizedOnce('gitlab')
-    service.notifyUnauthorizedOnce('gitlab')
-    service.notifyUnauthorizedOnce('gitlab')
+    const coord = createCoordinator(makeDeps({ toast: t.toast }))
+    coord.notifyUnauthorizedOnce('gitlab')
+    coord.notifyUnauthorizedOnce('gitlab')
+    coord.notifyUnauthorizedOnce('gitlab')
     expect(t.events).toEqual([
       { kind: 'error', message: 'GitLab auth failed — check `GITLAB_TOKEN`' },
     ])

@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
-import { AuthGate } from '~/features/auth-status'
 import { Board } from '~/contexts/board'
-import { Header } from '~/features/header'
 import { IssueDetailPanel } from '~/contexts/detail'
+import { AuthGate } from './-auth-gate'
+import { Header } from './-header'
 
 type IndexSearch = { issue?: string }
 

@@ -1,11 +1,8 @@
 import { useEffect } from 'react'
 import { useQuery, type UseQueryResult } from '@tanstack/react-query'
-import {
-  DASHBOARD_QUERY_KEYS,
-  DASHBOARD_STALE_TIMES,
-  useBoardData,
-  useCoordinator,
-} from '~/coordinator'
+import { DASHBOARD_QUERY_KEYS, DASHBOARD_STALE_TIMES } from '~/coordinator/adapters/tanstack-cache'
+import { useBoardData } from '~/coordinator/hooks'
+import { useCoordinator } from '~/coordinator/provider'
 import type { GetReviewCardsResult } from '~/kernel'
 import { usePolling } from '~/lib/use-polling'
 import { getReviewCards } from '~/server/gitlab'

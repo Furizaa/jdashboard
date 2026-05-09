@@ -1,12 +1,13 @@
 import { match } from 'ts-pattern'
 import type { BoardIssue, Column, ReviewCard } from '~/kernel'
-import { COLUMNS, columnForStatus } from '~/kernel'
 import {
+  COLUMNS,
+  columnForStatus,
   REVIEW_BUCKET_STATUS_NAME,
   reviewBucketColumn,
   reviewCardId,
   reviewSearchHaystack,
-} from '~/contexts/review'
+} from '~/kernel'
 import type { AnimationState } from './animation-state'
 import type { ChangeVisual } from './change-indication'
 import { filterIssues } from './filter-issues'

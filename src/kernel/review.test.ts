@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import type { ReviewCard, ReviewCardFake, ReviewCardReal } from '~/kernel'
+import type { ReviewCard, ReviewCardFake, ReviewCardReal } from './gitlab'
 import {
   REVIEW_BUCKET_STATUS_NAME,
   REVIEW_CARD_ID_PREFIX,
   reviewBucketColumn,
   reviewCardId,
   reviewSearchHaystack,
-} from './projection'
+} from './review'
 
 const COMMON = {
   iid: 7,

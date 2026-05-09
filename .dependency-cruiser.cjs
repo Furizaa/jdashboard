@@ -4,26 +4,14 @@ module.exports = {
     {
       name: 'no-cross-context',
       comment:
-        'a bounded context cannot import another bounded context — cross-context coordination belongs in coordinator/. Graduated exception below for contexts/board → contexts/review.',
+        'a bounded context cannot import another bounded context — cross-context coordination belongs in coordinator/.',
       severity: 'error',
       from: {
         path: '^src/contexts/([^/]+)/',
-        pathNot: '^src/contexts/board/',
       },
       to: {
         path: '^src/contexts/([^/]+)/',
         pathNot: '^src/contexts/$1/',
-      },
-    },
-    {
-      name: 'board-may-only-cross-import-review',
-      comment:
-        'graduated exception: contexts/board imports contexts/review for the cards-on-the-board projection (the projection helpers + the review cache hook). Slice 58 (lockdown) revisits whether the projection should move to kernel/ to remove this cross-context edge entirely.',
-      severity: 'error',
-      from: { path: '^src/contexts/board/' },
-      to: {
-        path: '^src/contexts/[^/]+/',
-        pathNot: ['^src/contexts/board/', '^src/contexts/review/'],
       },
     },
     {
@@ -64,7 +52,7 @@ module.exports = {
       },
     },
     {
-      name: 'no-fixtures-in-production',
+      name: 'production-cant-import-fixtures',
       comment:
         '__fixtures__/ folders contain test-only fakes — production (non-test) code must not import from them',
       severity: 'error',
@@ -79,12 +67,12 @@ module.exports = {
     {
       name: 'board-domain-only-imports-kernel',
       comment:
-        "board's domain layer is pure: it may only import from ~/kernel, its own peers, and contexts/review (graduated cross-context exception for the review-card projection — see slice 58 lockdown).",
+        "board's domain layer is pure: it may only import from ~/kernel and its own peers.",
       severity: 'error',
       from: { path: '^src/contexts/board/domain/' },
       to: {
         path: '^src/',
-        pathNot: '^(src/contexts/board/domain/|src/kernel/|src/contexts/review/)',
+        pathNot: '^(src/contexts/board/domain/|src/kernel/)',
       },
     },
     {
@@ -116,7 +104,7 @@ module.exports = {
     {
       name: 'detail-domain-only-imports-kernel',
       comment:
-        "detail's domain layer is pure: it may only import from ~/kernel and its own peers — graduated rule active now that contexts/detail/ exists",
+        "detail's domain layer is pure: it may only import from ~/kernel and its own peers",
       severity: 'error',
       from: { path: '^src/contexts/detail/domain/' },
       to: {
@@ -153,7 +141,7 @@ module.exports = {
     {
       name: 'capture-domain-only-imports-kernel',
       comment:
-        "capture's domain layer is pure: it may only import from ~/kernel and its own peers — graduated rule active now that contexts/capture/ exists",
+        "capture's domain layer is pure: it may only import from ~/kernel and its own peers",
       severity: 'error',
       from: { path: '^src/contexts/capture/domain/' },
       to: {
@@ -188,17 +176,6 @@ module.exports = {
       },
     },
     {
-      name: 'review-domain-only-imports-kernel',
-      comment:
-        "review's domain layer is pure: it may only import from ~/kernel and its own peers — graduated rule active now that contexts/review/ exists",
-      severity: 'error',
-      from: { path: '^src/contexts/review/domain/' },
-      to: {
-        path: '^src/',
-        pathNot: '^(src/contexts/review/domain/|src/kernel/)',
-      },
-    },
-    {
       name: 'review-application-only-imports-kernel-and-self',
       comment:
         "review's application layer talks to gateway/cache ports declared inside the context — it may only import ~/kernel and its own peers",
@@ -213,7 +190,7 @@ module.exports = {
       },
     },
     {
-      name: 'widgets-cant-import-contexts',
+      name: 'widgets-stay-out-of-contexts',
       comment:
         'widgets are reusable visual surfaces — they must not depend on any bounded context. Cross-cutting wiring belongs at the route or coordinator layer.',
       severity: 'error',
@@ -221,7 +198,7 @@ module.exports = {
       to: { path: '^src/contexts/' },
     },
     {
-      name: 'coordinator-cant-import-context-presenter-or-view',
+      name: 'coordinator-cant-see-context-views',
       comment:
         "coordinator orchestrates contexts via their public ports — it must not reach into a context's view, presenter, or view-model. Cross-context wiring goes through ports + application services.",
       severity: 'error',
@@ -229,7 +206,7 @@ module.exports = {
       to: { path: '^src/contexts/[^/]+/(view|presenter|view-model)/' },
     },
     {
-      name: 'coordinator-react-deps-stay-at-the-boundary',
+      name: 'coordinator-effects-only-in-adapters',
       comment:
         'inside coordinator/, react / @tanstack/react-* / sonner live only at the framework boundary: adapters/, provider.tsx, and hooks.ts (presenter-helper hooks). The coordinator factory itself (coordinator.ts, ports.ts, errors.ts) stays framework-free.',
       severity: 'error',
@@ -267,6 +244,14 @@ module.exports = {
         path: '^@tanstack/react-query($|/)',
         dependencyTypes: ['npm', 'npm-dev', 'npm-peer'],
       },
+    },
+    {
+      name: 'no-features-folder',
+      comment:
+        'src/features/ no longer exists in this architecture — components live in contexts/ (bounded contexts), widgets/ (reusable surfaces), routes/ (route shell), or lib/ (utilities). Any import to or from features/ is a CI failure.',
+      severity: 'error',
+      from: { path: '^src/' },
+      to: { path: '^src/features/' },
     },
   ],
   options: {

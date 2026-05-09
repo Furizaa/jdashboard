@@ -1,8 +1,8 @@
 import { useEffect, useReducer, useRef } from 'react'
-import { useBoardData, useMrStatuses } from '~/coordinator'
-import { reviewCardId, useReviewCards } from '~/contexts/review'
+import { useBoardData, useMrStatuses, useReviewCards } from '~/coordinator'
 import { usePolling } from '~/lib/use-polling'
 import type { BoardIssue, ReviewCard } from '~/kernel'
+import { reviewCardId } from '~/kernel'
 import { diffChange, indexBy, type ChangeOptions } from '../domain'
 import { derive, initialState, reduce, type DisplayState } from '../view-model/board-view-model'
 

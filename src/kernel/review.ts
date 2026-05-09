@@ -1,5 +1,6 @@
 import { match } from 'ts-pattern'
-import type { Column, ReviewCard, ReviewCardReal } from '~/kernel'
+import type { Column } from './columns'
+import type { ReviewCard, ReviewCardReal } from './gitlab'
 
 export const REVIEW_CARD_ID_PREFIX = 'review:'
 

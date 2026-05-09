@@ -1,4 +1,4 @@
-import { columnForStatus } from '~/features/board'
+import { columnForStatus } from '~/kernel'
 import type { BoardIssue } from '~/server/jira'
 
 export function findSiblings(

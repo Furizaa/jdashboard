@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { AuthGate } from '~/features/auth-status'
-import { Board } from '~/features/board'
+import { Board } from '~/contexts/board'
 import { Header } from '~/features/header'
 import { IssueDetailPanel } from '~/features/ticket-detail'
 

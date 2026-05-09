@@ -49,6 +49,56 @@ module.exports = {
         path: '^src/(contexts|widgets|coordinator|routes|design-system)/',
       },
     },
+    {
+      name: 'no-fixtures-in-production',
+      comment:
+        '__fixtures__/ folders contain test-only fakes — production (non-test) code must not import from them',
+      severity: 'error',
+      from: {
+        path: '^src/',
+        pathNot: '\\.(test|spec)\\.(ts|tsx)$',
+      },
+      to: {
+        path: '/__fixtures__/',
+      },
+    },
+    {
+      name: 'board-domain-only-imports-kernel',
+      comment:
+        "board's domain layer is pure: it may only import from ~/kernel and its own peers — graduated rule active now that contexts/board/ exists",
+      severity: 'error',
+      from: { path: '^src/contexts/board/domain/' },
+      to: {
+        path: '^src/',
+        pathNot: '^(src/contexts/board/domain/|src/kernel/)',
+      },
+    },
+    {
+      name: 'board-application-only-imports-kernel-and-self',
+      comment:
+        "board's application layer talks to gateway/cache ports declared inside the context — it may only import ~/kernel and its own peers",
+      severity: 'error',
+      from: {
+        path: '^src/contexts/board/application/',
+        pathNot: '/__fixtures__/',
+      },
+      to: {
+        path: '^src/',
+        pathNot: '^(src/contexts/board/application/|src/kernel/)',
+      },
+    },
+    {
+      name: 'board-view-model-only-imports-kernel-and-domain',
+      comment:
+        "board's view-model is framework-free; it may only import ~/kernel, its own domain, and its own peers",
+      severity: 'error',
+      from: { path: '^src/contexts/board/view-model/' },
+      to: {
+        path: '^src/',
+        pathNot:
+          '^(src/contexts/board/view-model/|src/contexts/board/domain/|src/kernel/)',
+      },
+    },
   ],
   options: {
     doNotFollow: { path: 'node_modules' },

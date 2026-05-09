@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { resolveTransition } from './transition-resolver'
-import { COLUMNS, statusesForColumn, type Column } from '~/features/board'
+import { COLUMNS, statusesForColumn, type Column } from '~/kernel'
 import type { AllowedTransition } from '~/server/jira'
 
 const ALL_STATUSES = [

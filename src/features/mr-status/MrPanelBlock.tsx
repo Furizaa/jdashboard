@@ -1,6 +1,6 @@
 import { AlertTriangle, MessageSquare } from 'lucide-react'
 import { cn } from '~/lib/cn'
-import { columnForStatus } from '~/features/board'
+import { columnForStatus } from '~/kernel'
 import { useBoardData, useMrFor } from '~/coordinator'
 import type { MrReviewerState } from '~/server/gitlab'
 import type { CiVisualState } from './ci-state'

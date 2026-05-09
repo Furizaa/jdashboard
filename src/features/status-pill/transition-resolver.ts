@@ -1,4 +1,4 @@
-import { columnForStatus, statusesForColumn, type Column } from '~/features/board'
+import { columnForStatus, statusesForColumn, type Column } from '~/kernel'
 import type { AllowedTransition } from '~/server/jira'
 
 export function resolveTransition(

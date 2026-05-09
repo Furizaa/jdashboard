@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import type { BoardIssue } from '~/server/jira'
-import type { ReviewCard, ReviewCardReal } from '~/server/gitlab'
+import type { BoardIssue, ReviewCard, ReviewCardReal } from '~/kernel'
 import { assembleColumns, type ColumnItem } from './assemble-columns'
-import type { ChangeIndicationResult } from './use-change-indication'
+import type { ChangeVisual } from './change-indication'
 
 function issue(key: string, overrides: Partial<BoardIssue> = {}): BoardIssue {
   return {
@@ -16,9 +15,7 @@ function issue(key: string, overrides: Partial<BoardIssue> = {}): BoardIssue {
   }
 }
 
-function jiraChange(
-  overrides: Partial<ChangeIndicationResult<BoardIssue>> = {},
-): ChangeIndicationResult<BoardIssue> {
+function jiraChange(overrides: Partial<ChangeVisual<BoardIssue>> = {}): ChangeVisual<BoardIssue> {
   return {
     enteringKeys: new Set<string>(),
     changedKeys: new Set<string>(),
@@ -27,9 +24,7 @@ function jiraChange(
   }
 }
 
-function reviewChange(
-  overrides: Partial<ChangeIndicationResult<ReviewCard>> = {},
-): ChangeIndicationResult<ReviewCard> {
+function reviewChange(overrides: Partial<ChangeVisual<ReviewCard>> = {}): ChangeVisual<ReviewCard> {
   return {
     enteringKeys: new Set<string>(),
     changedKeys: new Set<string>(),

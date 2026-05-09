@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { BoardIssue } from '~/server/jira'
+import type { BoardIssue } from '~/kernel'
 import { filterIssues } from './filter-issues'
 
 function issue(key: string, summary: string): BoardIssue {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { BoardIssue } from '~/server/jira'
+import type { BoardIssue } from '~/kernel'
 import { sortColumnIssues } from './sort-column'
 
 function issue(key: string, statusName: string): BoardIssue {

@@ -1,6 +1,4 @@
-import type { BoardIssue } from '~/server/jira'
-
-type Filterable = Pick<BoardIssue, 'key' | 'summary'>
+type Filterable = { key: string; summary: string }
 
 export function filterIssues<T extends Filterable>(
   issues: readonly T[],

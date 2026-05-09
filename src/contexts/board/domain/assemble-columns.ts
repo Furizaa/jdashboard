@@ -1,10 +1,10 @@
-import type { BoardIssue } from '~/server/jira'
-import type { ReviewCard, ReviewCardReal } from '~/server/gitlab'
-import type { TicketCardAnimationState } from '~/features/ticket-card'
-import { COLUMNS, columnForStatus, type Column } from './status-mapping'
+import { match } from 'ts-pattern'
+import type { BoardIssue, Column, ReviewCard, ReviewCardReal } from '~/kernel'
+import { COLUMNS, columnForStatus } from '~/kernel'
+import type { AnimationState } from './animation-state'
+import type { ChangeVisual } from './change-indication'
 import { filterIssues } from './filter-issues'
 import { sortColumnIssues } from './sort-column'
-import type { ChangeIndicationResult } from './use-change-indication'
 
 export type CardSource = { kind: 'jira'; issue: BoardIssue } | { kind: 'review'; card: ReviewCard }
 
@@ -12,12 +12,11 @@ export type ColumnItem = {
   card: CardSource
   /** Stable id for animation/key purposes (Jira key for jira; review:<iid> for review cards). */
   id: string
-  state: TicketCardAnimationState
+  state: AnimationState
 }
 
 function reviewBucketColumn(bucket: ReviewCard['bucket']): Column {
-  if (bucket === 'accepted') return 'Done'
-  return 'TO DO'
+  return bucket === 'accepted' ? 'Done' : 'TO DO'
 }
 
 const REVIEW_BUCKET_STATUS_NAME: Record<ReviewCardReal['bucket'], string> = {
@@ -27,32 +26,34 @@ const REVIEW_BUCKET_STATUS_NAME: Record<ReviewCardReal['bucket'], string> = {
 }
 
 function statusNameForItem(item: ColumnItem): string {
-  if (item.card.kind === 'jira') return item.card.issue.statusName
-  return REVIEW_BUCKET_STATUS_NAME[item.card.card.bucket]
+  return match(item.card)
+    .with({ kind: 'jira' }, ({ issue }) => issue.statusName)
+    .with({ kind: 'review' }, ({ card }) => REVIEW_BUCKET_STATUS_NAME[card.bucket])
+    .exhaustive()
 }
 
 function reviewSearchHaystack(card: ReviewCard): string {
-  if (card.kind === 'review-real') {
-    return `${card.jira.key} ${card.jira.summary}`.toLowerCase()
-  }
-  return `MR !${card.iid} ${card.title}`.toLowerCase()
+  return match(card)
+    .with({ kind: 'review-real' }, (c) => `${c.jira.key} ${c.jira.summary}`.toLowerCase())
+    .with({ kind: 'review-fake' }, (c) => `MR !${c.iid} ${c.title}`.toLowerCase())
+    .exhaustive()
 }
 
 function matchesSearch(card: CardSource, query: string): boolean {
   const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
   if (terms.length === 0) return true
-  const haystack =
-    card.kind === 'jira'
-      ? `${card.issue.key} ${card.issue.summary}`.toLowerCase()
-      : reviewSearchHaystack(card.card)
+  const haystack = match(card)
+    .with({ kind: 'jira' }, ({ issue }) => `${issue.key} ${issue.summary}`.toLowerCase())
+    .with({ kind: 'review' }, ({ card: rc }) => reviewSearchHaystack(rc))
+    .exhaustive()
   return terms.every((term) => haystack.includes(term))
 }
 
-function animationState(
+function animationStateOf(
   id: string,
   enteringKeys: ReadonlySet<string>,
   changedKeys: ReadonlySet<string>,
-): TicketCardAnimationState {
+): AnimationState {
   if (enteringKeys.has(id)) return 'entering'
   if (changedKeys.has(id)) return 'changed'
   return 'idle'
@@ -60,9 +61,9 @@ function animationState(
 
 export function assembleColumns(input: {
   liveIssues: readonly BoardIssue[]
-  jiraChange: ChangeIndicationResult<BoardIssue>
+  jiraChange: ChangeVisual<BoardIssue>
   reviewCards?: readonly ReviewCard[]
-  reviewChange?: ChangeIndicationResult<ReviewCard>
+  reviewChange?: ChangeVisual<ReviewCard>
   searchQuery: string
 }): Record<Column, ColumnItem[]> {
   const { liveIssues, jiraChange, reviewCards, reviewChange, searchQuery } = input
@@ -76,7 +77,7 @@ export function assembleColumns(input: {
     result[columnForStatus(issue.statusName)].push({
       card: { kind: 'jira', issue },
       id: issue.key,
-      state: animationState(issue.key, jiraChange.enteringKeys, jiraChange.changedKeys),
+      state: animationStateOf(issue.key, jiraChange.enteringKeys, jiraChange.changedKeys),
     })
   }
   for (const leavingIssue of filterIssues([...jiraChange.leaving.values()], searchQuery)) {
@@ -96,7 +97,7 @@ export function assembleColumns(input: {
       result[reviewBucketColumn(rc.bucket)].push({
         card: cardInput,
         id,
-        state: animationState(id, entering, changed),
+        state: animationStateOf(id, entering, changed),
       })
     }
   }
@@ -116,7 +117,11 @@ export function assembleColumns(input: {
     const sortables = items.map((item) => ({ id: item.id, statusName: statusNameForItem(item) }))
     const sorted = sortColumnIssues(sortables, column)
     const itemById = new Map(items.map((item) => [item.id, item]))
-    result[column] = sorted.map((s) => itemById.get(s.id)!)
+    result[column] = sorted.map((s) => {
+      const item = itemById.get(s.id)
+      if (item === undefined) throw new Error(`assembleColumns: missing item for id ${s.id}`)
+      return item
+    })
   }
   return result
 }

@@ -1,5 +1,4 @@
-import { columnForStatus } from '~/kernel'
-import type { BoardIssue } from '~/server/jira'
+import { columnForStatus, type BoardIssue } from '~/kernel'
 
 export function findSiblings(
   issueKey: string,

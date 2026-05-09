@@ -1,0 +1,1 @@
+export { IssueDetailPanel } from './view'

@@ -1,4 +1,4 @@
-import type { AdfNode } from '~/server/jira'
+import type { AdfNode } from '~/kernel'
 
 const BLOCK_TYPES = new Set([
   'paragraph',

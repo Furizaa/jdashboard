@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { render } from '@testing-library/react'
-import type { AdfNode } from '~/server/jira'
+import type { AdfNode } from '~/kernel'
 import { RenderAdf } from './RenderAdf'
 
 function html(doc: AdfNode | null): string {

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { AdfNode } from '~/server/jira'
+import type { AdfNode } from '~/kernel'
 import { Paragraph } from './nodes/Paragraph'
 import { Heading } from './nodes/Heading'
 import { Text } from './nodes/Text'

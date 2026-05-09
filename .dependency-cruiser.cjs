@@ -99,6 +99,43 @@ module.exports = {
           '^(src/contexts/board/view-model/|src/contexts/board/domain/|src/kernel/)',
       },
     },
+    {
+      name: 'detail-domain-only-imports-kernel',
+      comment:
+        "detail's domain layer is pure: it may only import from ~/kernel and its own peers — graduated rule active now that contexts/detail/ exists",
+      severity: 'error',
+      from: { path: '^src/contexts/detail/domain/' },
+      to: {
+        path: '^src/',
+        pathNot: '^(src/contexts/detail/domain/|src/kernel/)',
+      },
+    },
+    {
+      name: 'detail-application-only-imports-kernel-and-self',
+      comment:
+        "detail's application layer talks to gateway/cache ports declared inside the context — it may only import ~/kernel and its own peers",
+      severity: 'error',
+      from: {
+        path: '^src/contexts/detail/application/',
+        pathNot: '/__fixtures__/',
+      },
+      to: {
+        path: '^src/',
+        pathNot: '^(src/contexts/detail/application/|src/kernel/)',
+      },
+    },
+    {
+      name: 'detail-view-model-only-imports-kernel-and-domain',
+      comment:
+        "detail's view-model is framework-free; it may only import ~/kernel, its own domain, and its own peers",
+      severity: 'error',
+      from: { path: '^src/contexts/detail/view-model/' },
+      to: {
+        path: '^src/',
+        pathNot:
+          '^(src/contexts/detail/view-model/|src/contexts/detail/domain/|src/kernel/)',
+      },
+    },
   ],
   options: {
     doNotFollow: { path: 'node_modules' },

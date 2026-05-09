@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { formatDistanceToNow } from 'date-fns'
-import type { DetailIssue } from '~/server/jira'
+import type { DetailIssue } from '~/kernel'
 import { RenderAdf } from './adf'
 
 type Comment = DetailIssue['comments'][number]

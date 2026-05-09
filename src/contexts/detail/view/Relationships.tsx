@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import type { IssueLink, LinkedIssueRef } from '~/server/jira'
+import type { IssueLink, LinkedIssueRef } from '~/kernel'
 import { TypeIcon } from '~/features/ticket-card'
 import { StatusPill } from '~/features/status-pill'
 import { testIds } from '~/lib/testids'

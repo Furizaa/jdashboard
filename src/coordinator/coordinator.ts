@@ -112,6 +112,7 @@ export function createCoordinator(deps: CoordinatorDeps): Coordinator {
       .with({ ok: true }, (): Result<void, ApplyTransitionError> => {
         cache.invalidateIssue(key)
         cache.invalidateTransitions(key)
+        // oxlint-disable-next-line no-useless-undefined -- neverthrow's ok<void>() requires explicit undefined
         return ok(undefined)
       })
       .with({ ok: false, reason: 'rejected' }, ({ message }) => {

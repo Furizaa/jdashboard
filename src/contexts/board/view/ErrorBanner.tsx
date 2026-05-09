@@ -13,7 +13,7 @@ export function ErrorBanner({
       role="alert"
       className="border-destructive/40 bg-destructive/10 mx-4 mt-4 flex shrink-0 items-center gap-3 rounded-md border px-3 py-2 text-sm"
     >
-      <span className="text-destructive font-medium">Couldn't reach Jira.</span>
+      <span className="text-destructive font-medium">Couldn&apos;t reach Jira.</span>
       <span className="text-muted-foreground" title={errorMessage}>
         Retrying in {retrySeconds}s.
       </span>

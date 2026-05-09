@@ -56,8 +56,8 @@ function readAndValidate(): ServerEnv {
     throw new Error(message)
   }
 
-  const baseUrl = values.JIRA_BASE_URL!.replace(/\/+$/, '')
-  const gitlabBaseUrl = values.GITLAB_BASE_URL!.replace(/\/+$/, '')
+  const baseUrl = values.JIRA_BASE_URL!.replace(/\/+$/u, '')
+  const gitlabBaseUrl = values.GITLAB_BASE_URL!.replace(/\/+$/u, '')
 
   const hideLabelsRaw = process.env.JIRA_HIDE_LABELS ?? ''
   const hideLabels = hideLabelsRaw

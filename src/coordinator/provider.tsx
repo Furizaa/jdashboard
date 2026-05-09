@@ -10,7 +10,7 @@ import { createCoordinator, type Coordinator } from './coordinator'
 
 const CREATE_ISSUE_TIMEOUT_MS = 10_000
 
-export const CoordinatorCtx = createContext<Coordinator | null>(null)
+const CoordinatorCtx = createContext<Coordinator | null>(null)
 
 export function useCoordinator(): Coordinator {
   const coord = useContext(CoordinatorCtx)

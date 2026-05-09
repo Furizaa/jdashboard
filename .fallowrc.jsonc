@@ -1,0 +1,40 @@
+{
+  // _tag is the neverthrow / ts-pattern discriminator on error classes — present
+  // by design even when only string-matched in pattern matching.
+  "usedClassMembers": ["_tag"],
+
+  // start.ts is referenced only by the auto-generated route tree, which fallow
+  // (correctly) ignores. routeTree.gen.ts is rebuilt by `pnpm gen:routes`.
+  "dynamicallyLoaded": ["src/start.ts", "src/routeTree.gen.ts"],
+
+  // srvx is invoked by playwright.config.ts as a CLI, not imported.
+  "ignoreDependencies": ["srvx"],
+
+  // Exports referenced only inside their own file are still legitimate top-level
+  // declarations (e.g. constants used by hooks defined in the same file).
+  "ignoreExportsUsedInFile": true,
+
+  "duplicates": {
+    // Test fixtures legitimately repeat setup blocks; the duplication signal is
+    // most useful for production code, so we tighten the threshold there only.
+    "ignore": [
+      "**/*.test.ts",
+      "**/*.test.tsx",
+      "**/*.spec.ts",
+      "**/__fixtures__/**",
+      "tests/e2e/**"
+    ]
+  },
+
+  "health": {
+    // Long arrow functions in test files are usually `describe(..., () => { ... })`
+    // bodies — they do not represent production complexity.
+    "ignore": [
+      "**/*.test.ts",
+      "**/*.test.tsx",
+      "**/*.spec.ts",
+      "**/__fixtures__/**",
+      "tests/e2e/**"
+    ]
+  }
+}

@@ -14,8 +14,8 @@ export const LABEL_COLOR_PALETTE = [
 export function colorForLabel(label: string): string {
   let hash = 5381
   for (let i = 0; i < label.length; i++) {
-    hash = (hash * 33) ^ label.charCodeAt(i)
+    hash = (hash * 33) ^ label.codePointAt(i)!
   }
-  const idx = Math.abs(hash | 0) % LABEL_COLOR_PALETTE.length
+  const idx = Math.abs(Math.trunc(hash)) % LABEL_COLOR_PALETTE.length
   return LABEL_COLOR_PALETTE[idx]!
 }

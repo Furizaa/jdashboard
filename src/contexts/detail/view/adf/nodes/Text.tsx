@@ -5,14 +5,14 @@ type Mark = {
   attrs?: Record<string, string | number | boolean | null>
 }
 
-export function Text({ text, marks }: { text: string; marks?: Mark[] }) {
+export function Text({ text, marks }: { text: string; marks?: Mark[] }): ReactNode {
   let node: ReactNode = text
   if (marks !== undefined) {
     for (const mark of marks) {
       node = applyMark(node, mark)
     }
   }
-  return <>{node}</>
+  return node
 }
 
 function applyMark(node: ReactNode, mark: Mark): ReactNode {

@@ -1,11 +1,6 @@
 import { useEffect, useReducer, useRef, type RefObject } from 'react'
 import { useTransitionAction, useTransitions } from '~/coordinator'
-import {
-  derive,
-  initialState,
-  reduce,
-  type DisplayState,
-} from '../view-model/status-pill-select-view-model'
+import { derive, initialState, reduce, type DisplayState } from '../view-model'
 
 export type StatusPillSelectApi = {
   display: DisplayState

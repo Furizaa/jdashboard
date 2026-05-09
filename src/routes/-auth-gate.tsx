@@ -5,7 +5,7 @@ import { cn } from '~/lib/cn'
 
 const TOKEN_PAGE_URL = 'https://id.atlassian.com/manage-profile/security/api-tokens'
 
-export function AuthGate({ children }: { children: ReactNode }) {
+export function AuthGate({ children }: { children: ReactNode }): ReactNode {
   const query = useQuery({
     queryKey: ['jira', 'myself'],
     queryFn: () => getMyself(),
@@ -34,7 +34,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
     return <InvalidCredentials />
   }
 
-  return <>{children}</>
+  return children
 }
 
 function InvalidCredentials() {

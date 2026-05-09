@@ -15,7 +15,7 @@ export const TYPE_STYLES = {
   spike: { Icon: Flame, color: '#f97316', bg: 'rgba(249, 115, 22, 0.14)' },
 } satisfies Record<string, TypeStyle>
 
-export const TYPE_STYLE_FALLBACK: TypeStyle = {
+const TYPE_STYLE_FALLBACK: TypeStyle = {
   Icon: CheckSquare,
   color: '#94a3b8',
   bg: 'rgba(148, 163, 184, 0.14)',

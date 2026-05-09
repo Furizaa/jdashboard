@@ -135,7 +135,7 @@ const BOARD_FIELDS = ['summary', 'status', 'labels', 'issuetype', 'parent'] as c
 const EPIC_FIELDS = ['summary'] as const
 
 function quoteJqlString(value: string): string {
-  return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
+  return `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`
 }
 
 function buildBoardJql(input: {

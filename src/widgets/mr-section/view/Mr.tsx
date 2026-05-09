@@ -1,4 +1,4 @@
-import { createContext, useContext, type ReactNode } from 'react'
+import { createContext, useContext, useMemo, type ReactNode } from 'react'
 import { match } from 'ts-pattern'
 import { AlertTriangle, MessageSquare } from 'lucide-react'
 import { useMrMergedAction } from '~/coordinator'
@@ -46,6 +46,11 @@ function Root({
   column: Column | null
   children: ReactNode
 }) {
+  const ctxValue = useMemo(
+    () => ({ summary, layout, issueKey, column }),
+    [summary, layout, issueKey, column],
+  )
+
   if (state.kind === 'idle') return null
   if (state.kind === 'loading') {
     if (layout === 'row') {
@@ -68,7 +73,7 @@ function Root({
   }
 
   return (
-    <MrContext.Provider value={{ summary, layout, issueKey, column }}>
+    <MrContext.Provider value={ctxValue}>
       {layout === 'row' ? (
         <CardShell summary={summary}>{children}</CardShell>
       ) : (
@@ -92,7 +97,7 @@ function CardShell({ summary, children }: { summary: MrSummary | null; children:
           {children}
         </div>
       ) : (
-        <>{children}</>
+        children
       )}
     </div>
   )

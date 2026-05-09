@@ -1,21 +1,26 @@
 import type { ReactNode } from 'react'
+import { match, P } from 'ts-pattern'
 import type { AdfNode } from '~/kernel'
-import { Paragraph } from './nodes/Paragraph'
-import { Heading } from './nodes/Heading'
-import { Text } from './nodes/Text'
-import { BulletList } from './nodes/BulletList'
-import { OrderedList } from './nodes/OrderedList'
-import { ListItem } from './nodes/ListItem'
-import { CodeBlock } from './nodes/CodeBlock'
-import { Blockquote } from './nodes/Blockquote'
-import { HardBreak } from './nodes/HardBreak'
-import { Rule } from './nodes/Rule'
-import { Mention } from './nodes/Mention'
-import { Emoji } from './nodes/Emoji'
-import { Status } from './nodes/Status'
-import { Panel } from './nodes/Panel'
-import { Media, MediaGroup, MediaSingle } from './nodes/Media'
-import { Unsupported } from './nodes/Unsupported'
+import {
+  Blockquote,
+  BulletList,
+  CodeBlock,
+  Emoji,
+  HardBreak,
+  Heading,
+  ListItem,
+  Media,
+  MediaGroup,
+  MediaSingle,
+  Mention,
+  OrderedList,
+  Panel,
+  Paragraph,
+  Rule,
+  Status,
+  Text,
+  Unsupported,
+} from './nodes'
 
 export function RenderAdf({ doc, jiraUrl }: { doc: AdfNode | null; jiraUrl?: string }) {
   if (doc === null) return null
@@ -23,66 +28,66 @@ export function RenderAdf({ doc, jiraUrl }: { doc: AdfNode | null; jiraUrl?: str
 }
 
 function renderNode(node: AdfNode, key: number, jiraUrl: string | undefined): ReactNode {
-  switch (node.type) {
-    case 'doc':
-      return <div key={key}>{renderChildren(node, jiraUrl)}</div>
-    case 'paragraph':
-      return <Paragraph key={key}>{renderChildren(node, jiraUrl)}</Paragraph>
-    case 'heading': {
-      const level = typeof node.attrs?.level === 'number' ? node.attrs.level : 1
-      return (
-        <Heading key={key} level={level}>
-          {renderChildren(node, jiraUrl)}
-        </Heading>
-      )
-    }
-    case 'text':
-      return <Text key={key} text={node.text ?? ''} marks={node.marks} />
-    case 'bulletList':
-      return <BulletList key={key}>{renderChildren(node, jiraUrl)}</BulletList>
-    case 'orderedList':
-      return <OrderedList key={key}>{renderChildren(node, jiraUrl)}</OrderedList>
-    case 'listItem':
-      return <ListItem key={key}>{renderChildren(node, jiraUrl)}</ListItem>
-    case 'codeBlock':
-      return <CodeBlock key={key}>{renderChildren(node, jiraUrl)}</CodeBlock>
-    case 'blockquote':
-      return <Blockquote key={key}>{renderChildren(node, jiraUrl)}</Blockquote>
-    case 'hardBreak':
-      return <HardBreak key={key} />
-    case 'rule':
-      return <Rule key={key} />
-    case 'mention': {
-      const text = typeof node.attrs?.text === 'string' ? node.attrs.text : ''
-      return <Mention key={key} text={text} />
-    }
-    case 'emoji': {
-      const text = typeof node.attrs?.text === 'string' ? node.attrs.text : undefined
-      const shortName = typeof node.attrs?.shortName === 'string' ? node.attrs.shortName : undefined
-      return <Emoji key={key} text={text} shortName={shortName} />
-    }
-    case 'status': {
-      const text = typeof node.attrs?.text === 'string' ? node.attrs.text : ''
-      const color = typeof node.attrs?.color === 'string' ? node.attrs.color : 'neutral'
-      return <Status key={key} text={text} color={color} />
-    }
-    case 'panel': {
-      const panelType = typeof node.attrs?.panelType === 'string' ? node.attrs.panelType : 'info'
-      return (
-        <Panel key={key} panelType={panelType}>
-          {renderChildren(node, jiraUrl)}
-        </Panel>
-      )
-    }
-    case 'mediaSingle':
-      return <MediaSingle key={key}>{renderChildren(node, jiraUrl)}</MediaSingle>
-    case 'mediaGroup':
-      return <MediaGroup key={key}>{renderChildren(node, jiraUrl)}</MediaGroup>
-    case 'media':
-      return <Media key={key} attrs={node.attrs} jiraUrl={jiraUrl} />
-    default:
-      return <Unsupported key={key} type={node.type ?? 'unknown'} />
-  }
+  return match(node)
+    .with({ type: 'doc' }, (n) => <div key={key}>{renderChildren(n, jiraUrl)}</div>)
+    .with({ type: 'paragraph' }, (n) => (
+      <Paragraph key={key}>{renderChildren(n, jiraUrl)}</Paragraph>
+    ))
+    .with({ type: 'heading' }, (n) => (
+      <Heading key={key} level={typeof n.attrs?.level === 'number' ? n.attrs.level : 1}>
+        {renderChildren(n, jiraUrl)}
+      </Heading>
+    ))
+    .with({ type: 'text' }, (n) => <Text key={key} text={n.text ?? ''} marks={n.marks} />)
+    .with({ type: 'bulletList' }, (n) => (
+      <BulletList key={key}>{renderChildren(n, jiraUrl)}</BulletList>
+    ))
+    .with({ type: 'orderedList' }, (n) => (
+      <OrderedList key={key}>{renderChildren(n, jiraUrl)}</OrderedList>
+    ))
+    .with({ type: 'listItem' }, (n) => <ListItem key={key}>{renderChildren(n, jiraUrl)}</ListItem>)
+    .with({ type: 'codeBlock' }, (n) => (
+      <CodeBlock key={key}>{renderChildren(n, jiraUrl)}</CodeBlock>
+    ))
+    .with({ type: 'blockquote' }, (n) => (
+      <Blockquote key={key}>{renderChildren(n, jiraUrl)}</Blockquote>
+    ))
+    .with({ type: 'hardBreak' }, () => <HardBreak key={key} />)
+    .with({ type: 'rule' }, () => <Rule key={key} />)
+    .with({ type: 'mention' }, (n) => (
+      <Mention key={key} text={typeof n.attrs?.text === 'string' ? n.attrs.text : ''} />
+    ))
+    .with({ type: 'emoji' }, (n) => (
+      <Emoji
+        key={key}
+        text={typeof n.attrs?.text === 'string' ? n.attrs.text : undefined}
+        shortName={typeof n.attrs?.shortName === 'string' ? n.attrs.shortName : undefined}
+      />
+    ))
+    .with({ type: 'status' }, (n) => (
+      <Status
+        key={key}
+        text={typeof n.attrs?.text === 'string' ? n.attrs.text : ''}
+        color={typeof n.attrs?.color === 'string' ? n.attrs.color : 'neutral'}
+      />
+    ))
+    .with({ type: 'panel' }, (n) => (
+      <Panel
+        key={key}
+        panelType={typeof n.attrs?.panelType === 'string' ? n.attrs.panelType : 'info'}
+      >
+        {renderChildren(n, jiraUrl)}
+      </Panel>
+    ))
+    .with({ type: 'mediaSingle' }, (n) => (
+      <MediaSingle key={key}>{renderChildren(n, jiraUrl)}</MediaSingle>
+    ))
+    .with({ type: 'mediaGroup' }, (n) => (
+      <MediaGroup key={key}>{renderChildren(n, jiraUrl)}</MediaGroup>
+    ))
+    .with({ type: 'media' }, (n) => <Media key={key} attrs={n.attrs} jiraUrl={jiraUrl} />)
+    .with({ type: P.string }, (n) => <Unsupported key={key} type={n.type} />)
+    .otherwise(() => <Unsupported key={key} type="unknown" />)
 }
 
 function renderChildren(node: AdfNode, jiraUrl: string | undefined): ReactNode {

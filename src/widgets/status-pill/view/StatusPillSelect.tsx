@@ -83,7 +83,7 @@ function DropdownContents({
   return match(dropdown)
     .with({ kind: 'loading' }, () => <DropdownMessage>Loading transitions…</DropdownMessage>)
     .with({ kind: 'error-network' }, () => (
-      <DropdownMessage>Couldn't load transitions</DropdownMessage>
+      <DropdownMessage>Couldn&apos;t load transitions</DropdownMessage>
     ))
     .with({ kind: 'error-unauthorized' }, () => (
       <DropdownMessage>Invalid Jira credentials</DropdownMessage>

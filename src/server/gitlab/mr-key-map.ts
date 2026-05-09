@@ -1,11 +1,11 @@
 import type { RawMrSummary } from './gateway'
 
 function escapeRegex(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return value.replaceAll(/[.*+?^${}()|[\]\\]/gu, '\\$&')
 }
 
-export function buildKeyRegex(projectKey: string): RegExp {
-  return new RegExp(`\\b${escapeRegex(projectKey)}-\\d+\\b`, 'g')
+function buildKeyRegex(projectKey: string): RegExp {
+  return new RegExp(`\\b${escapeRegex(projectKey)}-\\d+\\b`, 'gu')
 }
 
 export function extractKeysFromTitle(title: string, projectKey: string): string[] {

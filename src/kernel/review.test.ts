@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { ReviewCard, ReviewCardFake, ReviewCardReal } from './gitlab'
+import type { ReviewCard, ReviewCardFake, ReviewCardReal } from '~/server/gitlab'
 import {
   REVIEW_BUCKET_STATUS_NAME,
   REVIEW_CARD_ID_PREFIX,

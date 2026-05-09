@@ -2,7 +2,7 @@ import { match, P } from 'ts-pattern'
 import type { BoardIssue, DetailIssue, GetIssueResult } from '~/kernel'
 import { findSiblings } from '../domain'
 
-const PROJECT_KEY_RE = /^([A-Z][A-Z0-9]+)-\d+$/
+const PROJECT_KEY_RE = /^([A-Z][A-Z0-9]+)-\d+$/u
 
 export type IssueQueryView = {
   data: GetIssueResult | undefined

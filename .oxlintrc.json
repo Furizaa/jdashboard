@@ -9,7 +9,14 @@
   },
   "rules": {
     "react/react-in-jsx-scope": "off",
-    "jsx-a11y/prefer-tag-over-role": "warn"
+    "jsx-a11y/prefer-tag-over-role": "off",
+    "eslint/max-lines-per-function": ["warn", { "max": 100 }],
+    "eslint/max-lines": ["warn", { "max": 400 }],
+    "eslint/max-classes-per-file": ["warn", { "max": 2 }],
+    "import/max-dependencies": ["warn", { "max": 15 }],
+    "eslint/no-negated-condition": "off",
+    "unicorn/no-negated-condition": "off",
+    "unicorn/no-array-callback-reference": "off"
   },
   "env": {
     "browser": true,
@@ -25,5 +32,63 @@
     ".claude",
     ".fallow",
     "src/routeTree.gen.ts"
+  ],
+  "overrides": [
+    {
+      "files": [
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "**/*.spec.ts",
+        "**/*.spec.tsx",
+        "tests/**",
+        "src/test/**",
+        "playwright.config.ts"
+      ],
+      "rules": {
+        "eslint/max-lines-per-function": "off",
+        "eslint/max-lines": "off",
+        "eslint/max-classes-per-file": "off",
+        "eslint/require-await": "off",
+        "eslint/require-unicode-regexp": "off",
+        "eslint/no-underscore-dangle": "off",
+        "eslint/no-negated-condition": "off",
+        "eslint/eqeqeq": "off",
+        "unicorn/no-negated-condition": "off",
+        "unicorn/consistent-function-scoping": "off",
+        "unicorn/prefer-dom-node-append": "off",
+        "unicorn/no-array-callback-reference": "off",
+        "unicorn/no-useless-undefined": "off",
+        "unicorn/prefer-string-replace-all": "off",
+        "react/jsx-no-useless-fragment": "off",
+        "react/no-array-index-key": "off",
+        "react-hooks/rules-of-hooks": "off",
+        "import/max-dependencies": "off",
+        "import/no-unassigned-import": "off"
+      }
+    },
+    {
+      "files": ["src/**/errors.ts"],
+      "rules": {
+        "eslint/max-classes-per-file": "off",
+        "eslint/no-underscore-dangle": "off"
+      }
+    },
+    {
+      "files": [
+        "src/contexts/**/view/**/*.tsx",
+        "src/widgets/**/view/**/*.tsx",
+        "src/routes/**/*.tsx"
+      ],
+      "rules": {
+        "eslint/max-lines-per-function": "off",
+        "react/no-array-index-key": "off"
+      }
+    },
+    {
+      "files": ["src/coordinator/coordinator.ts", "src/coordinator/hooks.ts"],
+      "rules": {
+        "eslint/require-await": "off"
+      }
+    }
   ]
 }

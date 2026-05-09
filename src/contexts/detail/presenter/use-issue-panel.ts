@@ -6,7 +6,7 @@ import { usePolling } from '~/lib/use-polling'
 import { shouldHandleShortcut } from '../domain'
 import { derive, type IssuePanelState } from '../view-model'
 
-export const ISSUE_PANEL_POLL_INTERVAL_MS = 60_000
+const ISSUE_PANEL_POLL_INTERVAL_MS = 60_000
 
 export function useIssuePanel(issueKey: string | null): IssuePanelState {
   const navigateFn = useNavigate()

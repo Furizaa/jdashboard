@@ -1,1 +1,1 @@
-export { useStatusPillSelect, type StatusPillSelectApi } from './use-status-pill-select'
+export { useStatusPillSelect } from './use-status-pill-select'

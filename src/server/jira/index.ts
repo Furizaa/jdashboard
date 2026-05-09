@@ -11,10 +11,8 @@ export type {
   AdfNode,
   AllowedTransition,
   BoardIssue,
-  BulkLoadIssuesResult,
   DetailIssue,
   EpicRef,
-  GetMyselfResult,
   IssueLink,
   LinkedIssueRef,
   LoadBoardResult as SearchIssuesResult,
@@ -23,6 +21,5 @@ export type {
   LoadTransitionsResult as GetTransitionsResult,
   PerformTransitionResult as TransitionIssueResult,
   QuickCreateResult as CreateIssueResult,
-  StatusCategoryKey,
 } from './issue-service'
 export { quickCreateSchema, type QuickCreateInput } from './quick-create-schema'

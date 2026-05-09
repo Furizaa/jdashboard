@@ -30,7 +30,7 @@ function statusNameForItem(item: ColumnItem): string {
 }
 
 function matchesSearch(card: CardSource, query: string): boolean {
-  const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
+  const terms = query.trim().toLowerCase().split(/\s+/u).filter(Boolean)
   if (terms.length === 0) return true
   const haystack = match(card)
     .with({ kind: 'jira' }, ({ issue }) => `${issue.key} ${issue.summary}`.toLowerCase())

@@ -1,6 +1,6 @@
 import type { EpicConfig, QuickCreateConfig } from './config'
 import type { AdfNode, CreateIssueBody, JiraGateway, RawLinkedRef } from './gateway'
-import type { QuickCreateInput } from './quick-create-schema'
+import type { QuickCreateInput } from '~/server/contexts/capture/application/quick-create-schema'
 
 export type { AdfNode }
 

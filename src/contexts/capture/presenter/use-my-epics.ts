@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { getMyEpics } from '~/server/jira'
+import { getMyEpics } from '~/server/server-functions/capture'
 
 const myEpicsQueryKey = ['my-epics'] as const
 

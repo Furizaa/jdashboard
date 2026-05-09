@@ -1,5 +1,5 @@
 import { columnForStatus, statusesForColumn, type Column } from '~/kernel'
-import type { AllowedTransition } from '~/server/jira'
+import type { AllowedTransition } from '~/server/gateways/jira'
 
 export function resolveTransition(
   currentStatus: string,

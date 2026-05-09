@@ -6,8 +6,15 @@ export type {
   IssueLink,
   LinkedIssueRef,
 } from '~/server/gateways/jira'
-export type { CreateIssueResult, GetMyEpicsResult } from '~/server/jira'
-export { quickCreateSchema, type QuickCreateInput } from '~/server/jira'
+export type {
+  CreateIssueResult,
+  GetMyEpicsResult,
+  GetMyselfResult,
+} from '~/server/server-functions/capture'
+export {
+  quickCreateSchema,
+  type QuickCreateInput,
+} from '~/server/contexts/capture/application/quick-create-schema'
 export type { SearchIssuesResult } from '~/server/server-functions/board'
 export type {
   GetIssueResult,

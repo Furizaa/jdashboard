@@ -1,7 +1,7 @@
 import { createContext, useContext, useMemo, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
-import { createIssue } from '~/server/jira'
+import { createIssue } from '~/server/server-functions/capture'
 import { transitionIssue } from '~/server/server-functions/detail'
 import { createBrowserWindowAdapter } from './adapters/browser-window'
 import { createRouterNavigateAdapter } from './adapters/router-navigate'

@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import type { CreateIssueResult } from '~/server/jira'
+import type { CreateIssueResult } from '~/server/server-functions/capture'
 import type { SearchIssuesResult } from '~/server/server-functions/board'
 import type {
   GetIssueResult,
   GetTransitionsResult,
   TransitionIssueResult,
 } from '~/server/server-functions/detail'
-import type { QuickCreateInput } from '~/server/jira/quick-create-schema'
+import type { QuickCreateInput } from '~/server/contexts/capture/application/quick-create-schema'
 import { createCoordinator, type CoordinatorDeps } from './coordinator'
 import type { Browser, Cache, Navigate, Patch, Rollback, Toast, ToastFn } from './ports'
 
@@ -460,8 +460,7 @@ describe('createIssue', () => {
           createIssue: () =>
             Promise.resolve({
               ok: false,
-              reason: 'rejected',
-              message: 'no',
+              error: { _tag: 'Rejected', message: 'no' },
             } as CreateIssueResult),
         },
       }),

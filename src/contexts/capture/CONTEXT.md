@@ -5,7 +5,7 @@ Owns the Quick Create modal: a four-field form that creates a Jira issue and toa
 ## Language
 
 **QuickCreateInput** (kernel re-export):
-The validated form payload — `{ type, parentKey, summary, description }`. Schema lives in `~/server/jira/quick-create-schema` and is re-exported through `~/kernel`; the view-model and presenter receive it as a plain value.
+The validated form payload — `{ type, parentKey, summary, description }`. Schema lives in `~/server/contexts/capture/application/quick-create-schema` and is re-exported through `~/kernel`; the view-model and presenter receive it as a plain value.
 
 **QuickCreate state**:
 The view-model's discriminated union — `closed | open-idle | open-pending | open-error`. `open-error` carries the last failure message. `open-pending` blocks close events and hides the form (spinner shown).
@@ -51,9 +51,9 @@ Transition table:
 
 ## Cross-context dependencies
 
-- `~/kernel` — `QuickCreateInput`, `quickCreateSchema`, `EpicRef`, `CreateIssueResult`, `GetMyEpicsResult` (all re-exported from `~/server/jira`).
+- `~/kernel` — `QuickCreateInput`, `quickCreateSchema`, `EpicRef`, `CreateIssueResult`, `GetMyEpicsResult` (all re-exported from `~/server/contexts/capture` + `~/server/server-functions/capture`).
 - `~/coordinator` — `useCreateAction` (presenter only); the cross-context `createIssue` action handles toasts, board cache invalidation, and the 10s timeout.
-- `~/server/jira` — `getMyEpics` server function (presenter only, called via `useMyEpics`).
+- `~/server/server-functions/capture` — `getMyEpics` server function (presenter only, called via `useMyEpics`).
 - `~/widgets/ticket-card` — `TYPE_STYLES` (view layer only).
 
 No imports from `~/contexts/<other>`. Cross-context coordination would go through the coordinator.

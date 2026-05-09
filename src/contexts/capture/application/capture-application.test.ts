@@ -43,9 +43,9 @@ describe('CaptureApplicationService.submit', () => {
     expect(gateway.lastCreateSignal()).toBe(controller.signal)
   })
 
-  it('returns err CaptureUnauthorized when gateway returns { ok: false, reason: "unauthorized" }', async () => {
+  it('returns err CaptureUnauthorized when gateway returns { ok: false, error: { _tag: "Unauthorized" } }', async () => {
     const gateway = createFakeCaptureGateway()
-    gateway.setCreateResult({ ok: false, reason: 'unauthorized', message: 'auth failed' })
+    gateway.setCreateResult({ ok: false, error: { _tag: 'Unauthorized' } })
     const service = createCaptureApplicationService({ gateway })
 
     const result = await service.submit(SAMPLE_INPUT)
@@ -56,9 +56,12 @@ describe('CaptureApplicationService.submit', () => {
     expect(result.error).toBeInstanceOf(CaptureUnauthorized)
   })
 
-  it('returns err CaptureRejected carrying the message when gateway returns { ok: false, reason: "rejected" }', async () => {
+  it('returns err CaptureRejected carrying the message when gateway returns { ok: false, error: { _tag: "Rejected" } }', async () => {
     const gateway = createFakeCaptureGateway()
-    gateway.setCreateResult({ ok: false, reason: 'rejected', message: 'parent missing' })
+    gateway.setCreateResult({
+      ok: false,
+      error: { _tag: 'Rejected', message: 'parent missing' },
+    })
     const service = createCaptureApplicationService({ gateway })
 
     const result = await service.submit(SAMPLE_INPUT)
@@ -110,9 +113,9 @@ describe('CaptureApplicationService.loadEpics', () => {
     expect(gateway.epicsCallCount()).toBe(1)
   })
 
-  it('returns err CaptureEpicsUnauthorized when gateway returns { ok: false, reason: "unauthorized" }', async () => {
+  it('returns err CaptureEpicsUnauthorized when gateway returns { ok: false, error: { _tag: "Unauthorized" } }', async () => {
     const gateway = createFakeCaptureGateway()
-    gateway.setEpicsResult({ ok: false, reason: 'unauthorized' })
+    gateway.setEpicsResult({ ok: false, error: { _tag: 'Unauthorized' } })
     const service = createCaptureApplicationService({ gateway })
 
     const result = await service.loadEpics()

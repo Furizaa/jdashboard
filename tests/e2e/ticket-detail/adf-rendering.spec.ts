@@ -1,6 +1,6 @@
 import { test, expect } from '../fixtures/test'
 import { makeIssue } from '../fixtures/factories'
-import type { AdfNode } from '~/server/jira'
+import type { AdfNode } from '~/server/gateways/jira'
 
 const KEY = 'HDR-450'
 
@@ -44,9 +44,7 @@ const description: AdfNode = {
       content: [
         {
           type: 'listItem',
-          content: [
-            { type: 'paragraph', content: [{ type: 'text', text: 'bullet-item' }] },
-          ],
+          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'bullet-item' }] }],
         },
       ],
     },
@@ -55,9 +53,7 @@ const description: AdfNode = {
       content: [
         {
           type: 'listItem',
-          content: [
-            { type: 'paragraph', content: [{ type: 'text', text: 'ordered-item' }] },
-          ],
+          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'ordered-item' }] }],
         },
       ],
     },
@@ -67,9 +63,7 @@ const description: AdfNode = {
     },
     {
       type: 'blockquote',
-      content: [
-        { type: 'paragraph', content: [{ type: 'text', text: 'quoted-text' }] },
-      ],
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'quoted-text' }] }],
     },
     { type: 'rule' },
     { type: 'mention', attrs: { id: 'acct-1', text: '@Mentioned User' } },
@@ -78,9 +72,7 @@ const description: AdfNode = {
     {
       type: 'panel',
       attrs: { panelType: 'info' },
-      content: [
-        { type: 'paragraph', content: [{ type: 'text', text: 'panel-content' }] },
-      ],
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'panel-content' }] }],
     },
     {
       type: 'mediaSingle',

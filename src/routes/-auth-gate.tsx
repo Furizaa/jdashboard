@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getMyself } from '~/server/jira'
+import { getMyself } from '~/server/server-functions/capture'
 import { cn } from '~/lib/cn'
 
 const TOKEN_PAGE_URL = 'https://id.atlassian.com/manage-profile/security/api-tokens'

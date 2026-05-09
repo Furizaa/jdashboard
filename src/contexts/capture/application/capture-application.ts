@@ -47,11 +47,11 @@ export function createCaptureApplicationService(
           .with({ ok: true }, ({ key, baseUrl }) =>
             okAsync<CaptureSubmitSnapshot, CaptureSubmitError>({ key, baseUrl }),
           )
-          .with({ ok: false, reason: 'unauthorized' }, () =>
+          .with({ ok: false, error: { _tag: 'Unauthorized' } }, () =>
             errAsync<CaptureSubmitSnapshot, CaptureSubmitError>(new CaptureUnauthorized()),
           )
-          .with({ ok: false, reason: 'rejected' }, ({ message }) =>
-            errAsync<CaptureSubmitSnapshot, CaptureSubmitError>(new CaptureRejected(message)),
+          .with({ ok: false, error: { _tag: 'Rejected' } }, ({ error }) =>
+            errAsync<CaptureSubmitSnapshot, CaptureSubmitError>(new CaptureRejected(error.message)),
           )
           .exhaustive(),
       ),
@@ -66,7 +66,7 @@ export function createCaptureApplicationService(
           .with({ ok: true }, ({ epics }) =>
             okAsync<CaptureEpicsSnapshot, CaptureLoadEpicsError>({ epics }),
           )
-          .with({ ok: false, reason: 'unauthorized' }, () =>
+          .with({ ok: false, error: { _tag: 'Unauthorized' } }, () =>
             errAsync<CaptureEpicsSnapshot, CaptureLoadEpicsError>(new CaptureEpicsUnauthorized()),
           )
           .exhaustive(),

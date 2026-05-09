@@ -1,9 +1,9 @@
 import { err, ok, Result, ResultAsync } from 'neverthrow'
 import { match } from 'ts-pattern'
-import type { CreateIssueResult } from '~/server/jira'
+import type { CreateIssueResult } from '~/server/server-functions/capture'
 import type { SearchIssuesResult } from '~/server/server-functions/board'
 import type { GetIssueResult, TransitionIssueResult } from '~/server/server-functions/detail'
-import type { QuickCreateInput } from '~/server/jira/quick-create-schema'
+import type { QuickCreateInput } from '~/server/contexts/capture/application/quick-create-schema'
 import {
   CreateIssueNetworkError,
   CreateIssueRejected,
@@ -170,11 +170,12 @@ export function createCoordinator(deps: CoordinatorDeps): Coordinator {
           })
           return ok({ key, baseUrl })
         })
-        .with({ ok: false, reason: 'rejected' }, ({ message }) => {
-          toast.error('Failed to create ticket', { description: message })
-          return err<CreateIssueSnapshot, CreateIssueError>(new CreateIssueRejected(message))
+        .with({ ok: false, error: { _tag: 'Rejected' } }, ({ error }) => {
+          toast.error('Failed to create ticket', { description: error.message })
+          return err<CreateIssueSnapshot, CreateIssueError>(new CreateIssueRejected(error.message))
         })
-        .with({ ok: false, reason: 'unauthorized' }, ({ message }) => {
+        .with({ ok: false, error: { _tag: 'Unauthorized' } }, () => {
+          const message = 'Invalid Jira credentials'
           toast.error('Failed to create ticket', { description: message })
           return err<CreateIssueSnapshot, CreateIssueError>(new CreateIssueUnauthorized(message))
         })

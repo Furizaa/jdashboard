@@ -8,7 +8,7 @@ import {
   type GetIssueResult,
   type GetTransitionsResult,
 } from '~/server/server-functions/detail'
-import type { QuickCreateInput } from '~/server/jira/quick-create-schema'
+import type { QuickCreateInput } from '~/server/contexts/capture/application/quick-create-schema'
 import { getMrStatuses } from '~/server/gitlab'
 import type { GetMrStatusesResult, MrSummary } from '~/server/gitlab'
 import { usePolling } from '~/lib/use-polling'

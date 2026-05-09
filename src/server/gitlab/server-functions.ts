@@ -2,8 +2,33 @@ import { createServerFn } from '@tanstack/react-start'
 import { createHttpGitlabGateway } from './http-gateway'
 import { createGitlabMrService, type GitlabMrService } from './mr-service'
 import { createGitlabReviewService, type GitlabReviewService } from './review-service'
-import { getJiraService } from '~/server/jira/server-functions'
+import { defaultEpicConfig, defaultQuickCreateConfig } from '~/server/jira/config'
+import { createHttpJiraGateway } from '~/server/jira/http-gateway'
+import { createJiraIssueService, type JiraIssueService } from '~/server/jira/issue-service'
 import { getServerEnv } from '~/server/env'
+
+let cachedJira: JiraIssueService | null = null
+
+function jiraService(): JiraIssueService {
+  if (cachedJira === null) {
+    const env = getServerEnv()
+    const gateway = createHttpJiraGateway({
+      baseUrl: env.JIRA_BASE_URL,
+      email: env.JIRA_EMAIL,
+      apiToken: env.JIRA_API_TOKEN,
+    })
+    cachedJira = createJiraIssueService(gateway, {
+      baseUrl: env.JIRA_BASE_URL,
+      projectKey: env.JIRA_PROJECT_KEY,
+      labelFilter: env.JIRA_LABEL_FILTER,
+      hideLabels: env.JIRA_HIDE_LABELS,
+      doneWindowDays: env.JIRA_DONE_WINDOW_DAYS,
+      quickCreate: defaultQuickCreateConfig,
+      epic: defaultEpicConfig,
+    })
+  }
+  return cachedJira
+}
 
 let cachedMr: GitlabMrService | null = null
 let cachedReview: GitlabReviewService | null = null
@@ -34,7 +59,7 @@ function reviewService(): GitlabReviewService {
       token: env.GITLAB_TOKEN,
       projectPath: env.GITLAB_PROJECT_PATH,
     })
-    cachedReview = createGitlabReviewService(gateway, getJiraService(), {
+    cachedReview = createGitlabReviewService(gateway, jiraService(), {
       jiraProjectKey: env.JIRA_PROJECT_KEY,
       lookbackDays: env.JIRA_DONE_WINDOW_DAYS,
       clock: () => new Date(),

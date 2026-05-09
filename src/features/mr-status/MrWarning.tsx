@@ -1,14 +1,17 @@
 import { AlertTriangle } from 'lucide-react'
 import { cn } from '~/lib/cn'
+import { testIds, type MrWarningKind } from '~/lib/testids'
 
 const ROW_CLASS =
   'flex items-center gap-2 bg-amber-500/10 border-l-2 border-amber-500/40 rounded-b-md px-3 py-1.5 text-[11px]'
 
 export function MrWarning({
+  kind,
   text,
   onClick,
   viewMrUrl,
 }: {
+  kind: MrWarningKind
   text: string
   onClick?: () => void
   viewMrUrl?: string
@@ -33,6 +36,8 @@ export function MrWarning({
       {onClick !== undefined ? (
         <button
           type="button"
+          data-testid={testIds.mrWarningRow}
+          data-kind={kind}
           onClick={onClick}
           className={cn(ROW_CLASS, 'w-full text-left hover:bg-amber-500/15')}
         >
@@ -41,7 +46,7 @@ export function MrWarning({
           {link}
         </button>
       ) : (
-        <div className={ROW_CLASS}>
+        <div data-testid={testIds.mrWarningRow} data-kind={kind} className={ROW_CLASS}>
           {icon}
           {label}
           {link}

@@ -1,5 +1,6 @@
 import { AlertTriangle, CheckCircle, Loader2, XCircle } from 'lucide-react'
 import { cn } from '~/lib/cn'
+import { testIds } from '~/lib/testids'
 import type { CiVisualState } from './ci-state'
 
 const ICON_CLASS = 'h-3 w-3 shrink-0'
@@ -8,7 +9,12 @@ export function MrCiIndicator({ state, className }: { state: CiVisualState; clas
   if (state === 'none') return null
   const { label, icon } = render(state)
   return (
-    <span title={label} className={cn('inline-flex items-center', className)}>
+    <span
+      data-testid={testIds.ciIndicator}
+      data-state={state}
+      title={label}
+      className={cn('inline-flex items-center', className)}
+    >
       {icon}
     </span>
   )

@@ -2,6 +2,7 @@ import { MessageSquare } from 'lucide-react'
 import { cn } from '~/lib/cn'
 import type { Column } from '~/features/board/status-mapping'
 import { useMrFor, useMrMergedAction } from '~/dashboard'
+import { mrWarningKind, testIds } from '~/lib/testids'
 import { MrCiIndicator } from './MrCiIndicator'
 import { MrWarning } from './MrWarning'
 import { ReviewerAvatar } from './ReviewerAvatar'
@@ -58,6 +59,7 @@ function DoneSection({ issueKey }: { issueKey: string }) {
   if (result.summary.kind === 'merged') return null
   return (
     <MrWarning
+      kind={mrWarningKind.doneStillOpen}
       text="Ticket is Done — MR still open"
       onClick={openInNewTab(result.summary.webUrl)}
     />
@@ -72,18 +74,29 @@ function CodeReviewSection({ issueKey }: { issueKey: string }) {
   if (result.state === 'loading') return <SkeletonRow />
 
   const summary = result.summary
-  if (summary === null) return <MrWarning text="No MR found" />
+  if (summary === null) return <MrWarning kind={mrWarningKind.noMr} text="No MR found" />
   if (summary.kind === 'draft') {
-    return <MrWarning text="MR is draft" onClick={openInNewTab(summary.webUrl)} />
+    return (
+      <MrWarning
+        kind={mrWarningKind.draft}
+        text="MR is draft"
+        onClick={openInNewTab(summary.webUrl)}
+      />
+    )
   }
   if (summary.kind === 'no-reviewers') {
     return (
-      <MrWarning text="MR open, no reviewers assigned" onClick={openInNewTab(summary.webUrl)} />
+      <MrWarning
+        kind={mrWarningKind.noReviewers}
+        text="MR open, no reviewers assigned"
+        onClick={openInNewTab(summary.webUrl)}
+      />
     )
   }
   if (summary.kind === 'merged') {
     return (
       <MrWarning
+        kind={mrWarningKind.mergedDesync}
         text={`MR is merged — move ticket to ${MERGED_TARGET_STATUS}`}
         onClick={() => merge({ key: issueKey, targetStatusName: MERGED_TARGET_STATUS })}
         viewMrUrl={summary.webUrl}
@@ -116,7 +129,7 @@ function ReviewerRow({
   const visible = reviewers.slice(0, MAX_VISIBLE_REVIEWERS)
   const overflow = reviewers.length - visible.length
   return (
-    <div className="border-border/50 -mx-3 mt-2 -mb-2.5 border-t">
+    <div data-testid={testIds.mrSection} className="border-border/50 -mx-3 mt-2 -mb-2.5 border-t">
       <div
         className={cn(
           'flex items-center gap-2 px-3 py-1.5',
@@ -139,6 +152,7 @@ function ReviewerRow({
         <MrCiIndicator state={ciState} className="ml-auto" />
         {unresolvedCount > 0 && (
           <span
+            data-testid={testIds.unresolvedThreadChip}
             title={`${unresolvedCount} unresolved comment thread${unresolvedCount === 1 ? '' : 's'}`}
             className={cn(
               'text-muted-foreground inline-flex items-center gap-1 text-[11px] tabular-nums',

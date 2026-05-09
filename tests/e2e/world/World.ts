@@ -12,6 +12,57 @@ export type WorldUser = {
   avatarUrls: Record<string, string>
 }
 
+export type GitlabUser = {
+  username: string
+  displayName: string
+}
+
+export type GitlabReviewerEndpointState =
+  | 'unreviewed'
+  | 'review_started'
+  | 'reviewed'
+  | 'requested_changes'
+  | 'approved'
+
+export type GitlabMr = {
+  iid: number
+  title: string
+  webUrl: string
+  state: 'opened' | 'closed' | 'merged' | 'locked'
+  draft: boolean
+  updatedAt: string
+  authorUsername: string
+}
+
+export type GitlabMrReviewer = {
+  username: string
+  displayName: string
+  avatarUrl: string | null
+  state: GitlabReviewerEndpointState
+}
+
+export type GitlabDiscussionNote = {
+  authorUsername: string
+  resolvable: boolean
+  resolved: boolean
+  system: boolean
+}
+
+export type GitlabDiscussion = {
+  id: string
+  notes: GitlabDiscussionNote[]
+}
+
+export type GitlabApprovals = {
+  approvedUsernames: readonly string[]
+}
+
+export type GitlabPipeline = {
+  /** GitLab pipeline status (e.g. 'success', 'failed', 'running', 'pending', 'canceled'); null = no pipeline. */
+  status: string | null
+  hasConflicts: boolean
+}
+
 export type WorldTransition = {
   id: string
   name: string
@@ -63,6 +114,15 @@ export class World {
       '32x32': 'http://127.0.0.1:9999/avatar.png',
       '24x24': 'http://127.0.0.1:9999/avatar.png',
     },
+  }
+  private readonly mrs: GitlabMr[] = []
+  private readonly mrReviewers = new Map<number, GitlabMrReviewer[]>()
+  private readonly mrDiscussions = new Map<number, GitlabDiscussion[]>()
+  private readonly mrApprovals = new Map<number, GitlabApprovals>()
+  private readonly mrPipelines = new Map<number, GitlabPipeline>()
+  private gitlabUser: GitlabUser = {
+    username: 'e2e-gitlab',
+    displayName: 'E2E GitLab User',
   }
 
   seedIssues(issues: readonly RawIssue[]): void {
@@ -182,6 +242,65 @@ export class World {
         },
       },
     }
+  }
+
+  seedGitlabCurrentUser(user: GitlabUser): void {
+    this.gitlabUser = { ...user }
+  }
+
+  getGitlabCurrentUser(): GitlabUser {
+    return this.gitlabUser
+  }
+
+  seedMrs(mrs: readonly GitlabMr[]): void {
+    for (const mr of mrs) {
+      const idx = this.mrs.findIndex((m) => m.iid === mr.iid)
+      if (idx === -1) this.mrs.push({ ...mr })
+      else this.mrs[idx] = { ...mr }
+    }
+  }
+
+  seedMrReviewers(iid: number, reviewers: readonly GitlabMrReviewer[]): void {
+    this.mrReviewers.set(iid, reviewers.map((r) => ({ ...r })))
+  }
+
+  seedMrDiscussions(iid: number, discussions: readonly GitlabDiscussion[]): void {
+    this.mrDiscussions.set(
+      iid,
+      discussions.map((d) => ({ id: d.id, notes: d.notes.map((n) => ({ ...n })) })),
+    )
+  }
+
+  seedMrApprovals(iid: number, approvals: GitlabApprovals): void {
+    this.mrApprovals.set(iid, { approvedUsernames: [...approvals.approvedUsernames] })
+  }
+
+  seedMrPipeline(iid: number, pipeline: GitlabPipeline): void {
+    this.mrPipelines.set(iid, { ...pipeline })
+  }
+
+  getMr(iid: number): GitlabMr | null {
+    return this.mrs.find((m) => m.iid === iid) ?? null
+  }
+
+  getMrReviewers(iid: number): GitlabMrReviewer[] {
+    return this.mrReviewers.get(iid) ?? []
+  }
+
+  getMrDiscussions(iid: number): GitlabDiscussion[] {
+    return this.mrDiscussions.get(iid) ?? []
+  }
+
+  getMrApprovals(iid: number): GitlabApprovals {
+    return this.mrApprovals.get(iid) ?? { approvedUsernames: [] }
+  }
+
+  getMrPipeline(iid: number): GitlabPipeline {
+    return this.mrPipelines.get(iid) ?? { status: null, hasConflicts: false }
+  }
+
+  listMrsByAuthor(username: string): GitlabMr[] {
+    return this.mrs.filter((m) => m.authorUsername === username)
   }
 
   searchIssues(jql: string): RawSearchResponse {

@@ -6,7 +6,22 @@ export const testIds = Object.freeze({
   refreshButton: 'refresh-button',
   subIssueRow: 'sub-issue-row',
   linkedIssueRow: 'linked-issue-row',
+  mrSection: 'mr-section',
+  reviewerAvatar: 'reviewer-avatar',
+  ciIndicator: 'ci-indicator',
+  unresolvedThreadChip: 'unresolved-thread-chip',
+  mrWarningRow: 'mr-warning-row',
 } as const)
+
+/** `data-kind` discriminator on `mrWarningRow`. */
+export const mrWarningKind = Object.freeze({
+  noMr: 'no-mr',
+  draft: 'draft',
+  noReviewers: 'no-reviewers',
+  mergedDesync: 'merged-desync',
+  doneStillOpen: 'done-still-open',
+} as const)
+export type MrWarningKind = (typeof mrWarningKind)[keyof typeof mrWarningKind]
 
 /**
  * Values of the `data-animation` attribute on `ticket-card`. State markers

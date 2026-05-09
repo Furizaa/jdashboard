@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react'
+import { testIds } from '~/lib/testids'
 import { REVIEWER_STATE_LABEL, type ReviewerVisualState } from './reviewer-state'
 
 const RING_STYLES: Record<ReviewerVisualState, { color: string; style: 'solid' | 'dashed' }> = {
@@ -26,6 +27,8 @@ export function ReviewerAvatar({
   const initial = displayName.trim().charAt(0).toUpperCase() || '?'
   return (
     <span
+      data-testid={testIds.reviewerAvatar}
+      data-visual-state={visualState}
       title={`${displayName} — ${REVIEWER_STATE_LABEL[visualState]}`}
       className="bg-muted text-muted-foreground inline-flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-full text-[10px] leading-none font-medium"
       style={style}

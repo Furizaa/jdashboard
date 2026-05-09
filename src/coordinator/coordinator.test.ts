@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
+import type { CreateIssueResult } from '~/server/jira'
+import type { SearchIssuesResult } from '~/server/server-functions/board'
 import type {
-  CreateIssueResult,
   GetIssueResult,
   GetTransitionsResult,
   TransitionIssueResult,
-} from '~/server/jira'
-import type { SearchIssuesResult } from '~/server/server-functions/board'
+} from '~/server/server-functions/detail'
 import type { QuickCreateInput } from '~/server/jira/quick-create-schema'
 import { createCoordinator, type CoordinatorDeps } from './coordinator'
 import type { Browser, Cache, Navigate, Patch, Rollback, Toast, ToastFn } from './ports'
@@ -313,8 +313,7 @@ describe('applyTransition', () => {
           transitionIssue: () =>
             Promise.resolve({
               ok: false,
-              reason: 'rejected',
-              message: 'Workflow says no',
+              error: { _tag: 'Rejected', message: 'Workflow says no' },
             } as TransitionIssueResult),
         },
       }),
@@ -538,7 +537,8 @@ describe('handleMrMerged', () => {
   it('returns MrMergedTransitionsFailed and toasts unauthorized when fetchTransitions returns unauthorized', async () => {
     const t = fakeToast()
     const cache = fakeCache({
-      fetchTransitions: async () => ({ ok: false, reason: 'unauthorized' }) as GetTransitionsResult,
+      fetchTransitions: async () =>
+        ({ ok: false, error: { _tag: 'Unauthorized' } }) as GetTransitionsResult,
     })
     const coord = createCoordinator(makeDeps({ cache, toast: t.toast }))
     const result = await coord.handleMrMerged({
@@ -553,7 +553,8 @@ describe('handleMrMerged', () => {
   it('returns MrMergedTransitionsFailed and toasts generic when fetchTransitions returns not-found', async () => {
     const t = fakeToast()
     const cache = fakeCache({
-      fetchTransitions: async () => ({ ok: false, reason: 'not-found' }) as GetTransitionsResult,
+      fetchTransitions: async () =>
+        ({ ok: false, error: { _tag: 'NotFound' } }) as GetTransitionsResult,
     })
     const coord = createCoordinator(makeDeps({ cache, toast: t.toast }))
     const result = await coord.handleMrMerged({

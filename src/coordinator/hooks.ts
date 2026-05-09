@@ -1,9 +1,13 @@
 import { useEffect } from 'react'
 import { useMutation, useQuery, type UseQueryResult } from '@tanstack/react-query'
 import type { Result } from 'neverthrow'
-import { getIssue, getTransitions } from '~/server/jira'
-import type { GetIssueResult, GetTransitionsResult } from '~/server/jira'
 import { searchIssues, type SearchIssuesResult } from '~/server/server-functions/board'
+import {
+  getIssue,
+  getTransitions,
+  type GetIssueResult,
+  type GetTransitionsResult,
+} from '~/server/server-functions/detail'
 import type { QuickCreateInput } from '~/server/jira/quick-create-schema'
 import { getMrStatuses } from '~/server/gitlab'
 import type { GetMrStatusesResult, MrSummary } from '~/server/gitlab'

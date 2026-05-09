@@ -27,9 +27,7 @@ test('POST 400 rolls back the optimistic update and surfaces the Jira error in a
     delayMs: 400,
   })
 
-  await card
-    .getByRole('button', { name: 'Change status from Reviewed' })
-    .click()
+  await card.getByRole('button', { name: 'Change status from Reviewed' }).click()
   await page.getByRole('menuitem', { name: 'In Implementation' }).click()
 
   // Optimistic — appears while the failure response is still in flight.
@@ -42,17 +40,13 @@ test('POST 400 rolls back the optimistic update and surfaces the Jira error in a
   // (`<section aria-label="Notifications …">` → role="region") rather than a
   // CSS selector on internal toast markup.
   await expect(
-    page
-      .getByRole('region', { name: /Notifications/ })
-      .getByText('Workflow violation'),
+    page.getByRole('region', { name: /Notifications/ }).getByText('Workflow violation'),
   ).toBeVisible()
 
   // The one-shot is consumed: a follow-up transition hits the default
   // world-backed handler and succeeds, mutating the world and leaving the
   // card on the new status.
-  await card
-    .getByRole('button', { name: 'Change status from Reviewed' })
-    .click()
+  await card.getByRole('button', { name: 'Change status from Reviewed' }).click()
   await page.getByRole('menuitem', { name: 'In Implementation' }).click()
   await expect(card).toContainText('In Implementation')
   expect(world.searchIssues('').issues.find((i) => i.key === KEY)?.fields.status.name).toBe(
@@ -77,11 +71,13 @@ test('GET 500 surfaces a fetch error in the dropdown without crashing', async ({
   const card = page.locator(`[data-issue-key="${KEY}"]`)
   await expect(card).toBeVisible()
 
+  // The Effect HTTP middleware retries transient (5xx) failures up to twice;
+  // stack three one-shots so all retry attempts hit the failure path.
+  mocks.failNext('GET', `*${TRANSITIONS_PATH}`, { status: 500 })
+  mocks.failNext('GET', `*${TRANSITIONS_PATH}`, { status: 500 })
   mocks.failNext('GET', `*${TRANSITIONS_PATH}`, { status: 500 })
 
-  await card
-    .getByRole('button', { name: 'Change status from Reviewed' })
-    .click()
+  await card.getByRole('button', { name: 'Change status from Reviewed' }).click()
 
   const menu = page.getByRole('menu')
   await expect(menu).toContainText("Couldn't load transitions")

@@ -71,12 +71,12 @@ export function derive(input: DeriveInput): IssuePanelState {
         message: `Couldn't load issue: ${message}`,
       }
     })
-    .with({ ok: false, reason: 'unauthorized' }, () => ({
+    .with({ ok: false, error: { _tag: 'Unauthorized' } }, () => ({
       ...openFields,
       phase: 'error' as const,
       message: 'Invalid Jira credentials.',
     }))
-    .with({ ok: false, reason: 'not-found' }, () => ({
+    .with({ ok: false, error: { _tag: 'NotFound' } }, () => ({
       ...openFields,
       phase: 'error' as const,
       message: 'Issue not found.',

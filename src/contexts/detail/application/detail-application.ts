@@ -38,10 +38,10 @@ export function createDetailApplicationService(
           .with({ ok: true }, ({ baseUrl, issue }) =>
             okAsync<DetailSnapshot, DetailLoadError>({ baseUrl, issue }),
           )
-          .with({ ok: false, reason: 'unauthorized' }, () =>
+          .with({ ok: false, error: { _tag: 'Unauthorized' } }, () =>
             errAsync<DetailSnapshot, DetailLoadError>(new DetailUnauthorized()),
           )
-          .with({ ok: false, reason: 'not-found' }, () =>
+          .with({ ok: false, error: { _tag: 'NotFound' } }, () =>
             errAsync<DetailSnapshot, DetailLoadError>(new DetailNotFound()),
           )
           .exhaustive(),

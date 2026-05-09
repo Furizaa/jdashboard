@@ -53,7 +53,8 @@ export function derive(
     return {
       open: true,
       dropdown: {
-        kind: data.reason === 'unauthorized' ? 'error-unauthorized' : 'error-network',
+        // oxlint-disable-next-line no-underscore-dangle -- `_tag` is the standard discriminator on Effect Schema tagged errors
+        kind: data.error._tag === 'Unauthorized' ? 'error-unauthorized' : 'error-network',
       },
     }
   }

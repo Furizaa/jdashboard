@@ -25,6 +25,7 @@ export type {
   LinkedIssueRef,
   QuickCreateInput,
   SearchIssuesResult,
+  TransitionIssueResult,
 } from './jira'
 export { quickCreateSchema } from './jira'
 export type {

@@ -1,7 +1,8 @@
 import { err, ok, Result, ResultAsync } from 'neverthrow'
 import { match } from 'ts-pattern'
-import type { CreateIssueResult, GetIssueResult, TransitionIssueResult } from '~/server/jira'
+import type { CreateIssueResult } from '~/server/jira'
 import type { SearchIssuesResult } from '~/server/server-functions/board'
+import type { GetIssueResult, TransitionIssueResult } from '~/server/server-functions/detail'
 import type { QuickCreateInput } from '~/server/jira/quick-create-schema'
 import {
   CreateIssueNetworkError,
@@ -111,13 +112,14 @@ export function createCoordinator(deps: CoordinatorDeps): Coordinator {
         // oxlint-disable-next-line no-useless-undefined -- neverthrow's ok<void>() requires explicit undefined
         return ok(undefined)
       })
-      .with({ ok: false, reason: 'rejected' }, ({ message }) => {
+      .with({ ok: false, error: { _tag: 'Rejected' } }, ({ error }) => {
         rollbackBoard()
         rollbackIssue()
-        toast.error(message)
-        return err<void, ApplyTransitionError>(new TransitionRejected(message))
+        toast.error(error.message)
+        return err<void, ApplyTransitionError>(new TransitionRejected(error.message))
       })
-      .with({ ok: false, reason: 'unauthorized' }, ({ message }) => {
+      .with({ ok: false, error: { _tag: 'Unauthorized' } }, () => {
+        const message = 'Invalid Jira credentials'
         rollbackBoard()
         rollbackIssue()
         toast.error(message)
@@ -195,14 +197,14 @@ export function createCoordinator(deps: CoordinatorDeps): Coordinator {
 
     return match(transitions)
       .with(
-        { ok: false, reason: 'unauthorized' },
+        { ok: false, error: { _tag: 'Unauthorized' } },
         async (): Promise<Result<MrMergedSnapshot, HandleMrMergedError>> => {
           const message = 'Invalid Jira credentials'
           toast.error(message)
           return err(new MrMergedTransitionsFailed(message))
         },
       )
-      .with({ ok: false, reason: 'not-found' }, async () => {
+      .with({ ok: false, error: { _tag: 'NotFound' } }, async () => {
         const message = "Couldn't load transitions"
         toast.error(message)
         return err<MrMergedSnapshot, HandleMrMergedError>(new MrMergedTransitionsFailed(message))

@@ -51,7 +51,7 @@ describe('DetailApplicationService.loadIssue', () => {
   it('returns err DetailUnauthorized when the gateway returns { ok: false, reason: "unauthorized" }', async () => {
     const gateway = createFakeDetailGateway()
     const cache = createFakeDetailCache()
-    gateway.setResult({ ok: false, reason: 'unauthorized' })
+    gateway.setResult({ ok: false, error: { _tag: 'Unauthorized' } })
     const service = createDetailApplicationService({ gateway, cache })
 
     const result = await service.loadIssue(ISSUE_KEY)
@@ -65,7 +65,7 @@ describe('DetailApplicationService.loadIssue', () => {
   it('returns err DetailNotFound when the gateway returns { ok: false, reason: "not-found" }', async () => {
     const gateway = createFakeDetailGateway()
     const cache = createFakeDetailCache()
-    gateway.setResult({ ok: false, reason: 'not-found' })
+    gateway.setResult({ ok: false, error: { _tag: 'NotFound' } })
     const service = createDetailApplicationService({ gateway, cache })
 
     const result = await service.loadIssue(ISSUE_KEY)

@@ -32,29 +32,7 @@ function service(): JiraIssueService {
   return getJiraService()
 }
 
-function requireKey(label: string, value: unknown): string {
-  if (typeof value !== 'string' || value.trim() === '') {
-    throw new Error(`${label}: key is required`)
-  }
-  return value.trim()
-}
-
 export const getMyself = createServerFn({ method: 'GET' }).handler(() => service().getMyself())
-
-export const getIssue = createServerFn({ method: 'GET' })
-  .inputValidator((data: { key: string }) => ({ key: requireKey('getIssue', data?.key) }))
-  .handler(({ data }) => service().loadIssue(data.key))
-
-export const getTransitions = createServerFn({ method: 'GET' })
-  .inputValidator((data: { key: string }) => ({ key: requireKey('getTransitions', data?.key) }))
-  .handler(({ data }) => service().loadTransitions(data.key))
-
-export const transitionIssue = createServerFn({ method: 'POST' })
-  .inputValidator((data: { key: string; transitionId: string }) => ({
-    key: requireKey('transitionIssue', data?.key),
-    transitionId: requireKey('transitionIssue (transitionId)', data?.transitionId),
-  }))
-  .handler(({ data }) => service().performTransition(data.key, data.transitionId))
 
 export const createIssue = createServerFn({ method: 'POST' })
   .inputValidator((data: unknown) => {

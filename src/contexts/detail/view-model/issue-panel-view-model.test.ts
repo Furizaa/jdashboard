@@ -90,13 +90,15 @@ describe('derive — phase resolution', () => {
 
   it('returns phase: error with the unauthorized message when data.ok is false / unauthorized', () => {
     const state = derive(
-      makeInput({ issueQuery: dataQuery({ ok: false, reason: 'unauthorized' }) }),
+      makeInput({ issueQuery: dataQuery({ ok: false, error: { _tag: 'Unauthorized' } }) }),
     )
     expect(state).toMatchObject({ phase: 'error', message: 'Invalid Jira credentials.' })
   })
 
   it('returns phase: error with the not-found message when data.ok is false / not-found', () => {
-    const state = derive(makeInput({ issueQuery: dataQuery({ ok: false, reason: 'not-found' }) }))
+    const state = derive(
+      makeInput({ issueQuery: dataQuery({ ok: false, error: { _tag: 'NotFound' } }) }),
+    )
     expect(state).toMatchObject({ phase: 'error', message: 'Issue not found.' })
   })
 
@@ -116,8 +118,8 @@ describe('derive — phase resolution', () => {
     const expectations: Array<{ phase: 'loading' | 'error'; query: IssueQueryView }> = [
       { phase: 'loading', query: pendingQuery() },
       { phase: 'error', query: errorQuery(new Error('x')) },
-      { phase: 'error', query: dataQuery({ ok: false, reason: 'unauthorized' }) },
-      { phase: 'error', query: dataQuery({ ok: false, reason: 'not-found' }) },
+      { phase: 'error', query: dataQuery({ ok: false, error: { _tag: 'Unauthorized' } }) },
+      { phase: 'error', query: dataQuery({ ok: false, error: { _tag: 'NotFound' } }) },
     ]
     for (const { phase, query } of expectations) {
       const state = derive(makeInput({ issueKey, issueQuery: query }))

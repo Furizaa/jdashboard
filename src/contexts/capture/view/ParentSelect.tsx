@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
-import { HARDCODED_PARENTS } from './hardcoded-parents'
-import { useMyEpics } from './use-my-epics'
+import { HARDCODED_PARENTS } from '../domain'
+import { useMyEpics } from '../presenter'
 
 const TRIGGER_CLASS =
   'border-border bg-background text-foreground placeholder:text-muted-foreground focus-visible:ring-ring flex w-full items-center justify-between rounded border px-2 py-1.5 text-left text-xs focus-visible:ring-1 focus-visible:outline-none'

@@ -136,6 +136,43 @@ module.exports = {
           '^(src/contexts/detail/view-model/|src/contexts/detail/domain/|src/kernel/)',
       },
     },
+    {
+      name: 'capture-domain-only-imports-kernel',
+      comment:
+        "capture's domain layer is pure: it may only import from ~/kernel and its own peers — graduated rule active now that contexts/capture/ exists",
+      severity: 'error',
+      from: { path: '^src/contexts/capture/domain/' },
+      to: {
+        path: '^src/',
+        pathNot: '^(src/contexts/capture/domain/|src/kernel/)',
+      },
+    },
+    {
+      name: 'capture-application-only-imports-kernel-and-self',
+      comment:
+        "capture's application layer talks to gateway ports declared inside the context — it may only import ~/kernel and its own peers",
+      severity: 'error',
+      from: {
+        path: '^src/contexts/capture/application/',
+        pathNot: '/__fixtures__/',
+      },
+      to: {
+        path: '^src/',
+        pathNot: '^(src/contexts/capture/application/|src/kernel/)',
+      },
+    },
+    {
+      name: 'capture-view-model-only-imports-kernel-and-domain',
+      comment:
+        "capture's view-model is framework-free; it may only import ~/kernel, its own domain, and its own peers",
+      severity: 'error',
+      from: { path: '^src/contexts/capture/view-model/' },
+      to: {
+        path: '^src/',
+        pathNot:
+          '^(src/contexts/capture/view-model/|src/contexts/capture/domain/|src/kernel/)',
+      },
+    },
   ],
   options: {
     doNotFollow: { path: 'node_modules' },

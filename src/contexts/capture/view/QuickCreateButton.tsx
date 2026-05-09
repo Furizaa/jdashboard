@@ -1,5 +1,5 @@
 import { Plus } from 'lucide-react'
-import { useQuickCreate } from './use-quick-create'
+import { useQuickCreate } from '../presenter'
 import { QuickCreateModal } from './QuickCreateModal'
 
 export function QuickCreateButton() {

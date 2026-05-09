@@ -1,10 +1,10 @@
 import { useRef } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { Loader2, X } from 'lucide-react'
-import type { QuickCreateState } from './use-quick-create'
+import type { QuickCreateApi } from '../presenter'
 import { QuickCreateForm } from './QuickCreateForm'
 
-export function QuickCreateModal({ qc }: { qc: QuickCreateState }) {
+export function QuickCreateModal({ qc }: { qc: QuickCreateApi }) {
   const summaryRef = useRef<HTMLInputElement>(null)
   return (
     <Dialog.Root open={qc.open} onOpenChange={qc.setOpen}>

@@ -1,6 +1,6 @@
 import { useEffect, type RefObject } from 'react'
 import { useForm } from '@tanstack/react-form'
-import { quickCreateSchema, type QuickCreateInput } from '~/server/jira/quick-create-schema'
+import { quickCreateSchema, type QuickCreateInput } from '~/kernel'
 import type { CreateIssueResultWithTimeout } from '~/coordinator/service'
 import { ParentSelect } from './ParentSelect'
 import { SummaryInput } from './SummaryInput'

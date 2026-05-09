@@ -144,26 +144,14 @@ export function useTransitionAction(): {
   return { mutate: mutation.mutate, isPending: mutation.isPending }
 }
 
-export function useCreateAction(opts: { closeModal: () => void; resetForm: () => void }): {
-  mutate: (form: QuickCreateInput) => void
+export function useCreateAction(): {
   mutateAsync: (form: QuickCreateInput) => Promise<CreateIssueResultWithTimeout>
-  isPending: boolean
 } {
   const service = useDashboardService()
   const mutation = useMutation<CreateIssueResultWithTimeout, Error, QuickCreateInput>({
     mutationFn: (form) => service.createIssue(form),
-    onSuccess: (result) => {
-      if (result.ok) {
-        opts.resetForm()
-        opts.closeModal()
-      }
-    },
   })
-  return {
-    mutate: mutation.mutate,
-    mutateAsync: mutation.mutateAsync,
-    isPending: mutation.isPending,
-  }
+  return { mutateAsync: mutation.mutateAsync }
 }
 
 export function useMrMergedAction(): (input: {

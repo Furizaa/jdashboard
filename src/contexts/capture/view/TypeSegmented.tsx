@@ -1,6 +1,6 @@
 import { useRef, type KeyboardEvent } from 'react'
 import { TYPE_STYLES, type TypeStyle } from '~/features/ticket-card/type-styles'
-import type { QuickCreateInput } from '~/server/jira/quick-create-schema'
+import type { QuickCreateInput } from '~/kernel'
 
 type Type = QuickCreateInput['type']
 

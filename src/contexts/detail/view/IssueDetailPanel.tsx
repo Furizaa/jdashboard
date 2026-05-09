@@ -1,5 +1,6 @@
 import { match } from 'ts-pattern'
-import { FixasapRibbon, hasFixasapLabel } from '~/features/ticket-card'
+import { FixasapRibbon } from '~/widgets/fixasap-ribbon'
+import { hasFixasapLabel } from '~/widgets/ticket-card'
 import { useIssuePanel } from '../presenter'
 import type { IssuePanelState } from '../view-model'
 import { PanelBody } from './PanelBody'

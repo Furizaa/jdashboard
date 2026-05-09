@@ -50,7 +50,7 @@ The phase ladder is one `match(...).with(...).exhaustive()` over `issueQuery.dat
 - `~/coordinator` — `useTicket`, `useBoardData`, `useMrFor`, `useReviewCards` (presenter / view layers only).
 - `~/lib/use-polling` — visibility-aware refetch interval (presenter only).
 - `~/lib/testids` — centralised test ids (view layer only).
-- `~/features/status-pill`, `~/features/ticket-card`, `~/features/mr-status` — widgets imported from their _current_ `features/` locations until slice 56 moves them under `~/widgets/`.
+- `~/widgets/status-pill`, `~/widgets/ticket-card`, `~/widgets/mr-section`, `~/widgets/fixasap-ribbon` — reusable visual surfaces (view layer only). Detail composes the panel-block MR layout from `Mr.Root` + `Mr.ReviewerStack` / `Mr.WarningRow` / `Mr.OpenLink` directly inside `view/PropertiesRail.tsx`.
 
 No imports from `~/contexts/<other>`. Cross-context coordination would go through the coordinator.
 

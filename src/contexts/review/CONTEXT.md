@@ -2,7 +2,7 @@
 
 Owns the cross-cutting GitLab merge-request review queue and projects each MR onto the Board grid as a "fake card" in the TO DO or Done column. The server already builds `ReviewCard`s (`src/server/gitlab/review-service.ts`); this context owns the **client-side** projection of those cards into board column items, plus the cache hook that subscribes to them.
 
-Review has **no top-level view**. Its visible surfaces are cards rendered by the Board context (and the per-card MR section rendered by the `mr-section` widget — currently still in `~/features/mr-status/` until slice 56). Board's `assembleColumns` consumes Review's projection through the `~/contexts/review` barrel.
+Review has **no top-level view**. Its visible surfaces are cards rendered by the Board context (and the per-card MR section rendered by the `~/widgets/mr-section` compound API). Board's `assembleColumns` consumes Review's projection through the `~/contexts/review` barrel.
 
 ## Language
 

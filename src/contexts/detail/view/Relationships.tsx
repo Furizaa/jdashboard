@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import type { IssueLink, LinkedIssueRef } from '~/kernel'
-import { TypeIcon } from '~/features/ticket-card'
-import { StatusPill } from '~/features/status-pill'
+import { TypeIcon } from '~/widgets/ticket-card'
+import { StatusPill } from '~/widgets/status-pill'
 import { testIds } from '~/lib/testids'
 
 export function Relationships({

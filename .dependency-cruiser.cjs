@@ -212,6 +212,28 @@ module.exports = {
         pathNot: '^(src/contexts/review/application/|src/kernel/)',
       },
     },
+    {
+      name: 'widgets-cant-import-contexts',
+      comment:
+        'widgets are reusable visual surfaces — they must not depend on any bounded context. Cross-cutting wiring belongs at the route or coordinator layer.',
+      severity: 'error',
+      from: { path: '^src/widgets/' },
+      to: { path: '^src/contexts/' },
+    },
+    {
+      name: 'no-tanstack-query-in-widgets-outside-presenter',
+      comment:
+        'inside widgets/, @tanstack/react-query lives only in presenter/ — view, view-model, and domain receive query data via the coordinator hooks or as plain values.',
+      severity: 'error',
+      from: {
+        path: '^src/widgets/[^/]+/',
+        pathNot: '^src/widgets/[^/]+/presenter/',
+      },
+      to: {
+        path: '^@tanstack/react-query($|/)',
+        dependencyTypes: ['npm', 'npm-dev', 'npm-peer'],
+      },
+    },
   ],
   options: {
     doNotFollow: { path: 'node_modules' },

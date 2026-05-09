@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
+import { Skeleton } from '~/design-system'
 import { HARDCODED_PARENTS } from '../domain'
 import { useMyEpics } from '../presenter'
 
@@ -153,7 +154,7 @@ function DynamicSection({
   if (isLoading) {
     return (
       <div className="px-2.5 py-1.5" aria-hidden>
-        <div className="skeleton-shimmer h-4 w-full rounded" />
+        <Skeleton className="h-4 w-full rounded" />
       </div>
     )
   }

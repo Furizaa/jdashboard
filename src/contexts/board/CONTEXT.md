@@ -61,7 +61,7 @@ ready ← data.ok === true ∧ issues.length > 0
 - `~/kernel` — `Column`, `COLUMNS`, `columnForStatus`, `statusesForColumn`, `isDeemphasized`, status normalisation; re-exported server DTO types (`BoardIssue`, `SearchIssuesResult`, `ReviewCard`, ...).
 - `~/coordinator` — `useBoardData`, `useMrStatuses`, `useReviewCards` (presenter only).
 - `~/lib/use-polling` — visibility-aware refetch interval (presenter only).
-- `~/features/ticket-card` — `TicketCard`, `buildCardView` (view layer only; will move to `~/widgets/ticket-card` in slice 56).
+- `~/widgets/ticket-card` — `TicketCard`, `buildCardView` (view layer only).
 
 No imports from `~/contexts/<other>`; cross-context coordination would go through the coordinator.
 

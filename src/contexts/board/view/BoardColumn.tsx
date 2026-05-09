@@ -1,5 +1,5 @@
 import { match } from 'ts-pattern'
-import { TicketCard, buildCardView } from '~/features/ticket-card'
+import { TicketCard, buildCardView } from '~/widgets/ticket-card'
 import type { Column } from '~/kernel'
 import type { ColumnItem } from '../domain'
 

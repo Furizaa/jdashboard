@@ -1,5 +1,5 @@
 import { GitMerge } from 'lucide-react'
-import { getTypeStyle } from './type-styles'
+import { getTypeStyle } from '../domain/type-styles'
 
 export type TypeIconProps = { type: string } | { kind: 'merge-request' }
 

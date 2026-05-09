@@ -1,5 +1,5 @@
 import { useRef, type KeyboardEvent } from 'react'
-import { TYPE_STYLES, type TypeStyle } from '~/features/ticket-card/type-styles'
+import { TYPE_STYLES, type TypeStyle } from '~/widgets/ticket-card'
 import type { QuickCreateInput } from '~/kernel'
 
 type Type = QuickCreateInput['type']

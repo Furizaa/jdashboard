@@ -54,7 +54,7 @@ Transition table:
 - `~/kernel` — `QuickCreateInput`, `quickCreateSchema`, `EpicRef`, `CreateIssueResult`, `GetMyEpicsResult` (all re-exported from `~/server/jira`).
 - `~/coordinator` — `useCreateAction` (presenter only); the cross-context `createIssue` action handles toasts, board cache invalidation, and the 10s timeout.
 - `~/server/jira` — `getMyEpics` server function (presenter only, called via `useMyEpics`).
-- `~/features/ticket-card` — `TYPE_STYLES` (view layer only; will move to `~/widgets/ticket-card` in slice 56).
+- `~/widgets/ticket-card` — `TYPE_STYLES` (view layer only).
 
 No imports from `~/contexts/<other>`. Cross-context coordination would go through the coordinator.
 

@@ -1,4 +1,5 @@
 import { AlertTriangle, CheckCircle, Loader2, XCircle } from 'lucide-react'
+import { match } from 'ts-pattern'
 import { cn } from '~/lib/cn'
 import { testIds } from '~/lib/testids'
 import type { CiVisualState } from '~/kernel'
@@ -21,26 +22,22 @@ export function MrCiIndicator({ state, className }: { state: CiVisualState; clas
 }
 
 function render(state: Exclude<CiVisualState, 'none'>) {
-  if (state === 'conflict') {
-    return {
+  return match(state)
+    .with('conflict', () => ({
       label: 'Merge conflict',
       icon: <AlertTriangle className={`${ICON_CLASS} text-amber-500`} aria-hidden />,
-    }
-  }
-  if (state === 'failed') {
-    return {
+    }))
+    .with('failed', () => ({
       label: 'CI failed',
       icon: <XCircle className={`${ICON_CLASS} text-red-500`} aria-hidden />,
-    }
-  }
-  if (state === 'running') {
-    return {
+    }))
+    .with('running', () => ({
       label: 'CI running',
       icon: <Loader2 className={`${ICON_CLASS} text-muted-foreground animate-spin`} aria-hidden />,
-    }
-  }
-  return {
-    label: 'CI passed',
-    icon: <CheckCircle className={`${ICON_CLASS} text-green-500`} aria-hidden />,
-  }
+    }))
+    .with('passed', () => ({
+      label: 'CI passed',
+      icon: <CheckCircle className={`${ICON_CLASS} text-green-500`} aria-hidden />,
+    }))
+    .exhaustive()
 }

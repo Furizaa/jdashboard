@@ -1,6 +1,6 @@
 import { StatusIcon } from './StatusIcon'
-import { styleForStatus } from './status-color'
-import { displayNameForStatus } from './status-display-name'
+import { styleForStatus } from '../domain/status-color'
+import { displayNameForStatus } from '../domain/status-display-name'
 
 export function StatusPill({ status }: { status: string }) {
   const style = styleForStatus(status)

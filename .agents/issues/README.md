@@ -1,6 +1,6 @@
 # clashboard issues
 
-Tracer-bullet vertical slices derived from [the clashboard PRD](../prds/clashboard.md), [the GitLab MR status PRD](../prds/gitlab-mr-status.md), [the misc improvements PRD](../prds/misc-improvements.md), [the Quick Create PRD](../prds/quick-create.md), [the GitLab MR review cards PRD](../prds/gitlab-mr-review-cards.md), and [the e2e harness PRD](../prds/e2e-harness.md). Each slice cuts through all layers (server function → query hook → UI → tests where applicable) and is demoable on its own.
+Tracer-bullet vertical slices derived from [the clashboard PRD](../prds/clashboard.md), [the GitLab MR status PRD](../prds/gitlab-mr-status.md), [the misc improvements PRD](../prds/misc-improvements.md), [the Quick Create PRD](../prds/quick-create.md), [the GitLab MR review cards PRD](../prds/gitlab-mr-review-cards.md), [the e2e harness PRD](../prds/e2e-harness.md), and [the clean architecture refactor PRD](../prds/clean-architecture-refactor.md). Each slice cuts through all layers (server function → query hook → UI → tests where applicable) and is demoable on its own.
 
 ## Order & dependencies
 
@@ -39,6 +39,10 @@ Tracer-bullet vertical slices derived from [the clashboard PRD](../prds/clashboa
     ├─→ 46 ─→ 50
     ├─→ 47
     └─→ 48 ─→ 49
+
+51 → 52 ─┬─→ 53 ─┐
+         ├─→ 54 ─┼─→ 56 → 57 → 58 ─┬─→ 59 ─→ 61
+         └─→ 55 ─┘                  └─→ 60 ─→ 61
 ```
 
 ## Index
@@ -117,3 +121,19 @@ Tracer-bullet vertical slices derived from [the clashboard PRD](../prds/clashboa
 | 48 | [E2e: MR-status folder specs (GitLab World + factories)](./48-e2e-mr-status-folder.md) | AFK | 43 |
 | 49 | [E2e: review-cards folder specs](./49-e2e-review-cards-folder.md) | AFK | 48 |
 | 50 | [E2e: auth-status folder specs](./50-e2e-auth-status-folder.md) | AFK | 46 |
+
+### Clean architecture refactor (PRD: [clean-architecture-refactor.md](../prds/clean-architecture-refactor.md))
+
+| # | File | Type | Blocked by |
+|---|---|---|---|
+| 51 | [Foundation: scaffolding, libs, governance, coordinator rename](./51-arch-foundation.md) | AFK | — |
+| 52 | [Board context migration (exemplar)](./52-arch-board-context.md) | HITL | 51 |
+| 53 | [Detail context migration](./53-arch-detail-context.md) | AFK | 52 |
+| 54 | [Capture context migration](./54-arch-capture-context.md) | AFK | 52 |
+| 55 | [Review context migration](./55-arch-review-context.md) | AFK | 52 |
+| 56 | [Widgets refactor (status-pill, ticket-card, mr-section, fixasap-ribbon)](./56-arch-widgets.md) | AFK | 53, 54, 55 |
+| 57 | [Coordinator finalisation (port/adapter split, naming)](./57-arch-coordinator-finalisation.md) | AFK | 56 |
+| 58 | [Lockdown (all rules to error, graduated exceptions removed)](./58-arch-lockdown.md) | AFK | 57 |
+| 59 | [Tour doc (the manga's first chapter)](./59-arch-tour-doc.md) | HITL | 58 |
+| 60 | [Layers reference doc](./60-arch-layers-reference.md) | AFK | 58 |
+| 61 | [README rewrite (architecture-first)](./61-arch-readme-rewrite.md) | HITL | 59, 60 |

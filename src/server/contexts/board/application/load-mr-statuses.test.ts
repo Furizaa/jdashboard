@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@effect/vitest'
 import { Effect, Layer, TestClock } from 'effect'
-import { NotFound, Unauthorized } from '../../../gateways/gitlab/errors'
+import { GitlabNotFound, GitlabUnauthorized } from '../../../gateways/gitlab/errors'
 import { GitlabGateway } from '../../../gateways/gitlab/port'
 import type {
   ListMrsQuery,
@@ -241,7 +241,7 @@ describe('loadMrStatuses', () => {
     Effect.gen(function* () {
       let listCalled = false
       const gitlab = fakeGitlabGateway({
-        getCurrentUser: () => Effect.fail(new Unauthorized()),
+        getCurrentUser: () => Effect.fail(new GitlabUnauthorized()),
         listMrs: () => {
           listCalled = true
           return Effect.succeed([])
@@ -257,7 +257,7 @@ describe('loadMrStatuses', () => {
     Effect.gen(function* () {
       const gitlab = fakeGitlabGateway({
         getCurrentUser: () => Effect.succeed(ME),
-        listMrs: () => Effect.fail(new Unauthorized()),
+        listMrs: () => Effect.fail(new GitlabUnauthorized()),
       })
       const failure = yield* withClockAt(loadMrStatuses, FIXED_NOW, gitlab).pipe(Effect.flip)
       expect(failure._tag).toBe('Unauthorized')
@@ -274,7 +274,7 @@ describe('loadMrStatuses', () => {
             summary({ iid: 2, title: 'HDR-2' }),
           ]),
         getMr: (iid) => {
-          if (iid === 1) return Effect.fail(new NotFound())
+          if (iid === 1) return Effect.fail(new GitlabNotFound())
           return Effect.succeed(detail({ iid, title: `HDR-${iid}`, state: 'merged' }))
         },
         getMrDiscussions: () => Effect.succeed([]),

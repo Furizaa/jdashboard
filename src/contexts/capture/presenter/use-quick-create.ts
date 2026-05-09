@@ -36,6 +36,16 @@ export type QuickCreateDeps = {
   submit: SubmitFn
 }
 
+function isPlainCKey(e: KeyboardEvent): boolean {
+  if (e.key !== 'c') return false
+  return !(e.ctrlKey || e.metaKey || e.altKey || e.shiftKey)
+}
+
+function eventTargetIsTextInput(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false
+  return target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable
+}
+
 export function useQuickCreate(): QuickCreateApi {
   const action = useCreateAction()
   return useQuickCreateWithDeps({ submit: action.mutateAsync })
@@ -50,16 +60,9 @@ export function useQuickCreateWithDeps(deps: QuickCreateDeps): QuickCreateApi {
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'c') return
-      if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return
+      if (!isPlainCKey(e)) return
       if (phaseRef.current !== 'closed') return
-      const target = e.target
-      if (
-        target instanceof HTMLElement &&
-        (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
-      ) {
-        return
-      }
+      if (eventTargetIsTextInput(e.target)) return
       e.preventDefault()
       dispatch({ type: 'opened' })
     }

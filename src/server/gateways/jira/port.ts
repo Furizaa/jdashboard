@@ -4,13 +4,13 @@ import type {
   AllowedTransition,
   CreateIssueBody,
   GatewayCreatedIssue,
-  GatewayUser,
+  JiraUser,
   RawDetailedIssue,
   RawSearchResponse,
 } from './types'
 
 export type JiraGatewayShape = {
-  readonly getMyself: () => Effect.Effect<GatewayUser, JiraGatewayError>
+  readonly getMyself: () => Effect.Effect<JiraUser, JiraGatewayError>
   readonly searchIssues: (
     jql: string,
     fields: readonly string[],

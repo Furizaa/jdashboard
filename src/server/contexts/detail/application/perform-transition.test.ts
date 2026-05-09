@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@effect/vitest'
 import { Effect, Layer } from 'effect'
-import { NotFound, Rejected, Unauthorized } from '../../../gateways/jira/errors'
+import { JiraNotFound, JiraRejected, JiraUnauthorized } from '../../../gateways/jira/errors'
 import { JiraGateway } from '../../../gateways/jira/port'
 import { fakeJiraGateway } from './__fixtures__/fake-jira-gateway'
 import { performTransition } from './perform-transition'
@@ -33,7 +33,7 @@ describe('performTransition', () => {
   it.effect('propagates Unauthorized as a tagged failure', () =>
     Effect.gen(function* () {
       const jira = fakeJiraGateway({
-        transitionIssue: () => Effect.fail(new Unauthorized()),
+        transitionIssue: () => Effect.fail(new JiraUnauthorized()),
       })
       const failure = yield* provide(performTransition('HDR-1', '21'), jira).pipe(Effect.flip)
       expect(failure._tag).toBe('Unauthorized')
@@ -43,7 +43,7 @@ describe('performTransition', () => {
   it.effect('propagates Rejected with the gateway message', () =>
     Effect.gen(function* () {
       const jira = fakeJiraGateway({
-        transitionIssue: () => Effect.fail(new Rejected({ message: 'Transition not allowed' })),
+        transitionIssue: () => Effect.fail(new JiraRejected({ message: 'Transition not allowed' })),
       })
       const failure = yield* provide(performTransition('HDR-1', '21'), jira).pipe(Effect.flip)
       expect(failure._tag).toBe('Rejected')
@@ -56,7 +56,7 @@ describe('performTransition', () => {
   it.effect('translates NotFound from the gateway into Rejected with "Issue not found"', () =>
     Effect.gen(function* () {
       const jira = fakeJiraGateway({
-        transitionIssue: () => Effect.fail(new NotFound()),
+        transitionIssue: () => Effect.fail(new JiraNotFound()),
       })
       const failure = yield* provide(performTransition('HDR-NOPE', '21'), jira).pipe(Effect.flip)
       expect(failure._tag).toBe('Rejected')

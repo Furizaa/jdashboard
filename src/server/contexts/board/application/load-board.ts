@@ -2,7 +2,7 @@ import { Effect } from 'effect'
 import { JiraGateway } from '../../../gateways/jira/port'
 import type { BoardIssue, RawIssue } from '../../../gateways/jira/types'
 import { BoardConfig } from '../config'
-import type { Unauthorized } from '../errors'
+import type { JiraUnauthorized } from '../../../gateways/jira/errors'
 
 export type LoadBoardOk = {
   readonly baseUrl: string
@@ -47,7 +47,7 @@ function toBoardIssue(issue: RawIssue, hideSet: ReadonlySet<string>): BoardIssue
   }
 }
 
-export const loadBoard: Effect.Effect<LoadBoardOk, Unauthorized, JiraGateway | BoardConfig> =
+export const loadBoard: Effect.Effect<LoadBoardOk, JiraUnauthorized, JiraGateway | BoardConfig> =
   Effect.gen(function* () {
     const jira = yield* JiraGateway
     const config = yield* BoardConfig

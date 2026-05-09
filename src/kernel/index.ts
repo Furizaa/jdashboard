@@ -1,15 +1,9 @@
 export { COLUMNS, columnForStatus, isDeemphasized, statusesForColumn, type Column } from './columns'
 export { normalizeStatus } from './status'
 export {
-  ciVisualState,
-  countUnresolvedThreads,
-  reviewBucket,
-  reviewerVisualState,
   REVIEWER_BADGE_LABEL,
   REVIEWER_STATE_LABEL,
   type CiVisualState,
-  type MrState,
-  type ReviewerApprovalStatus,
   type ReviewerVisualState,
 } from './mr'
 export type {
@@ -25,7 +19,6 @@ export type {
   LinkedIssueRef,
   QuickCreateInput,
   SearchIssuesResult,
-  TransitionIssueResult,
 } from './jira'
 export { quickCreateSchema } from './jira'
 export type {

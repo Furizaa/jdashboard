@@ -24,7 +24,18 @@ export function CardKey({
     [],
   )
 
-  async function handleClick(event: MouseEvent<HTMLButtonElement>) {
+  async function copyAndIndicate(url: string) {
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopied(true)
+      if (timeoutRef.current !== null) clearTimeout(timeoutRef.current)
+      timeoutRef.current = setTimeout(() => setCopied(false), COPIED_INDICATOR_MS)
+    } catch {
+      toast.error("Couldn't copy link to clipboard")
+    }
+  }
+
+  function handleClick(event: MouseEvent<HTMLButtonElement>) {
     event.stopPropagation()
     if (keyClick.kind === 'open-mr') {
       window.open(keyClick.url, '_blank', 'noopener,noreferrer')
@@ -34,14 +45,7 @@ export function CardKey({
       window.open(keyOpenInJira, '_blank', 'noopener,noreferrer')
       return
     }
-    try {
-      await navigator.clipboard.writeText(keyClick.url)
-      setCopied(true)
-      if (timeoutRef.current !== null) clearTimeout(timeoutRef.current)
-      timeoutRef.current = setTimeout(() => setCopied(false), COPIED_INDICATOR_MS)
-    } catch {
-      toast.error("Couldn't copy link to clipboard")
-    }
+    void copyAndIndicate(keyClick.url)
   }
 
   const ariaLabel = match(keyClick)

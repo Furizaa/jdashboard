@@ -1,11 +1,11 @@
 import { Schema } from 'effect'
-import { Rejected, Unauthorized } from '../../gateways/jira/errors'
+import { JiraRejected, JiraUnauthorized } from '../../gateways/jira/errors'
 
-export const QuickCreateError = Schema.Union(Unauthorized, Rejected)
+export const QuickCreateError = Schema.Union(JiraUnauthorized, JiraRejected)
 export type QuickCreateError = Schema.Schema.Type<typeof QuickCreateError>
 
-export const LoadMyEpicsError = Schema.Union(Unauthorized)
+export const LoadMyEpicsError = Schema.Union(JiraUnauthorized)
 export type LoadMyEpicsError = Schema.Schema.Type<typeof LoadMyEpicsError>
 
-export const GetMyselfError = Schema.Union(Unauthorized)
-export type GetMyselfError = Schema.Schema.Type<typeof GetMyselfError>
+export const LoadMyselfError = Schema.Union(JiraUnauthorized)
+export type LoadMyselfError = Schema.Schema.Type<typeof LoadMyselfError>

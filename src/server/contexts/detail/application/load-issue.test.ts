@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@effect/vitest'
 import { Effect, Layer } from 'effect'
-import { NotFound, Unauthorized } from '../../../gateways/jira/errors'
+import { JiraNotFound, JiraUnauthorized } from '../../../gateways/jira/errors'
 import { JiraGateway } from '../../../gateways/jira/port'
 import type { RawDetailedIssue, RawSearchResponse } from '../../../gateways/jira/types'
 import { DetailConfig, type DetailConfigShape } from '../config'
@@ -239,7 +239,7 @@ describe('loadIssue', () => {
   it.effect('propagates Unauthorized as a tagged failure', () =>
     Effect.gen(function* () {
       const jira = fakeJiraGateway({
-        getIssue: () => Effect.fail(new Unauthorized()),
+        getIssue: () => Effect.fail(new JiraUnauthorized()),
         searchIssues: () => Effect.succeed(emptySearchResponse()),
       })
       const failure = yield* provide(loadIssue('HDR-1'), jira).pipe(Effect.flip)
@@ -250,7 +250,7 @@ describe('loadIssue', () => {
   it.effect('propagates NotFound from the main issue fetch as a tagged failure', () =>
     Effect.gen(function* () {
       const jira = fakeJiraGateway({
-        getIssue: () => Effect.fail(new NotFound()),
+        getIssue: () => Effect.fail(new JiraNotFound()),
         searchIssues: () => Effect.succeed(emptySearchResponse()),
       })
       const failure = yield* provide(loadIssue('HDR-NOPE'), jira).pipe(Effect.flip)
@@ -262,7 +262,7 @@ describe('loadIssue', () => {
     Effect.gen(function* () {
       const jira = fakeJiraGateway({
         getIssue: () => Effect.succeed(emptyDetailedIssue('HDR-1')),
-        searchIssues: () => Effect.fail(new Unauthorized()),
+        searchIssues: () => Effect.fail(new JiraUnauthorized()),
       })
       const failure = yield* provide(loadIssue('HDR-1'), jira).pipe(Effect.flip)
       expect(failure._tag).toBe('Unauthorized')

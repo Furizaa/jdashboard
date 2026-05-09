@@ -1,9 +1,9 @@
 import { describe, expect, it } from '@effect/vitest'
 import { Effect, Layer } from 'effect'
-import { Unauthorized } from '../../../gateways/jira/errors'
+import { JiraUnauthorized } from '../../../gateways/jira/errors'
 import { JiraGateway } from '../../../gateways/jira/port'
 import { fakeJiraGateway } from './__fixtures__/fake-jira-gateway'
-import { getMyself } from './get-myself'
+import { loadMyself } from './load-myself'
 
 function provide<A, E>(
   program: Effect.Effect<A, E, JiraGateway>,
@@ -12,7 +12,7 @@ function provide<A, E>(
   return program.pipe(Effect.provide(Layer.succeed(JiraGateway, jira)))
 }
 
-describe('getMyself', () => {
+describe('loadMyself', () => {
   it.effect('returns the user from the gateway on success', () =>
     Effect.gen(function* () {
       const jira = fakeJiraGateway({
@@ -23,7 +23,7 @@ describe('getMyself', () => {
             avatarUrl: 'https://j/avatar',
           }),
       })
-      const result = yield* provide(getMyself, jira)
+      const result = yield* provide(loadMyself, jira)
       expect(result.user).toEqual({
         accountId: 'acc-1',
         displayName: 'Andreas',
@@ -35,9 +35,9 @@ describe('getMyself', () => {
   it.effect('propagates Unauthorized as a tagged failure', () =>
     Effect.gen(function* () {
       const jira = fakeJiraGateway({
-        getMyself: () => Effect.fail(new Unauthorized()),
+        getMyself: () => Effect.fail(new JiraUnauthorized()),
       })
-      const failure = yield* provide(getMyself, jira).pipe(Effect.flip)
+      const failure = yield* provide(loadMyself, jira).pipe(Effect.flip)
       expect(failure._tag).toBe('Unauthorized')
     }),
   )

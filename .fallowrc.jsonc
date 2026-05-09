@@ -27,6 +27,12 @@
   },
 
   "health": {
+    // CRAP combines cyclomatic complexity with test coverage. Per CONTEXT-MAP, view
+    // components are not unit-tested (covered by e2e), so fallow's coverage estimate
+    // for `view/` files is always 0 and pushes their CRAP to 30+ for any conditional
+    // JSX. Default is 30; 45 lets cyclomatic-≤6 JSX through while still flagging
+    // cyclomatic-≥7 (CRAP 56) as a real signal.
+    "maxCrap": 45,
     // Long arrow functions in test files are usually `describe(..., () => { ... })`
     // bodies — they do not represent production complexity.
     "ignore": [

@@ -1,30 +1,30 @@
 import { createServerFn } from '@tanstack/react-start'
 import { Effect, Schema } from 'effect'
-import { Unauthorized } from '../gateways/gitlab/errors'
+import { GitlabUnauthorized } from '../gateways/gitlab/errors'
 import { GitlabGateway } from '../gateways/gitlab/port'
 import type { ReviewCard } from '../gateways/gitlab/types'
-import { getReviewCards as getReviewCardsProgram } from '../contexts/review/application/get-review-cards'
+import { loadReviewCards } from '../contexts/review/application/load-review-cards'
 import { ReviewConfigLive } from '../contexts/review/config'
-import { GetReviewCardsError } from '../contexts/review/errors'
+import { LoadReviewCardsError } from '../contexts/review/errors'
 import { appRuntime } from '../runtime/app-runtime'
 import { toWire, type WireResult } from '../wire/to-wire'
 
-type GetReviewCardsErrorWire = Schema.Schema.Encoded<typeof GetReviewCardsError>
+type LoadReviewCardsErrorWire = Schema.Schema.Encoded<typeof LoadReviewCardsError>
 
 export type GetReviewCardsResult = WireResult<
   { readonly baseUrl: string; readonly cards: readonly ReviewCard[] },
-  GetReviewCardsErrorWire
+  LoadReviewCardsErrorWire
 >
 
 export type GetGitlabUserResult =
   | { readonly ok: true; readonly username: string; readonly displayName: string }
   | { readonly ok: false; readonly reason: 'unauthorized' }
 
-const reviewCardsProgram = getReviewCardsProgram.pipe(Effect.provide(ReviewConfigLive))
+const reviewCardsProgram = loadReviewCards.pipe(Effect.provide(ReviewConfigLive))
 
 export const getReviewCards = createServerFn({ method: 'GET' }).handler(
   async (): Promise<GetReviewCardsResult> => {
-    const wire = await appRuntime.runPromise(toWire(reviewCardsProgram, GetReviewCardsError))
+    const wire = await appRuntime.runPromise(toWire(reviewCardsProgram, LoadReviewCardsError))
     if (!wire.ok && wire.error._tag === 'InternalError') {
       throw new Error('getReviewCards: internal error')
     }
@@ -32,7 +32,7 @@ export const getReviewCards = createServerFn({ method: 'GET' }).handler(
   },
 )
 
-const GitlabUserOnlyError = Schema.Union(Unauthorized)
+const GitlabUserOnlyError = Schema.Union(GitlabUnauthorized)
 
 const getGitlabUserProgram = Effect.gen(function* () {
   const gitlab = yield* GitlabGateway

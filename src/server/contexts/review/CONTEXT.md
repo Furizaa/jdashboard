@@ -4,7 +4,7 @@ The **Review** server context surfaces GitLab merge requests where the current u
 
 ## Boundary
 
-- **What it owns:** the `getReviewCards` use-case — fan-out across MR detail/discussions/approvals/reviewers, bucketing logic (needs-review / rejected / accepted), and the merge with Jira metadata extracted from MR titles.
+- **What it owns:** the `loadReviewCards` use-case — fan-out across MR detail/discussions/approvals/reviewers, bucketing logic (needs-review / rejected / accepted), and the merge with Jira metadata extracted from MR titles.
 - **What it does not own:** the GitLab and Jira wire formats (those are gateway-output types), the MR-status overlay on Board (that's `contexts/board/application/load-mr-statuses.ts`), and any UI rendering.
 
 ## Dependencies
@@ -23,7 +23,7 @@ Plus:
 
 Pre-Effect, `server/gitlab/review-service.ts` imported `JiraIssueService` directly from `server/jira/`. That smuggled cross-system orchestration into the GitLab folder, breaking the "gateway folder owns one external system" rule.
 
-In the new layout, `getReviewCards` lives in **Review's application layer** and depends on both gateway Tags as peers. The cross-namespace coupling no longer exists at the folder level — it's structurally correct cross-system orchestration in the only place it belongs: a context application service.
+In the new layout, `loadReviewCards` lives in **Review's application layer** and depends on both gateway Tags as peers. The cross-namespace coupling no longer exists at the folder level — it's structurally correct cross-system orchestration in the only place it belongs: a context application service.
 
 ## Concurrency
 

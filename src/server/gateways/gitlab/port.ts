@@ -1,7 +1,7 @@
 import { Context, type Effect } from 'effect'
 import type { GitlabGatewayError } from './errors'
 import type {
-  GatewayUser,
+  GitlabUser,
   ListMrsQuery,
   RawApprovals,
   RawDiscussion,
@@ -11,7 +11,7 @@ import type {
 } from './types'
 
 export type GitlabGatewayShape = {
-  readonly getCurrentUser: () => Effect.Effect<GatewayUser, GitlabGatewayError>
+  readonly getCurrentUser: () => Effect.Effect<GitlabUser, GitlabGatewayError>
   readonly listMrs: (query: ListMrsQuery) => Effect.Effect<RawMrSummary[], GitlabGatewayError>
   readonly getMr: (iid: number) => Effect.Effect<RawMrDetail, GitlabGatewayError>
   readonly getMrDiscussions: (iid: number) => Effect.Effect<RawDiscussion[], GitlabGatewayError>

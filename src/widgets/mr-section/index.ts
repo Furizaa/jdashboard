@@ -1,1 +1,1 @@
-export { Mr, type RootState } from './view/Mr'
+export { Mr, rootStateFromPhase } from './view/Mr'

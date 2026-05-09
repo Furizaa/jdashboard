@@ -1,6 +1,7 @@
 export {
   diffChange,
   indexBy,
+  isEmptyDiff,
   EMPTY_VISUAL,
   type ChangeOptions,
   type ChangeVisual,

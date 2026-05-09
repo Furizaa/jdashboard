@@ -26,10 +26,6 @@ export function Header({
     return () => clearInterval(id)
   }, [])
 
-  const errored = query.isError
-  const errorMessage =
-    query.error instanceof Error ? query.error.message : errored ? 'Unknown error' : ''
-
   return (
     <header className="border-border flex h-12 shrink-0 items-center gap-3 border-b px-4">
       <span className="flex items-center gap-2">
@@ -40,26 +36,7 @@ export function Header({
       <SearchInput value={searchQuery} onChange={onSearchChange} />
       <div className="ml-auto flex items-center gap-1">
         <GitlabIndicator />
-        {errored ? (
-          <button
-            type="button"
-            onClick={refresh}
-            title={errorMessage}
-            data-testid={testIds.syncIndicator}
-            className="text-destructive hover:text-destructive/80 focus-visible:ring-ring rounded px-2 py-1 text-xs transition-colors focus-visible:ring-1 focus-visible:outline-none"
-          >
-            Sync failed · Retry
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={refresh}
-            data-testid={testIds.syncIndicator}
-            className="text-muted-foreground hover:text-foreground focus-visible:ring-ring rounded px-2 py-1 text-xs transition-colors focus-visible:ring-1 focus-visible:outline-none"
-          >
-            {syncedLabel(query.dataUpdatedAt, query.isFetching)}
-          </button>
-        )}
+        <SyncIndicator query={query} onRefresh={refresh} />
         <button
           type="button"
           onClick={refresh}
@@ -71,6 +48,39 @@ export function Header({
         </button>
       </div>
     </header>
+  )
+}
+
+function SyncIndicator({
+  query,
+  onRefresh,
+}: {
+  query: ReturnType<typeof useBoardData>
+  onRefresh: () => void
+}) {
+  if (query.isError) {
+    const errorMessage = query.error instanceof Error ? query.error.message : 'Unknown error'
+    return (
+      <button
+        type="button"
+        onClick={onRefresh}
+        title={errorMessage}
+        data-testid={testIds.syncIndicator}
+        className="text-destructive hover:text-destructive/80 focus-visible:ring-ring rounded px-2 py-1 text-xs transition-colors focus-visible:ring-1 focus-visible:outline-none"
+      >
+        Sync failed · Retry
+      </button>
+    )
+  }
+  return (
+    <button
+      type="button"
+      onClick={onRefresh}
+      data-testid={testIds.syncIndicator}
+      className="text-muted-foreground hover:text-foreground focus-visible:ring-ring rounded px-2 py-1 text-xs transition-colors focus-visible:ring-1 focus-visible:outline-none"
+    >
+      {syncedLabel(query.dataUpdatedAt, query.isFetching)}
+    </button>
   )
 }
 

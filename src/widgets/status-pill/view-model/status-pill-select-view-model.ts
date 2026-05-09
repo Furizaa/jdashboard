@@ -39,33 +39,45 @@ export type TransitionsView = {
   isError: boolean
 }
 
-export function derive(
-  state: State,
+function buildItems(
+  data: Extract<GetTransitionsResult, { ok: true }>,
   currentStatus: string,
-  transitions: TransitionsView,
-): DisplayState {
-  if (!state.open) return { open: false }
-  if (transitions.isPending) return { open: true, dropdown: { kind: 'loading' } }
-  if (transitions.isError || transitions.data === undefined)
-    return { open: true, dropdown: { kind: 'error-network' } }
-  const data = transitions.data
-  if (!data.ok) {
-    return {
-      open: true,
-      dropdown: {
-        // oxlint-disable-next-line no-underscore-dangle -- `_tag` is the standard discriminator on Effect Schema tagged errors
-        kind: data.error._tag === 'Unauthorized' ? 'error-unauthorized' : 'error-network',
-      },
-    }
-  }
-  if (data.transitions.length === 0) return { open: true, dropdown: { kind: 'no-transitions' } }
+): readonly TransitionItem[] {
   const lower = currentStatus.toLowerCase()
-  const items: TransitionItem[] = data.transitions.map((t) => ({
+  return data.transitions.map((t) => ({
     id: t.id,
     toStatusName: t.toStatusName,
     displayName: displayNameForStatus(t.toStatusName),
     style: styleForStatus(t.toStatusName),
     isCurrent: t.toStatusName.toLowerCase() === lower,
   }))
-  return { open: true, dropdown: { kind: 'available', items } }
+}
+
+function dropdownFromOk(
+  data: Extract<GetTransitionsResult, { ok: true }>,
+  currentStatus: string,
+): DropdownState {
+  if (data.transitions.length === 0) return { kind: 'no-transitions' }
+  return { kind: 'available', items: buildItems(data, currentStatus) }
+}
+
+function dropdownFromErr(data: Extract<GetTransitionsResult, { ok: false }>): DropdownState {
+  // oxlint-disable-next-line no-underscore-dangle -- `_tag` is the standard discriminator on Effect Schema tagged errors
+  return { kind: data.error._tag === 'Unauthorized' ? 'error-unauthorized' : 'error-network' }
+}
+
+function deriveDropdown(currentStatus: string, transitions: TransitionsView): DropdownState {
+  if (transitions.isPending) return { kind: 'loading' }
+  const data = transitions.data
+  if (transitions.isError || data === undefined) return { kind: 'error-network' }
+  return data.ok ? dropdownFromOk(data, currentStatus) : dropdownFromErr(data)
+}
+
+export function derive(
+  state: State,
+  currentStatus: string,
+  transitions: TransitionsView,
+): DisplayState {
+  if (!state.open) return { open: false }
+  return { open: true, dropdown: deriveDropdown(currentStatus, transitions) }
 }

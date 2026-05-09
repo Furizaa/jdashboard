@@ -3,10 +3,74 @@ import { useNavigate } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import { useBoardData, useTicket } from '~/coordinator'
 import { usePolling } from '~/lib/use-polling'
-import { shouldHandleShortcut } from '../domain'
+import { panelKeyIntent, shouldHandleShortcut, type PanelKeyIntent } from '../domain'
 import { derive, type IssuePanelState } from '../view-model'
 
 const ISSUE_PANEL_POLL_INTERVAL_MS = 60_000
+
+type ShortcutTargets = {
+  prevKey: string | null
+  nextKey: string | null
+  jiraUrl: string | null
+  navigate: (key: string | null) => void
+  openInBrowser: (url: string) => void
+  copyJiraLinkAndToast: (url: string) => void
+}
+
+function runIfNotNull<T>(value: T | null, fn: (value: T) => void): boolean {
+  if (value === null) return false
+  fn(value)
+  return true
+}
+
+function dispatchPanelIntent(intent: PanelKeyIntent, t: ShortcutTargets): boolean {
+  if (intent === 'next') return runIfNotNull(t.nextKey, t.navigate)
+  if (intent === 'prev') return runIfNotNull(t.prevKey, t.navigate)
+  if (intent === 'open') return runIfNotNull(t.jiraUrl, t.openInBrowser)
+  return runIfNotNull(t.jiraUrl, t.copyJiraLinkAndToast)
+}
+
+function useEscapeToClose(active: boolean, onClose: () => void): void {
+  useEffect(() => {
+    if (!active) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [active, onClose])
+}
+
+function useShortcutTargets(
+  state: IssuePanelState,
+  navigate: (key: string | null) => void,
+  openInBrowser: (url: string) => void,
+  copyJiraLinkAndToast: (url: string) => void,
+): ShortcutTargets {
+  const prevKey = state.phase === 'ready' ? state.prevKey : null
+  const nextKey = state.phase === 'ready' ? state.nextKey : null
+  const jiraUrl = state.phase === 'ready' ? state.jiraUrl : null
+  return useMemo(
+    () => ({ prevKey, nextKey, jiraUrl, navigate, openInBrowser, copyJiraLinkAndToast }),
+    [prevKey, nextKey, jiraUrl, navigate, openInBrowser, copyJiraLinkAndToast],
+  )
+}
+
+function usePanelShortcuts(active: boolean, targets: ShortcutTargets): void {
+  useEffect(() => {
+    if (!active) return
+    const onKey = (event: KeyboardEvent) => {
+      if (!shouldHandleShortcut(event)) return
+      const intent = panelKeyIntent(event)
+      if (intent === null) return
+      if (dispatchPanelIntent(intent, targets)) event.preventDefault()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [active, targets])
+}
 
 export function useIssuePanel(issueKey: string | null): IssuePanelState {
   const navigateFn = useNavigate()
@@ -57,48 +121,11 @@ export function useIssuePanel(issueKey: string | null): IssuePanelState {
     copyJiraLinkAndToast,
   })
 
-  useEffect(() => {
-    if (issueKey === null) return
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
-      event.preventDefault()
-      navigate(null)
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [issueKey, navigate])
+  const targets = useShortcutTargets(state, navigate, openInBrowser, copyJiraLinkAndToast)
 
-  const ready = state.phase === 'ready' ? state : null
-  const prevKey = ready?.prevKey ?? null
-  const nextKey = ready?.nextKey ?? null
-  const jiraUrl = ready?.jiraUrl ?? null
-
-  useEffect(() => {
-    if (issueKey === null) return
-    const onKey = (event: KeyboardEvent) => {
-      if (!shouldHandleShortcut(event)) return
-      const key = event.key.toLowerCase()
-      if (key === 'j' || event.key === 'ArrowDown') {
-        if (nextKey === null) return
-        event.preventDefault()
-        navigate(nextKey)
-      } else if (key === 'k' || event.key === 'ArrowUp') {
-        if (prevKey === null) return
-        event.preventDefault()
-        navigate(prevKey)
-      } else if (key === 'o') {
-        if (jiraUrl === null) return
-        event.preventDefault()
-        openInBrowser(jiraUrl)
-      } else if (key === 'c') {
-        if (jiraUrl === null) return
-        event.preventDefault()
-        copyJiraLinkAndToast(jiraUrl)
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [issueKey, prevKey, nextKey, jiraUrl, navigate, openInBrowser, copyJiraLinkAndToast])
+  const closeOnEscape = useMemo(() => () => navigate(null), [navigate])
+  useEscapeToClose(issueKey !== null, closeOnEscape)
+  usePanelShortcuts(issueKey !== null, targets)
 
   return state
 }

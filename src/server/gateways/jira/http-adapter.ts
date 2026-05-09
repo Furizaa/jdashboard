@@ -1,13 +1,13 @@
 import { HttpClient, HttpClientRequest, HttpClientResponse } from '@effect/platform'
 import { Effect, Layer } from 'effect'
 import { ServerEnv } from '../../runtime/server-env'
-import { NotFound, Rejected, Unauthorized, type JiraGatewayError } from './errors'
+import { JiraNotFound, JiraRejected, JiraUnauthorized, type JiraGatewayError } from './errors'
 import { JiraGateway } from './port'
 import type {
   AllowedTransition,
   CreateIssueBody,
   GatewayCreatedIssue,
-  GatewayUser,
+  JiraUser,
   RawDetailedIssue,
   RawSearchResponse,
 } from './types'
@@ -40,7 +40,7 @@ const decodeJsonBody = <T>(
   response: HttpClientResponse.HttpClientResponse,
 ): Effect.Effect<T, JiraGatewayError> =>
   response.json.pipe(
-    Effect.mapError((error) => new Rejected({ message: error.message })),
+    Effect.mapError((error) => new JiraRejected({ message: error.message })),
   ) as Effect.Effect<T, JiraGatewayError>
 
 const readErrorBody = (response: HttpClientResponse.HttpClientResponse): Effect.Effect<string> =>
@@ -50,7 +50,9 @@ const failFromStatus = (
   response: HttpClientResponse.HttpClientResponse,
 ): Effect.Effect<never, JiraGatewayError> =>
   readErrorBody(response).pipe(
-    Effect.flatMap((body) => Effect.fail(new Rejected({ message: parseJiraErrorMessage(body) }))),
+    Effect.flatMap((body) =>
+      Effect.fail(new JiraRejected({ message: parseJiraErrorMessage(body) })),
+    ),
   )
 
 export const JiraGatewayLive: Layer.Layer<JiraGateway, never, HttpClient.HttpClient | ServerEnv> =
@@ -69,12 +71,12 @@ export const JiraGatewayLive: Layer.Layer<JiraGateway, never, HttpClient.HttpCli
       const postJson = (
         path: string,
         body: unknown,
-      ): Effect.Effect<HttpClientRequest.HttpClientRequest, Rejected> =>
+      ): Effect.Effect<HttpClientRequest.HttpClientRequest, JiraRejected> =>
         HttpClientRequest.post(`${baseUrl}${path}`).pipe(
           HttpClientRequest.setHeaders(baseHeaders),
           HttpClientRequest.bodyJson(body),
           Effect.mapError(
-            (err) => new Rejected({ message: `Encoding request body failed: ${err}` }),
+            (err) => new JiraRejected({ message: `Encoding request body failed: ${err}` }),
           ),
         )
 
@@ -83,13 +85,13 @@ export const JiraGatewayLive: Layer.Layer<JiraGateway, never, HttpClient.HttpCli
       ): Effect.Effect<T, JiraGatewayError> =>
         client.execute(request).pipe(
           Effect.mapError(
-            (error) => new Rejected({ message: `Jira request failed: ${error.message}` }),
+            (error) => new JiraRejected({ message: `Jira request failed: ${error.message}` }),
           ),
           Effect.flatMap((response) =>
             HttpClientResponse.matchStatus(response, {
               '2xx': (ok) => decodeJsonBody<T>(ok),
-              401: (): Effect.Effect<T, JiraGatewayError> => Effect.fail(new Unauthorized()),
-              404: (): Effect.Effect<T, JiraGatewayError> => Effect.fail(new NotFound()),
+              401: (): Effect.Effect<T, JiraGatewayError> => Effect.fail(new JiraUnauthorized()),
+              404: (): Effect.Effect<T, JiraGatewayError> => Effect.fail(new JiraNotFound()),
               orElse: (bad): Effect.Effect<T, JiraGatewayError> => failFromStatus(bad),
             }),
           ),
@@ -100,13 +102,13 @@ export const JiraGatewayLive: Layer.Layer<JiraGateway, never, HttpClient.HttpCli
       ): Effect.Effect<void, JiraGatewayError> =>
         client.execute(request).pipe(
           Effect.mapError(
-            (error) => new Rejected({ message: `Jira request failed: ${error.message}` }),
+            (error) => new JiraRejected({ message: `Jira request failed: ${error.message}` }),
           ),
           Effect.flatMap((response) =>
             HttpClientResponse.matchStatus(response, {
               '2xx': (): Effect.Effect<void, JiraGatewayError> => Effect.void,
-              401: (): Effect.Effect<void, JiraGatewayError> => Effect.fail(new Unauthorized()),
-              404: (): Effect.Effect<void, JiraGatewayError> => Effect.fail(new NotFound()),
+              401: (): Effect.Effect<void, JiraGatewayError> => Effect.fail(new JiraUnauthorized()),
+              404: (): Effect.Effect<void, JiraGatewayError> => Effect.fail(new JiraNotFound()),
               orElse: (bad): Effect.Effect<void, JiraGatewayError> => failFromStatus(bad),
             }),
           ),
@@ -119,7 +121,7 @@ export const JiraGatewayLive: Layer.Layer<JiraGateway, never, HttpClient.HttpCli
             displayName: string
             avatarUrls: Record<string, string>
           }>(get('/rest/api/3/myself')).pipe(
-            Effect.map((me): GatewayUser => {
+            Effect.map((me): JiraUser => {
               const avatarUrl =
                 me.avatarUrls['48x48'] ?? me.avatarUrls['32x32'] ?? me.avatarUrls['24x24'] ?? ''
               return { accountId: me.accountId, displayName: me.displayName, avatarUrl }

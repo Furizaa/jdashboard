@@ -1,6 +1,6 @@
 import type { CiVisualState, ReviewerVisualState } from './mr'
 
-export type GatewayUser = {
+export type GitlabUser = {
   username: string
   displayName: string
 }

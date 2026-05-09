@@ -16,8 +16,23 @@ export function IssueDetailPanel({ issueKey }: { issueKey: string | null }) {
   return <Panel panel={panel} />
 }
 
+function panelLabel(panel: OpenPanel): string {
+  if (panel.phase !== 'ready') return panel.issueKey
+  return `${panel.issueKey} — ${panel.issue.summary}`
+}
+
+function PanelContent({ panel }: { panel: OpenPanel }) {
+  return match(panel)
+    .with({ phase: 'loading' }, () => <PanelSkeleton />)
+    .with({ phase: 'error' }, ({ message }) => <PanelMessage>{message}</PanelMessage>)
+    .with({ phase: 'ready' }, (ready) => (
+      <PanelBody issue={ready.issue} jiraUrl={ready.jiraUrl} onOpen={ready.open} />
+    ))
+    .exhaustive()
+}
+
 function Panel({ panel }: { panel: OpenPanel }) {
-  const issue = panel.phase === 'ready' ? panel.issue : null
+  const showFixasap = panel.phase === 'ready' && hasFixasapLabel(panel.issue.labels)
   return (
     // outer dialog backdrop: click closes; keyboard close (Escape) is wired via useIssuePanel
     // oxlint-disable-next-line jsx-a11y/click-events-have-key-events
@@ -26,7 +41,7 @@ function Panel({ panel }: { panel: OpenPanel }) {
       onClick={panel.close}
       role="dialog"
       aria-modal="true"
-      aria-label={issue !== null ? `${panel.issueKey} — ${issue.summary}` : panel.issueKey}
+      aria-label={panelLabel(panel)}
     >
       <div className="bg-background/40 absolute inset-0 backdrop-blur-[1px]" aria-hidden />
       {/* inner panel stops backdrop clicks from closing the dialog; not itself actionable */}
@@ -35,16 +50,10 @@ function Panel({ panel }: { panel: OpenPanel }) {
         className="border-border bg-card relative my-4 mr-4 flex h-[calc(100dvh-2rem)] w-[760px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-xl border shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        {issue !== null && hasFixasapLabel(issue.labels) && <FixasapRibbon size="panel" />}
+        {showFixasap && <FixasapRibbon size="panel" />}
         <PanelHeader panel={panel} />
         <div className="flex-1 overflow-y-auto">
-          {match(panel)
-            .with({ phase: 'loading' }, () => <PanelSkeleton />)
-            .with({ phase: 'error' }, ({ message }) => <PanelMessage>{message}</PanelMessage>)
-            .with({ phase: 'ready' }, (ready) => (
-              <PanelBody issue={ready.issue} jiraUrl={ready.jiraUrl} onOpen={ready.open} />
-            ))
-            .exhaustive()}
+          <PanelContent panel={panel} />
         </div>
       </div>
     </div>

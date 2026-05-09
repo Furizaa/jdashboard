@@ -27,6 +27,15 @@ export function indexBy<T>(items: readonly T[], id: (item: T) => string): Readon
   return new Map(items.map((item) => [id(item), item]))
 }
 
+export function isEmptyDiff<T>(diff: ChangeDiff<T>): boolean {
+  return (
+    diff.entering.size === 0 &&
+    diff.changed.size === 0 &&
+    diff.leavingNow.size === 0 &&
+    diff.returning.size === 0
+  )
+}
+
 export function diffChange<T>(
   prev: ReadonlyMap<string, T> | null,
   current: ReadonlyMap<string, T>,

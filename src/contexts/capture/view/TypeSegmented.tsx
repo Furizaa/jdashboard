@@ -10,6 +10,20 @@ const TYPES: ReadonlyArray<{ value: Type; style: TypeStyle }> = [
   { value: 'Improvement', style: TYPE_STYLES.improvement },
 ]
 
+type Intent = 'next' | 'prev' | 'select'
+const KEY_INTENTS: Readonly<Record<string, Intent>> = {
+  ArrowRight: 'next',
+  ArrowDown: 'next',
+  ArrowLeft: 'prev',
+  ArrowUp: 'prev',
+  ' ': 'select',
+  Enter: 'select',
+}
+
+function arrowIntent(key: string): Intent | null {
+  return KEY_INTENTS[key] ?? null
+}
+
 export function TypeSegmented({
   value,
   onChange,
@@ -28,14 +42,12 @@ export function TypeSegmented({
   }
 
   const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>, currentIndex: number) => {
-    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
-      event.preventDefault()
-      moveTo(currentIndex + 1)
-    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
-      event.preventDefault()
-      moveTo(currentIndex - 1)
-    } else if (event.key === ' ' || event.key === 'Enter') {
-      event.preventDefault()
+    const intent = arrowIntent(event.key)
+    if (intent === null) return
+    event.preventDefault()
+    if (intent === 'next') moveTo(currentIndex + 1)
+    else if (intent === 'prev') moveTo(currentIndex - 1)
+    else {
       const current = TYPES[currentIndex]
       if (current) onChange(current.value)
     }

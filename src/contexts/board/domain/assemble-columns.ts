@@ -49,20 +49,16 @@ function animationStateOf(
   return 'idle'
 }
 
-export function assembleColumns(input: {
-  liveIssues: readonly BoardIssue[]
-  jiraChange: ChangeVisual<BoardIssue>
-  reviewCards?: readonly ReviewCard[]
-  reviewChange?: ChangeVisual<ReviewCard>
-  searchQuery: string
-}): Record<Column, ColumnItem[]> {
-  const { liveIssues, jiraChange, reviewCards, reviewChange, searchQuery } = input
-  const result: Record<Column, ColumnItem[]> = {
-    'TO DO': [],
-    'In Implementation': [],
-    'In Code Review': [],
-    Done: [],
-  }
+function emptyResult(): Record<Column, ColumnItem[]> {
+  return { 'TO DO': [], 'In Implementation': [], 'In Code Review': [], Done: [] }
+}
+
+function placeJiraIssues(
+  result: Record<Column, ColumnItem[]>,
+  liveIssues: readonly BoardIssue[],
+  jiraChange: ChangeVisual<BoardIssue>,
+  searchQuery: string,
+): void {
   for (const issue of filterIssues(liveIssues, searchQuery)) {
     result[columnForStatus(issue.statusName)].push({
       card: { kind: 'jira', issue },
@@ -77,41 +73,59 @@ export function assembleColumns(input: {
       state: 'leaving',
     })
   }
-  if (reviewCards !== undefined) {
-    const entering = reviewChange?.enteringKeys ?? new Set<string>()
-    const changed = reviewChange?.changedKeys ?? new Set<string>()
-    for (const rc of reviewCards) {
-      const cardInput: CardSource = { kind: 'review', card: rc }
-      if (!matchesSearch(cardInput, searchQuery)) continue
-      const id = reviewCardId(rc)
-      result[reviewBucketColumn(rc.bucket)].push({
-        card: cardInput,
-        id,
-        state: animationStateOf(id, entering, changed),
-      })
-    }
+}
+
+function pushReviewCard(
+  result: Record<Column, ColumnItem[]>,
+  card: ReviewCard,
+  state: AnimationState,
+  searchQuery: string,
+): void {
+  const cardInput: CardSource = { kind: 'review', card }
+  if (!matchesSearch(cardInput, searchQuery)) return
+  result[reviewBucketColumn(card.bucket)].push({ card: cardInput, id: reviewCardId(card), state })
+}
+
+function placeReviewCards(
+  result: Record<Column, ColumnItem[]>,
+  reviewCards: readonly ReviewCard[] | undefined,
+  reviewChange: ChangeVisual<ReviewCard> | undefined,
+  searchQuery: string,
+): void {
+  const entering = reviewChange?.enteringKeys ?? new Set<string>()
+  const changed = reviewChange?.changedKeys ?? new Set<string>()
+  for (const rc of reviewCards ?? []) {
+    pushReviewCard(result, rc, animationStateOf(reviewCardId(rc), entering, changed), searchQuery)
   }
-  if (reviewChange !== undefined) {
-    for (const leavingCard of reviewChange.leaving.values()) {
-      const cardInput: CardSource = { kind: 'review', card: leavingCard }
-      if (!matchesSearch(cardInput, searchQuery)) continue
-      result[reviewBucketColumn(leavingCard.bucket)].push({
-        card: cardInput,
-        id: reviewCardId(leavingCard),
-        state: 'leaving',
-      })
-    }
+  for (const leavingCard of reviewChange?.leaving.values() ?? []) {
+    pushReviewCard(result, leavingCard, 'leaving', searchQuery)
   }
+}
+
+function sortColumn(items: ColumnItem[], column: Column): ColumnItem[] {
+  const sortables = items.map((item) => ({ id: item.id, statusName: statusNameForItem(item) }))
+  const sorted = sortColumnIssues(sortables, column)
+  const itemById = new Map(items.map((item) => [item.id, item]))
+  return sorted.map((s) => {
+    const item = itemById.get(s.id)
+    if (item === undefined) throw new Error(`assembleColumns: missing item for id ${s.id}`)
+    return item
+  })
+}
+
+export function assembleColumns(input: {
+  liveIssues: readonly BoardIssue[]
+  jiraChange: ChangeVisual<BoardIssue>
+  reviewCards?: readonly ReviewCard[]
+  reviewChange?: ChangeVisual<ReviewCard>
+  searchQuery: string
+}): Record<Column, ColumnItem[]> {
+  const { liveIssues, jiraChange, reviewCards, reviewChange, searchQuery } = input
+  const result = emptyResult()
+  placeJiraIssues(result, liveIssues, jiraChange, searchQuery)
+  placeReviewCards(result, reviewCards, reviewChange, searchQuery)
   for (const column of COLUMNS) {
-    const items = result[column]
-    const sortables = items.map((item) => ({ id: item.id, statusName: statusNameForItem(item) }))
-    const sorted = sortColumnIssues(sortables, column)
-    const itemById = new Map(items.map((item) => [item.id, item]))
-    result[column] = sorted.map((s) => {
-      const item = itemById.get(s.id)
-      if (item === undefined) throw new Error(`assembleColumns: missing item for id ${s.id}`)
-      return item
-    })
+    result[column] = sortColumn(result[column], column)
   }
   return result
 }

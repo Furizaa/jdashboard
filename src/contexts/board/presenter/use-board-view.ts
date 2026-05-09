@@ -3,7 +3,7 @@ import { useBoardData, useMrStatuses, useReviewCards } from '~/coordinator'
 import { usePolling } from '~/lib/use-polling'
 import type { BoardIssue, ReviewCard } from '~/kernel'
 import { reviewCardId } from '~/kernel'
-import { diffChange, indexBy, type ChangeOptions } from '../domain'
+import { diffChange, indexBy, isEmptyDiff, type ChangeOptions } from '../domain'
 import { derive, initialState, reduce, type DisplayState } from '../view-model/board-view-model'
 
 export const BOARD_POLL_INTERVAL_MS = 60_000
@@ -23,6 +23,21 @@ const JIRA_OPTIONS: ChangeOptions<BoardIssue> = {
 const REVIEW_OPTIONS: ChangeOptions<ReviewCard> = {
   id: (c) => reviewCardId(c),
   equals: (a, b) => a.bucket === b.bucket,
+}
+
+function useExpiringKeys(
+  source: ReadonlySet<string> | ReadonlyMap<string, unknown>,
+  delayMs: number,
+  onExpire: (keys: string[]) => void,
+): void {
+  const onExpireRef = useRef(onExpire)
+  onExpireRef.current = onExpire
+  useEffect(() => {
+    if (source.size === 0) return
+    const keys = [...source.keys()]
+    const t = setTimeout(() => onExpireRef.current(keys), delayMs)
+    return () => clearTimeout(t)
+  }, [source, delayMs])
 }
 
 export function useBoardView(searchQuery: string): DisplayState {
@@ -52,15 +67,7 @@ export function useBoardView(searchQuery: string): DisplayState {
     const current = indexBy(liveIssues, JIRA_OPTIONS.id)
     const diff = diffChange(prevJiraRef.current, current, JIRA_OPTIONS, jiraLeavingRef.current)
     prevJiraRef.current = current
-    if (
-      prevJiraRef.current === current &&
-      diff.entering.size === 0 &&
-      diff.changed.size === 0 &&
-      diff.leavingNow.size === 0 &&
-      diff.returning.size === 0
-    ) {
-      return
-    }
+    if (isEmptyDiff(diff)) return
     dispatch({
       type: 'jiraDiffApplied',
       entering: diff.entering,
@@ -80,14 +87,7 @@ export function useBoardView(searchQuery: string): DisplayState {
       reviewLeavingRef.current,
     )
     prevReviewRef.current = current
-    if (
-      diff.entering.size === 0 &&
-      diff.changed.size === 0 &&
-      diff.leavingNow.size === 0 &&
-      diff.returning.size === 0
-    ) {
-      return
-    }
+    if (isEmptyDiff(diff)) return
     dispatch({
       type: 'reviewDiffApplied',
       entering: diff.entering,
@@ -97,47 +97,24 @@ export function useBoardView(searchQuery: string): DisplayState {
     })
   }, [reviewCards])
 
-  useEffect(() => {
-    if (state.jira.enteringKeys.size === 0) return
-    const keys = [...state.jira.enteringKeys]
-    const t = setTimeout(() => dispatch({ type: 'jiraEnteringExpired', keys }), BOARD_FADE_MS)
-    return () => clearTimeout(t)
-  }, [state.jira.enteringKeys])
-
-  useEffect(() => {
-    if (state.jira.changedKeys.size === 0) return
-    const keys = [...state.jira.changedKeys]
-    const t = setTimeout(() => dispatch({ type: 'jiraChangedExpired', keys }), BOARD_PULSE_MS)
-    return () => clearTimeout(t)
-  }, [state.jira.changedKeys])
-
-  useEffect(() => {
-    if (state.jira.leaving.size === 0) return
-    const keys = [...state.jira.leaving.keys()]
-    const t = setTimeout(() => dispatch({ type: 'jiraLeavingExpired', keys }), BOARD_FADE_MS)
-    return () => clearTimeout(t)
-  }, [state.jira.leaving])
-
-  useEffect(() => {
-    if (state.review.enteringKeys.size === 0) return
-    const keys = [...state.review.enteringKeys]
-    const t = setTimeout(() => dispatch({ type: 'reviewEnteringExpired', keys }), BOARD_FADE_MS)
-    return () => clearTimeout(t)
-  }, [state.review.enteringKeys])
-
-  useEffect(() => {
-    if (state.review.changedKeys.size === 0) return
-    const keys = [...state.review.changedKeys]
-    const t = setTimeout(() => dispatch({ type: 'reviewChangedExpired', keys }), BOARD_PULSE_MS)
-    return () => clearTimeout(t)
-  }, [state.review.changedKeys])
-
-  useEffect(() => {
-    if (state.review.leaving.size === 0) return
-    const keys = [...state.review.leaving.keys()]
-    const t = setTimeout(() => dispatch({ type: 'reviewLeavingExpired', keys }), BOARD_FADE_MS)
-    return () => clearTimeout(t)
-  }, [state.review.leaving])
+  useExpiringKeys(state.jira.enteringKeys, BOARD_FADE_MS, (keys) =>
+    dispatch({ type: 'jiraEnteringExpired', keys }),
+  )
+  useExpiringKeys(state.jira.changedKeys, BOARD_PULSE_MS, (keys) =>
+    dispatch({ type: 'jiraChangedExpired', keys }),
+  )
+  useExpiringKeys(state.jira.leaving, BOARD_FADE_MS, (keys) =>
+    dispatch({ type: 'jiraLeavingExpired', keys }),
+  )
+  useExpiringKeys(state.review.enteringKeys, BOARD_FADE_MS, (keys) =>
+    dispatch({ type: 'reviewEnteringExpired', keys }),
+  )
+  useExpiringKeys(state.review.changedKeys, BOARD_PULSE_MS, (keys) =>
+    dispatch({ type: 'reviewChangedExpired', keys }),
+  )
+  useExpiringKeys(state.review.leaving, BOARD_FADE_MS, (keys) =>
+    dispatch({ type: 'reviewLeavingExpired', keys }),
+  )
 
   return derive({
     state,

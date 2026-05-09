@@ -5,7 +5,9 @@ import type {
   DetailIssue,
   IssueLink,
   LinkedIssueRef,
+  RawComment,
   RawDetailedIssue,
+  RawIssueLink,
   RawLinkedRef,
   RawSearchResponse,
   StatusCategoryKey,
@@ -34,21 +36,99 @@ const DETAIL_ISSUE_FIELDS = [
 
 const SUB_ISSUE_FIELDS = ['summary', 'status', 'issuetype'] as const
 
+const STATUS_CATEGORY_KEYS = ['new', 'indeterminate', 'done', 'undefined'] as const
+
+function parseStatusCategory(key: string | undefined): StatusCategoryKey {
+  return (STATUS_CATEGORY_KEYS as readonly string[]).includes(key ?? '')
+    ? (key as StatusCategoryKey)
+    : 'undefined'
+}
+
 function toLinkedRef(ref: RawLinkedRef): LinkedIssueRef {
-  const categoryKey = ref.fields?.status?.statusCategory?.key
-  const statusCategory: StatusCategoryKey =
-    categoryKey === 'new' ||
-    categoryKey === 'indeterminate' ||
-    categoryKey === 'done' ||
-    categoryKey === 'undefined'
-      ? categoryKey
-      : 'undefined'
   return {
     key: ref.key,
     summary: ref.fields?.summary ?? '',
     typeName: ref.fields?.issuetype?.name ?? 'Task',
     statusName: ref.fields?.status?.name ?? '',
-    statusCategory,
+    statusCategory: parseStatusCategory(ref.fields?.status?.statusCategory?.key),
+  }
+}
+
+function toIssueLink(link: RawIssueLink): IssueLink | null {
+  if (link.outwardIssue) {
+    return {
+      id: link.id,
+      typeName: link.type.name,
+      direction: 'outward',
+      relationship: link.type.outward,
+      issue: toLinkedRef(link.outwardIssue),
+    }
+  }
+  if (link.inwardIssue) {
+    return {
+      id: link.id,
+      typeName: link.type.name,
+      direction: 'inward',
+      relationship: link.type.inward,
+      issue: toLinkedRef(link.inwardIssue),
+    }
+  }
+  return null
+}
+
+const AVATAR_SIZES = ['48x48', '32x32', '24x24', '16x16'] as const
+
+function pickAvatarUrl(urls: Record<string, string> | undefined): string | null {
+  if (urls === undefined) return null
+  for (const size of AVATAR_SIZES) {
+    const url = urls[size]
+    if (url !== undefined) return url
+  }
+  return null
+}
+
+function toComment(c: RawComment) {
+  return {
+    id: c.id,
+    authorName: c.author?.displayName ?? null,
+    authorAvatarUrl: pickAvatarUrl(c.author?.avatarUrls),
+    created: c.created,
+    body: (c.body as AdfNode | null | undefined) ?? null,
+  }
+}
+
+function pickPriorityName(name: string | undefined): string | null {
+  if (!name) return null
+  return name.toLowerCase() === 'undefined' ? null : name
+}
+
+function shapeLinks(rawLinks: readonly RawIssueLink[] | undefined): IssueLink[] {
+  return (rawLinks ?? []).map(toIssueLink).filter((l): l is IssueLink => l !== null)
+}
+
+function asAdfOrNull(value: unknown): AdfNode | null {
+  return (value as AdfNode | null | undefined) ?? null
+}
+
+function shapePeople(f: RawDetailedIssue['fields']): {
+  assigneeName: string | null
+  reporterName: string | null
+} {
+  return {
+    assigneeName: f.assignee?.displayName ?? null,
+    reporterName: f.reporter?.displayName ?? null,
+  }
+}
+
+function shapeMeta(f: RawDetailedIssue['fields']): {
+  typeName: string
+  labels: string[]
+  priorityName: string | null
+} {
+  return {
+    typeName: f.issuetype?.name ?? 'Task',
+    labels: f.labels ?? [],
+    priorityName: pickPriorityName(f.priority?.name),
   }
 }
 
@@ -58,52 +138,17 @@ function shapeIssue(input: {
 }): DetailIssue {
   const { detailed, subSearch } = input
   const f = detailed.fields
-  const links: IssueLink[] = []
-  for (const link of f.issuelinks ?? []) {
-    if (link.outwardIssue) {
-      links.push({
-        id: link.id,
-        typeName: link.type.name,
-        direction: 'outward',
-        relationship: link.type.outward,
-        issue: toLinkedRef(link.outwardIssue),
-      })
-    } else if (link.inwardIssue) {
-      links.push({
-        id: link.id,
-        typeName: link.type.name,
-        direction: 'inward',
-        relationship: link.type.inward,
-        issue: toLinkedRef(link.inwardIssue),
-      })
-    }
-  }
   return {
     key: detailed.key,
     summary: f.summary,
-    description: (f.description as AdfNode | null | undefined) ?? null,
+    description: asAdfOrNull(f.description),
     statusName: f.status.name,
-    typeName: f.issuetype?.name ?? 'Task',
-    labels: f.labels ?? [],
-    priorityName:
-      f.priority?.name && f.priority.name.toLowerCase() !== 'undefined' ? f.priority.name : null,
-    assigneeName: f.assignee?.displayName ?? null,
-    reporterName: f.reporter?.displayName ?? null,
+    ...shapeMeta(f),
+    ...shapePeople(f),
     parent: f.parent ? toLinkedRef(f.parent) : null,
     subIssues: subSearch.issues.map(toLinkedRef),
-    links,
-    comments: (f.comment?.comments ?? []).map((c) => {
-      const urls = c.author?.avatarUrls
-      const avatar =
-        urls?.['48x48'] ?? urls?.['32x32'] ?? urls?.['24x24'] ?? urls?.['16x16'] ?? null
-      return {
-        id: c.id,
-        authorName: c.author?.displayName ?? null,
-        authorAvatarUrl: avatar,
-        created: c.created,
-        body: (c.body as AdfNode | null | undefined) ?? null,
-      }
-    }),
+    links: shapeLinks(f.issuelinks),
+    comments: (f.comment?.comments ?? []).map(toComment),
   }
 }
 

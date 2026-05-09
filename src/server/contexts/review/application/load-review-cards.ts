@@ -1,11 +1,10 @@
 import { Clock, Effect } from 'effect'
 import { JiraGateway } from '../../../gateways/jira/port'
 import type { BoardIssue, RawIssue } from '../../../gateways/jira/types'
+import { fetchMrBundle, type MrBundle } from '../../../gateways/gitlab/mr-fanout'
 import { GitlabGateway } from '../../../gateways/gitlab/port'
 import type {
-  RawApprovals,
   RawDiscussion,
-  RawMrDetail,
   RawMrReviewerWithState,
   RawMrSummary,
   ReviewCard,
@@ -23,13 +22,13 @@ import {
 } from '../../../gateways/gitlab/mr'
 import { extractKeysFromTitle } from '../../../gateways/gitlab/mr-key-map'
 import { ReviewConfig } from '../config'
-import type { GetReviewCardsError } from '../errors'
+import type { LoadReviewCardsError } from '../errors'
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000
 
 const BULK_FIELDS = ['summary', 'status', 'labels', 'issuetype', 'parent'] as const
 
-export type GetReviewCardsOk = {
+export type LoadReviewCardsOk = {
   readonly baseUrl: string
   readonly cards: readonly ReviewCard[]
 }
@@ -41,13 +40,7 @@ type ReviewerVisual = {
   visualState: ReviewerVisualState
 }
 
-type MrFanOut = {
-  mr: RawMrSummary
-  detail: RawMrDetail
-  discussions: readonly RawDiscussion[]
-  approvals: RawApprovals
-  reviewers: readonly RawMrReviewerWithState[]
-}
+type MrFanOut = MrBundle & { mr: RawMrSummary }
 
 type Pre = {
   iid: number
@@ -126,31 +119,9 @@ function toBoardIssue(issue: RawIssue, hideSet: ReadonlySet<string>): BoardIssue
 
 const fanOutForMr =
   (gitlab: GitlabGateway['Type']) =>
-  (mr: RawMrSummary): Effect.Effect<MrFanOut | null, GetReviewCardsError> =>
-    Effect.all(
-      [
-        gitlab.getMr(mr.iid),
-        gitlab.getMrDiscussions(mr.iid),
-        gitlab.getMrApprovals(mr.iid),
-        gitlab.getMrReviewers(mr.iid),
-      ],
-      { concurrency: 'unbounded' },
-    ).pipe(
-      Effect.map(
-        ([detail, discussions, approvals, reviewers]): MrFanOut => ({
-          mr,
-          detail,
-          discussions,
-          approvals,
-          reviewers,
-        }),
-      ),
-      // NotFound / Rejected on a single MR drop that MR but keep the rest;
-      // Unauthorized propagates so the whole call surfaces as 401.
-      Effect.catchTags({
-        NotFound: () => Effect.succeed(null),
-        Rejected: () => Effect.succeed(null),
-      }),
+  (mr: RawMrSummary): Effect.Effect<MrFanOut | null, LoadReviewCardsError> =>
+    fetchMrBundle(gitlab, mr.iid).pipe(
+      Effect.map((bundle) => (bundle === null ? null : { mr, ...bundle })),
     )
 
 function preFromFanOut(fo: MrFanOut, currentUsername: string, projectKey: string): Pre | null {
@@ -189,7 +160,7 @@ const lookupBulkIssues = (
   jira: JiraGateway['Type'],
   uniqueKeys: readonly string[],
   hideLabels: readonly string[],
-): Effect.Effect<BoardIssue[], GetReviewCardsError> => {
+): Effect.Effect<BoardIssue[], LoadReviewCardsError> => {
   if (uniqueKeys.length === 0) return Effect.succeed([])
   const hideSet = new Set(hideLabels.map((l) => l.toLowerCase()))
   return jira.searchIssues(buildBulkIssuesJql(uniqueKeys), BULK_FIELDS).pipe(
@@ -229,9 +200,9 @@ function buildCard(p: Pre, foundByKey: ReadonlyMap<string, BoardIssue>): ReviewC
   return { kind: 'review-fake', ...common, jiraKeyAttempted: p.firstKey }
 }
 
-export const getReviewCards: Effect.Effect<
-  GetReviewCardsOk,
-  GetReviewCardsError,
+export const loadReviewCards: Effect.Effect<
+  LoadReviewCardsOk,
+  LoadReviewCardsError,
   GitlabGateway | JiraGateway | ReviewConfig
 > = Effect.gen(function* () {
   const gitlab = yield* GitlabGateway

@@ -7,11 +7,27 @@ import { OpenMrLink } from './OpenMrLink'
 
 type OpenPanel = Exclude<IssuePanelState, { phase: 'closed' }>
 
+type ReadyExtras = {
+  jiraUrl: string | null
+  copyJiraLink: (() => void) | null
+  prevKey: string | null
+  nextKey: string | null
+}
+
+function readyExtras(panel: OpenPanel): ReadyExtras {
+  if (panel.phase !== 'ready') {
+    return { jiraUrl: null, copyJiraLink: null, prevKey: null, nextKey: null }
+  }
+  return {
+    jiraUrl: panel.jiraUrl,
+    copyJiraLink: panel.copyJiraLink,
+    prevKey: panel.prevKey,
+    nextKey: panel.nextKey,
+  }
+}
+
 export function PanelHeader({ panel }: { panel: OpenPanel }) {
-  const jiraUrl = panel.phase === 'ready' ? panel.jiraUrl : null
-  const copyJiraLink = panel.phase === 'ready' ? panel.copyJiraLink : null
-  const prevKey = panel.phase === 'ready' ? panel.prevKey : null
-  const nextKey = panel.phase === 'ready' ? panel.nextKey : null
+  const { jiraUrl, copyJiraLink, prevKey, nextKey } = readyExtras(panel)
   return (
     <header className="border-border flex items-center gap-2 border-b px-4 py-2.5">
       <nav aria-label="Breadcrumb" className="text-muted-foreground font-mono text-xs">

@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@effect/vitest'
 import { Effect, Layer, TestClock } from 'effect'
-import { NotFound, Unauthorized } from '../../../gateways/gitlab/errors'
+import { GitlabNotFound, GitlabUnauthorized } from '../../../gateways/gitlab/errors'
 import { GitlabGateway } from '../../../gateways/gitlab/port'
 import type {
   RawApprovals,
@@ -14,7 +14,7 @@ import type { RawSearchResponse } from '../../../gateways/jira/types'
 import { ReviewConfig, type ReviewConfigShape } from '../config'
 import { fakeGitlabGateway } from './__fixtures__/fake-gitlab-gateway'
 import { fakeJiraGateway } from './__fixtures__/fake-jira-gateway'
-import { getReviewCards } from './get-review-cards'
+import { loadReviewCards } from './load-review-cards'
 
 const FIXED_NOW = new Date('2026-05-07T00:00:00.000Z')
 
@@ -98,7 +98,7 @@ function emptySearch(): RawSearchResponse {
   return { issues: [] }
 }
 
-describe('getReviewCards', () => {
+describe('loadReviewCards', () => {
   it.effect(
     'passes reviewerUsername and the lookback window from config + Clock to listMrs',
     () => {
@@ -116,7 +116,7 @@ describe('getReviewCards', () => {
       const jira = fakeJiraGateway({
         searchIssues: () => Effect.succeed(emptySearch()),
       })
-      return withClockAt(getReviewCards, FIXED_NOW, gitlab, jira).pipe(
+      return withClockAt(loadReviewCards, FIXED_NOW, gitlab, jira).pipe(
         Effect.tap(() => {
           expect(captured.reviewerUsername).toBe('me')
           const expected = new Date(FIXED_NOW.getTime() - 14 * 24 * 60 * 60 * 1000)
@@ -135,7 +135,7 @@ describe('getReviewCards', () => {
       const jira = fakeJiraGateway({
         searchIssues: () => Effect.succeed(emptySearch()),
       })
-      const result = yield* withClockAt(getReviewCards, FIXED_NOW, gitlab, jira)
+      const result = yield* withClockAt(loadReviewCards, FIXED_NOW, gitlab, jira)
       expect(result.cards).toEqual([])
     }),
   )
@@ -154,7 +154,7 @@ describe('getReviewCards', () => {
       getMrReviewers: () => Effect.succeed([meReviewer('unreviewed')]),
     })
     const jira = fakeJiraGateway({ searchIssues: () => Effect.succeed(emptySearch()) })
-    return withClockAt(getReviewCards, FIXED_NOW, gitlab, jira).pipe(
+    return withClockAt(loadReviewCards, FIXED_NOW, gitlab, jira).pipe(
       Effect.tap((result) => {
         expect(result.cards).toEqual([])
         expect(fanCalls).toEqual([])
@@ -173,7 +173,7 @@ describe('getReviewCards', () => {
         getMrReviewers: () => Effect.succeed([meReviewer('unreviewed')]),
       })
       const jira = fakeJiraGateway({ searchIssues: () => Effect.succeed(emptySearch()) })
-      const result = yield* withClockAt(getReviewCards, FIXED_NOW, gitlab, jira)
+      const result = yield* withClockAt(loadReviewCards, FIXED_NOW, gitlab, jira)
       expect(result.cards).toEqual([])
     }),
   )
@@ -205,7 +205,7 @@ describe('getReviewCards', () => {
             ],
           }),
       })
-      const result = yield* withClockAt(getReviewCards, FIXED_NOW, gitlab, jira)
+      const result = yield* withClockAt(loadReviewCards, FIXED_NOW, gitlab, jira)
       expect(result.cards).toHaveLength(1)
       expect(result.cards[0]?.bucket).toBe('rejected')
       expect(result.cards[0]?.kind).toBe('review-real')
@@ -235,7 +235,7 @@ describe('getReviewCards', () => {
             ],
           }),
       })
-      const result = yield* withClockAt(getReviewCards, FIXED_NOW, gitlab, jira)
+      const result = yield* withClockAt(loadReviewCards, FIXED_NOW, gitlab, jira)
       expect(result.cards[0]?.bucket).toBe('accepted')
       expect(result.cards[0]?.mrState).toBe('merged')
     }),
@@ -272,7 +272,7 @@ describe('getReviewCards', () => {
             ],
           }),
       })
-      const result = yield* withClockAt(getReviewCards, FIXED_NOW, gitlab, jira)
+      const result = yield* withClockAt(loadReviewCards, FIXED_NOW, gitlab, jira)
       expect(result.cards).toHaveLength(1)
       const card = result.cards[0]!
       if (card.kind !== 'review-real') throw new Error('expected review-real')
@@ -300,7 +300,7 @@ describe('getReviewCards', () => {
         getMrReviewers: () => Effect.succeed([meReviewer('unreviewed')]),
       })
       const jira = fakeJiraGateway({ searchIssues: () => Effect.succeed(emptySearch()) })
-      const result = yield* withClockAt(getReviewCards, FIXED_NOW, gitlab, jira)
+      const result = yield* withClockAt(loadReviewCards, FIXED_NOW, gitlab, jira)
       const card = result.cards[0]!
       if (card.kind !== 'review-fake') throw new Error('expected review-fake')
       expect(card.jiraKeyAttempted).toBe('HDR-8')
@@ -318,7 +318,7 @@ describe('getReviewCards', () => {
         getMrReviewers: () => Effect.succeed([meReviewer('unreviewed')]),
       })
       const jira = fakeJiraGateway({ searchIssues: () => Effect.succeed(emptySearch()) })
-      const result = yield* withClockAt(getReviewCards, FIXED_NOW, gitlab, jira)
+      const result = yield* withClockAt(loadReviewCards, FIXED_NOW, gitlab, jira)
       const card = result.cards[0]!
       if (card.kind !== 'review-fake') throw new Error('expected review-fake')
       expect(card.jiraKeyAttempted).toBeNull()
@@ -343,7 +343,7 @@ describe('getReviewCards', () => {
           return Effect.succeed(emptySearch())
         },
       })
-      yield* withClockAt(getReviewCards, FIXED_NOW, gitlab, jira)
+      yield* withClockAt(loadReviewCards, FIXED_NOW, gitlab, jira)
       expect(bulkArg).toEqual(['HDR-1'])
     }),
   )
@@ -385,7 +385,7 @@ describe('getReviewCards', () => {
             ],
           }),
       })
-      const result = yield* withClockAt(getReviewCards, FIXED_NOW, gitlab, jira)
+      const result = yield* withClockAt(loadReviewCards, FIXED_NOW, gitlab, jira)
       const card = result.cards[0]!
       const visuals = card.reviewers.map((r) => [r.username, r.visualState])
       expect(visuals).toEqual([
@@ -399,10 +399,10 @@ describe('getReviewCards', () => {
   it.effect('propagates Unauthorized from getCurrentUser', () =>
     Effect.gen(function* () {
       const gitlab = fakeGitlabGateway({
-        getCurrentUser: () => Effect.fail(new Unauthorized()),
+        getCurrentUser: () => Effect.fail(new GitlabUnauthorized()),
       })
       const jira = fakeJiraGateway({})
-      const failure = yield* withClockAt(getReviewCards, FIXED_NOW, gitlab, jira).pipe(Effect.flip)
+      const failure = yield* withClockAt(loadReviewCards, FIXED_NOW, gitlab, jira).pipe(Effect.flip)
       expect(failure._tag).toBe('Unauthorized')
     }),
   )
@@ -411,10 +411,10 @@ describe('getReviewCards', () => {
     Effect.gen(function* () {
       const gitlab = fakeGitlabGateway({
         getCurrentUser: () => Effect.succeed(ME),
-        listMrs: () => Effect.fail(new Unauthorized()),
+        listMrs: () => Effect.fail(new GitlabUnauthorized()),
       })
       const jira = fakeJiraGateway({})
-      const failure = yield* withClockAt(getReviewCards, FIXED_NOW, gitlab, jira).pipe(Effect.flip)
+      const failure = yield* withClockAt(loadReviewCards, FIXED_NOW, gitlab, jira).pipe(Effect.flip)
       expect(failure._tag).toBe('Unauthorized')
     }),
   )
@@ -425,12 +425,12 @@ describe('getReviewCards', () => {
         getCurrentUser: () => Effect.succeed(ME),
         listMrs: () => Effect.succeed([summary({ iid: 1, title: 'HDR-1' })]),
         getMr: (iid) => Effect.succeed(detail({ iid, title: 'HDR-1' })),
-        getMrDiscussions: () => Effect.fail(new Unauthorized()),
+        getMrDiscussions: () => Effect.fail(new GitlabUnauthorized()),
         getMrApprovals: () => Effect.succeed(approvals([])),
         getMrReviewers: () => Effect.succeed([meReviewer('unreviewed')]),
       })
       const jira = fakeJiraGateway({ searchIssues: () => Effect.succeed(emptySearch()) })
-      const failure = yield* withClockAt(getReviewCards, FIXED_NOW, gitlab, jira).pipe(Effect.flip)
+      const failure = yield* withClockAt(loadReviewCards, FIXED_NOW, gitlab, jira).pipe(Effect.flip)
       expect(failure._tag).toBe('Unauthorized')
     }),
   )
@@ -446,9 +446,9 @@ describe('getReviewCards', () => {
         getMrReviewers: () => Effect.succeed([meReviewer('unreviewed')]),
       })
       const jira = fakeJiraGateway({
-        searchIssues: () => Effect.fail(new Unauthorized()),
+        searchIssues: () => Effect.fail(new GitlabUnauthorized()),
       })
-      const failure = yield* withClockAt(getReviewCards, FIXED_NOW, gitlab, jira).pipe(Effect.flip)
+      const failure = yield* withClockAt(loadReviewCards, FIXED_NOW, gitlab, jira).pipe(Effect.flip)
       expect(failure._tag).toBe('Unauthorized')
     }),
   )
@@ -463,7 +463,7 @@ describe('getReviewCards', () => {
             summary({ iid: 2, title: 'HDR-2' }),
           ]),
         getMr: (iid) => {
-          if (iid === 1) return Effect.fail(new NotFound())
+          if (iid === 1) return Effect.fail(new GitlabNotFound())
           return Effect.succeed(detail({ iid, title: `HDR-${iid}`, state: 'merged' }))
         },
         getMrDiscussions: () => Effect.succeed([]),
@@ -482,7 +482,7 @@ describe('getReviewCards', () => {
             ],
           }),
       })
-      const result = yield* withClockAt(getReviewCards, FIXED_NOW, gitlab, jira)
+      const result = yield* withClockAt(loadReviewCards, FIXED_NOW, gitlab, jira)
       expect(result.cards.map((c) => c.iid)).toEqual([2])
     }),
   )

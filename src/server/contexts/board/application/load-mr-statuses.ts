@@ -1,15 +1,9 @@
 import { Clock, Effect } from 'effect'
+import { fetchMrBundle, type MrBundle } from '../../../gateways/gitlab/mr-fanout'
 import { GitlabGateway } from '../../../gateways/gitlab/port'
 import { buildMrKeyMap } from '../../../gateways/gitlab/mr-key-map'
 import { summarizeMr } from '../../../gateways/gitlab/mr-status'
-import type {
-  MrSummary,
-  RawApprovals,
-  RawDiscussion,
-  RawMrDetail,
-  RawMrReviewerWithState,
-  RawMrSummary,
-} from '../../../gateways/gitlab/types'
+import type { MrSummary, RawMrSummary } from '../../../gateways/gitlab/types'
 import { BoardConfig } from '../config'
 import type { LoadMrStatusesError } from '../errors'
 
@@ -20,14 +14,7 @@ export type LoadMrStatusesOk = {
   readonly byKey: Readonly<Record<string, MrSummary>>
 }
 
-type FanOut = {
-  key: string
-  iid: number
-  detail: RawMrDetail
-  discussions: readonly RawDiscussion[]
-  approvals: RawApprovals
-  reviewers: readonly RawMrReviewerWithState[]
-}
+type FanOut = MrBundle & { key: string }
 
 export const loadMrStatuses: Effect.Effect<
   LoadMrStatusesOk,
@@ -66,29 +53,8 @@ export const loadMrStatuses: Effect.Effect<
     entry: [string, RawMrSummary],
   ): Effect.Effect<FanOut | null, LoadMrStatusesError> => {
     const [key, mr] = entry
-    return Effect.all(
-      [
-        gitlab.getMr(mr.iid),
-        gitlab.getMrDiscussions(mr.iid),
-        gitlab.getMrApprovals(mr.iid),
-        gitlab.getMrReviewers(mr.iid),
-      ],
-      { concurrency: 'unbounded' },
-    ).pipe(
-      Effect.map(
-        ([detail, discussions, approvals, reviewers]): FanOut => ({
-          key,
-          iid: mr.iid,
-          detail,
-          discussions,
-          approvals,
-          reviewers,
-        }),
-      ),
-      Effect.catchTags({
-        NotFound: () => Effect.succeed(null),
-        Rejected: () => Effect.succeed(null),
-      }),
+    return fetchMrBundle(gitlab, mr.iid).pipe(
+      Effect.map((bundle) => (bundle === null ? null : { key, ...bundle })),
     )
   }
 

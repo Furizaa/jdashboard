@@ -16,6 +16,14 @@ type Layout = 'row' | 'stack'
 
 export type RootState = { kind: 'idle' } | { kind: 'loading' } | { kind: 'ready' }
 
+export type MrFetchPhase = 'idle' | 'loading' | 'unavailable' | 'ready'
+
+export function rootStateFromPhase(phase: MrFetchPhase): RootState {
+  if (phase === 'loading') return { kind: 'loading' }
+  if (phase === 'ready') return { kind: 'ready' }
+  return { kind: 'idle' }
+}
+
 type CtxValue = {
   summary: MrSummary | null
   layout: Layout
@@ -29,6 +37,42 @@ function useMrCtx(): CtxValue {
   const ctx = useContext(MrContext)
   if (ctx === null) throw new Error('Mr.* parts must be inside Mr.Root')
   return ctx
+}
+
+type ReviewSummary = Extract<MrSummary, { kind: 'review' }>
+
+function useReviewSummary(layout: Layout): ReviewSummary | null {
+  const ctx = useMrCtx()
+  if (ctx.layout !== layout) return null
+  if (ctx.summary === null || ctx.summary.kind !== 'review') return null
+  return ctx.summary
+}
+
+function unresolvedTitle(count: number): string {
+  return `${count} unresolved comment thread${count === 1 ? '' : 's'}`
+}
+
+function shouldHideReady(
+  layout: Layout,
+  summary: MrSummary | null,
+  column: Column | null,
+): boolean {
+  if (layout === 'stack') {
+    if (summary === null) return true
+    return column === 'Done' && summary.kind === 'merged'
+  }
+  return summary === null && column !== 'In Code Review'
+}
+
+function LoadingSkeleton({ layout }: { layout: Layout }) {
+  if (layout !== 'row') return null
+  return (
+    <div className="border-border/50 -mx-3 mt-2 -mb-2.5 border-t" aria-hidden>
+      <div className="px-3 py-1.5">
+        <Skeleton className="h-5 w-24 rounded-full" />
+      </div>
+    </div>
+  )
 }
 
 function Root({
@@ -52,25 +96,8 @@ function Root({
   )
 
   if (state.kind === 'idle') return null
-  if (state.kind === 'loading') {
-    if (layout === 'row') {
-      return (
-        <div className="border-border/50 -mx-3 mt-2 -mb-2.5 border-t" aria-hidden>
-          <div className="px-3 py-1.5">
-            <Skeleton className="h-5 w-24 rounded-full" />
-          </div>
-        </div>
-      )
-    }
-    return null
-  }
-
-  if (layout === 'stack') {
-    if (summary === null) return null
-    if (column === 'Done' && summary.kind === 'merged') return null
-  } else if (summary === null && column !== 'In Code Review') {
-    return null
-  }
+  if (state.kind === 'loading') return <LoadingSkeleton layout={layout} />
+  if (shouldHideReady(layout, summary, column)) return null
 
   return (
     <MrContext.Provider value={ctxValue}>
@@ -119,11 +146,10 @@ function PanelShell({ summary, children }: { summary: MrSummary | null; children
 }
 
 function ReviewerRow() {
-  const ctx = useMrCtx()
-  if (ctx.layout !== 'row') return null
-  if (ctx.summary === null || ctx.summary.kind !== 'review') return null
-  const visible = ctx.summary.reviewers.slice(0, MAX_VISIBLE_REVIEWERS)
-  const overflow = ctx.summary.reviewers.length - visible.length
+  const summary = useReviewSummary('row')
+  if (summary === null) return null
+  const visible = summary.reviewers.slice(0, MAX_VISIBLE_REVIEWERS)
+  const overflow = summary.reviewers.length - visible.length
   return (
     <>
       {visible.map((reviewer) => (
@@ -144,10 +170,8 @@ function ReviewerRow() {
 }
 
 function ReviewerStack() {
-  const ctx = useMrCtx()
-  if (ctx.layout !== 'stack') return null
-  if (ctx.summary === null || ctx.summary.kind !== 'review') return null
-  const summary = ctx.summary
+  const summary = useReviewSummary('stack')
+  if (summary === null) return null
   return (
     <div
       className={cn(
@@ -158,24 +182,12 @@ function ReviewerStack() {
     >
       <ul className="flex flex-col gap-1.5">
         {summary.reviewers.map((reviewer) => (
-          <li key={reviewer.username} className="flex items-start gap-2">
-            <ReviewerAvatar
-              displayName={reviewer.displayName}
-              avatarUrl={reviewer.avatarUrl}
-              visualState={reviewer.visualState}
-            />
-            <div className="min-w-0 flex-1 leading-tight">
-              <div className="text-foreground truncate text-[11px]">{reviewer.displayName}</div>
-              <div className="text-muted-foreground truncate text-[10px]">
-                {REVIEWER_BADGE_LABEL[reviewer.visualState]}
-              </div>
-            </div>
-          </li>
+          <ReviewerStackRow key={reviewer.username} reviewer={reviewer} />
         ))}
       </ul>
       {summary.unresolvedCount > 0 && (
         <div
-          title={`${summary.unresolvedCount} unresolved comment thread${summary.unresolvedCount === 1 ? '' : 's'}`}
+          title={unresolvedTitle(summary.unresolvedCount)}
           className="text-muted-foreground inline-flex items-center gap-1 text-[11px] tabular-nums"
         >
           <MessageSquare className="h-3 w-3" aria-hidden />
@@ -186,28 +198,41 @@ function ReviewerStack() {
   )
 }
 
+function ReviewerStackRow({ reviewer }: { reviewer: ReviewSummary['reviewers'][number] }) {
+  return (
+    <li className="flex items-start gap-2">
+      <ReviewerAvatar
+        displayName={reviewer.displayName}
+        avatarUrl={reviewer.avatarUrl}
+        visualState={reviewer.visualState}
+      />
+      <div className="min-w-0 flex-1 leading-tight">
+        <div className="text-foreground truncate text-[11px]">{reviewer.displayName}</div>
+        <div className="text-muted-foreground truncate text-[10px]">
+          {REVIEWER_BADGE_LABEL[reviewer.visualState]}
+        </div>
+      </div>
+    </li>
+  )
+}
+
 function CiIndicator() {
-  const ctx = useMrCtx()
-  if (ctx.layout !== 'row') return null
-  if (ctx.summary === null || ctx.summary.kind !== 'review') return null
-  if (ctx.summary.ciState === 'none') return null
-  return <MrCiIndicator state={ctx.summary.ciState} className="ml-auto" />
+  const summary = useReviewSummary('row')
+  if (summary === null || summary.ciState === 'none') return null
+  return <MrCiIndicator state={summary.ciState} className="ml-auto" />
 }
 
 function UnresolvedChip() {
-  const ctx = useMrCtx()
-  if (ctx.layout !== 'row') return null
-  if (ctx.summary === null || ctx.summary.kind !== 'review') return null
-  if (ctx.summary.unresolvedCount === 0) return null
-  const count = ctx.summary.unresolvedCount
-  const ciIsNone = ctx.summary.ciState === 'none'
+  const summary = useReviewSummary('row')
+  if (summary === null || summary.unresolvedCount === 0) return null
+  const count = summary.unresolvedCount
   return (
     <span
       data-testid={testIds.unresolvedThreadChip}
-      title={`${count} unresolved comment thread${count === 1 ? '' : 's'}`}
+      title={unresolvedTitle(count)}
       className={cn(
         'text-muted-foreground inline-flex items-center gap-1 text-[11px] tabular-nums',
-        ciIsNone && 'ml-auto',
+        summary.ciState === 'none' && 'ml-auto',
       )}
     >
       <MessageSquare className="h-3 w-3" aria-hidden />
@@ -223,24 +248,14 @@ type WarningInfo = {
   onClick?: () => void
 }
 
-function pickWarning(
-  ctx: CtxValue,
-  triggerMerge: (input: { key: string; targetStatusName: string }) => Promise<unknown>,
-): WarningInfo | null {
-  const { summary, column, issueKey } = ctx
-  if (summary === null) {
-    if (column === 'In Code Review') return { kind: mrWarningKind.noMr, text: 'No MR found' }
-    return null
-  }
-  if (summary.kind === 'review') return null
-  if (column === 'Done') {
-    if (summary.kind === 'merged') return null
-    return {
-      kind: mrWarningKind.doneStillOpen,
-      text: 'Ticket is Done — MR still open',
-      webUrl: summary.webUrl,
-    }
-  }
+type AuthorSummary = Exclude<MrSummary, { kind: 'review' }>
+type TriggerMerge = (input: { key: string; targetStatusName: string }) => Promise<unknown>
+
+function warningForAuthorSummary(
+  summary: AuthorSummary,
+  issueKey: string | null,
+  triggerMerge: TriggerMerge,
+): WarningInfo {
   return match(summary)
     .with({ kind: 'draft' }, (s) => ({
       kind: mrWarningKind.draft,
@@ -266,6 +281,24 @@ function pickWarning(
     .exhaustive()
 }
 
+function pickWarning(ctx: CtxValue, triggerMerge: TriggerMerge): WarningInfo | null {
+  const { summary, column, issueKey } = ctx
+  if (summary === null) {
+    return column === 'In Code Review' ? { kind: mrWarningKind.noMr, text: 'No MR found' } : null
+  }
+  if (summary.kind === 'review') return null
+  if (column === 'Done') {
+    return summary.kind === 'merged'
+      ? null
+      : {
+          kind: mrWarningKind.doneStillOpen,
+          text: 'Ticket is Done — MR still open',
+          webUrl: summary.webUrl,
+        }
+  }
+  return warningForAuthorSummary(summary, issueKey, triggerMerge)
+}
+
 const CARD_WARNING_ROW_CLASS =
   'flex items-center gap-2 bg-amber-500/10 border-l-2 border-amber-500/40 rounded-b-md px-3 py-1.5 text-[11px]'
 
@@ -274,20 +307,24 @@ function WarningRow() {
   const merge = useMrMergedAction()
   const warning = pickWarning(ctx, merge)
   if (warning === null) return null
+  if (ctx.layout === 'stack') return <StackWarning warning={warning} />
+  return <CardWarning warning={warning} />
+}
 
-  if (ctx.layout === 'stack') {
-    return (
-      <div
-        data-testid={testIds.mrWarningRow}
-        data-kind={warning.kind}
-        className="flex items-start gap-2 rounded-md border-l-2 border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-[11px]"
-      >
-        <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-amber-500" aria-hidden />
-        <span className="text-foreground/90 leading-tight">{warning.text}</span>
-      </div>
-    )
-  }
+function StackWarning({ warning }: { warning: WarningInfo }) {
+  return (
+    <div
+      data-testid={testIds.mrWarningRow}
+      data-kind={warning.kind}
+      className="flex items-start gap-2 rounded-md border-l-2 border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-[11px]"
+    >
+      <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-amber-500" aria-hidden />
+      <span className="text-foreground/90 leading-tight">{warning.text}</span>
+    </div>
+  )
+}
 
+function CardWarning({ warning }: { warning: WarningInfo }) {
   const icon = <AlertTriangle className="h-3 w-3 shrink-0 text-amber-500" aria-hidden />
   const label = <span className="text-foreground/90">{warning.text}</span>
   const link =
@@ -302,7 +339,6 @@ function WarningRow() {
         View MR ↗
       </a>
     ) : null
-
   if (warning.onClick !== undefined) {
     return (
       <button

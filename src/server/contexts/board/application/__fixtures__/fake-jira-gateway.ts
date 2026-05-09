@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { Rejected } from '../../../../gateways/jira/errors'
+import { JiraRejected } from '../../../../gateways/jira/errors'
 import type { JiraGatewayShape } from '../../../../gateways/jira/port'
 
 const notImpl = (label: string) =>
@@ -17,4 +17,4 @@ export function fakeJiraGateway(overrides: Partial<JiraGatewayShape>): JiraGatew
   } as JiraGatewayShape
 }
 
-export { Rejected }
+export { JiraRejected }

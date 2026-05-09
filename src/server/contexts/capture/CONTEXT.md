@@ -2,7 +2,7 @@
 
 The server side of the Capture context — the Quick Create modal's three use-cases:
 
-1. `getMyself` — fetch the current Jira user (also used by the client's `AuthGate` route).
+1. `loadMyself` — fetch the current Jira user (also used by the client's `AuthGate` route).
 2. `loadMyEpics` — list the user's currently-in-progress epics for the parent picker.
 3. `quickCreate` — create a Jira issue from the validated form input.
 
@@ -40,16 +40,16 @@ The `InternalError` tag is added by `toWire` for any unhandled defect — client
 `src/server/contexts/capture/application/`:
 
 ```ts
-getMyself: Effect.Effect<GetMyselfOk, Unauthorized, JiraGateway>
+loadMyself: Effect.Effect<LoadMyselfOk, Unauthorized, JiraGateway>
 loadMyEpics: Effect.Effect<LoadMyEpicsOk, Unauthorized, JiraGateway | CaptureConfig>
 quickCreate(input): Effect.Effect<QuickCreateOk, Unauthorized | Rejected, JiraGateway | CaptureConfig>
 ```
 
 What they do:
 
-- **`getMyself`** calls `JiraGateway.getMyself()` and surfaces the user. `Rejected` and `NotFound` from the gateway become defects (the Jira `/myself` endpoint never legitimately returns those).
+- **`loadMyself`** calls `JiraGateway.getMyself()` and surfaces the user. `Rejected` and `NotFound` from the gateway become defects (the Jira `/myself` endpoint never legitimately returns those).
 - **`loadMyEpics`** builds an epic JQL from `CaptureConfig.epic.statuses` + `CaptureConfig.projectKey`, calls `JiraGateway.searchIssues`, and shapes the response into `EpicRef[]`. `Rejected` and `NotFound` become defects.
-- **`quickCreate`** runs `getMyself` first (for `accountId`), assembles the `CreateIssueBody` via `domain/build-create-payload.ts`, then calls `JiraGateway.createIssue`. Both `Unauthorized` paths (from `getMyself` and from `createIssue`) and `Rejected` from `createIssue` propagate as tagged failures; `Rejected` from `getMyself` also propagates so a 5xx during user lookup surfaces consistently.
+- **`quickCreate`** runs `loadMyself` first (for `accountId`), assembles the `CreateIssueBody` via `domain/build-create-payload.ts`, then calls `JiraGateway.createIssue`. Both `Unauthorized` paths (from `loadMyself` and from `createIssue`) and `Rejected` from `createIssue` propagate as tagged failures; `Rejected` from `loadMyself` also propagates so a 5xx during user lookup surfaces consistently.
 
 ## Gateway dependencies
 
@@ -57,7 +57,7 @@ What they do:
 
 ## Error unions
 
-- `GetMyselfError = Schema.Union(Unauthorized)`
+- `LoadMyselfError = Schema.Union(Unauthorized)`
 - `LoadMyEpicsError = Schema.Union(Unauthorized)`
 - `QuickCreateError = Schema.Union(Unauthorized, Rejected)`
 
@@ -71,7 +71,7 @@ Each handler hands its error union to `toWire`, which encodes the tagged failure
 
 Each application module has a sibling `*.test.ts` using `@effect/vitest`'s `it.effect`. Gateway and config are faked via `Layer.succeed(JiraGateway, fake)` + `Layer.succeed(CaptureConfig, config)`. The hand-rolled fake gateway lives in `__fixtures__/fake-jira-gateway.ts` (per-context, even though its shape mirrors Board's and Detail's — the rule is per-context fakes).
 
-`quick-create.test.ts` covers both transitive `Unauthorized` paths (from `getMyself` and from `createIssue`) and the `Rejected` path.
+`quick-create.test.ts` covers both transitive `Unauthorized` paths (from `loadMyself` and from `createIssue`) and the `Rejected` path.
 
 ## Domain
 

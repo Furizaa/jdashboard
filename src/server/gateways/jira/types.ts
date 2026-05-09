@@ -9,7 +9,7 @@ export type AdfNode = {
   content?: AdfNode[]
 }
 
-export type GatewayUser = {
+export type JiraUser = {
   accountId: string
   displayName: string
   avatarUrl: string
@@ -101,6 +101,20 @@ export type RawSearchResponse = {
   isLast?: boolean
 }
 
+export type RawIssueLink = {
+  id: string
+  type: { name: string; inward: string; outward: string }
+  inwardIssue?: RawLinkedRef
+  outwardIssue?: RawLinkedRef
+}
+
+export type RawComment = {
+  id: string
+  author?: { displayName: string; avatarUrls?: Record<string, string> } | null
+  created: string
+  body?: unknown
+}
+
 export type RawDetailedIssue = {
   id: string
   key: string
@@ -114,20 +128,8 @@ export type RawDetailedIssue = {
     reporter?: { displayName: string } | null
     description?: unknown
     parent?: RawLinkedRef | null
-    issuelinks?: Array<{
-      id: string
-      type: { name: string; inward: string; outward: string }
-      inwardIssue?: RawLinkedRef
-      outwardIssue?: RawLinkedRef
-    }>
-    comment?: {
-      comments: Array<{
-        id: string
-        author?: { displayName: string; avatarUrls?: Record<string, string> } | null
-        created: string
-        body?: unknown
-      }>
-    }
+    issuelinks?: RawIssueLink[]
+    comment?: { comments: RawComment[] }
   }
 }
 

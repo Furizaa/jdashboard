@@ -1,5 +1,5 @@
 import { Schema } from 'effect'
-import { Unauthorized } from '../../gateways/gitlab/errors'
+import { GitlabUnauthorized } from '../../gateways/gitlab/errors'
 
-export const GetReviewCardsError = Schema.Union(Unauthorized)
-export type GetReviewCardsError = Schema.Schema.Type<typeof GetReviewCardsError>
+export const LoadReviewCardsError = Schema.Union(GitlabUnauthorized)
+export type LoadReviewCardsError = Schema.Schema.Type<typeof LoadReviewCardsError>

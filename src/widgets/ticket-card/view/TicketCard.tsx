@@ -2,7 +2,7 @@ import { match } from 'ts-pattern'
 import { type KeyboardEvent } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useMrFor } from '~/coordinator'
-import { Mr, type RootState } from '~/widgets/mr-section'
+import { Mr, rootStateFromPhase } from '~/widgets/mr-section'
 import { FixasapRibbon } from '~/widgets/fixasap-ribbon'
 import { cn } from '~/lib/cn'
 import { testIds } from '~/lib/testids'
@@ -79,20 +79,24 @@ export function TicketCard({
 
       <CardLabels view={view} />
 
-      {view.mrSection !== null &&
-        match(view.mrSection)
-          .with({ mode: 'jira' }, ({ issueKey, column }) => (
-            <CardMrJira issueKey={issueKey} column={column} />
-          ))
-          .with({ mode: 'review' }, (review) => <CardMrReview data={review} />)
-          .exhaustive()}
+      <CardMrSection mrSection={view.mrSection} />
     </article>
   )
 }
 
+function CardMrSection({ mrSection }: { mrSection: TicketCardViewModel['mrSection'] }) {
+  if (mrSection === null) return null
+  return match(mrSection)
+    .with({ mode: 'jira' }, ({ issueKey, column }) => (
+      <CardMrJira issueKey={issueKey} column={column} />
+    ))
+    .with({ mode: 'review' }, (review) => <CardMrReview data={review} />)
+    .exhaustive()
+}
+
 function CardMrJira({ issueKey, column }: { issueKey: string; column: Column }) {
   const result = useMrFor(issueKey)
-  const state = mrStatusToRootState(result.state)
+  const state = rootStateFromPhase(result.state)
   const summary = result.state === 'ready' ? result.summary : null
   return (
     <Mr.Root state={state} summary={summary} layout="row" issueKey={issueKey} column={column}>
@@ -128,13 +132,4 @@ function CardMrReview({
       <Mr.WarningRow />
     </Mr.Root>
   )
-}
-
-function mrStatusToRootState(state: 'idle' | 'loading' | 'unavailable' | 'ready'): RootState {
-  return match(state)
-    .with('idle', () => ({ kind: 'idle' }) as RootState)
-    .with('unavailable', () => ({ kind: 'idle' }) as RootState)
-    .with('loading', () => ({ kind: 'loading' }) as RootState)
-    .with('ready', () => ({ kind: 'ready' }) as RootState)
-    .exhaustive()
 }

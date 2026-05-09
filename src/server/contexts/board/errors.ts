@@ -1,8 +1,6 @@
 import { Schema } from 'effect'
-import { Unauthorized as JiraUnauthorized } from '../../gateways/jira/errors'
-import { Unauthorized as GitlabUnauthorized } from '../../gateways/gitlab/errors'
-
-export { JiraUnauthorized as Unauthorized }
+import { JiraUnauthorized } from '../../gateways/jira/errors'
+import { GitlabUnauthorized } from '../../gateways/gitlab/errors'
 
 export const LoadBoardError = Schema.Union(JiraUnauthorized)
 export type LoadBoardError = Schema.Schema.Type<typeof LoadBoardError>

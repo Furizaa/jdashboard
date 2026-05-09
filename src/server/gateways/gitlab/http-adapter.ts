@@ -1,10 +1,15 @@
 import { HttpClient, HttpClientRequest, HttpClientResponse } from '@effect/platform'
 import { Effect, Layer } from 'effect'
 import { ServerEnv } from '../../runtime/server-env'
-import { NotFound, Rejected, Unauthorized, type GitlabGatewayError } from './errors'
+import {
+  GitlabNotFound,
+  GitlabRejected,
+  GitlabUnauthorized,
+  type GitlabGatewayError,
+} from './errors'
 import { GitlabGateway } from './port'
 import type {
-  GatewayUser,
+  GitlabUser,
   ListMrsQuery,
   RawApprovals,
   RawDiscussion,
@@ -119,7 +124,7 @@ const decodeJsonBody = <T>(
   response: HttpClientResponse.HttpClientResponse,
 ): Effect.Effect<T, GitlabGatewayError> =>
   response.json.pipe(
-    Effect.mapError((error) => new Rejected({ message: error.message })),
+    Effect.mapError((error) => new GitlabRejected({ message: error.message })),
   ) as Effect.Effect<T, GitlabGatewayError>
 
 const readErrorBody = (response: HttpClientResponse.HttpClientResponse): Effect.Effect<string> =>
@@ -129,7 +134,9 @@ const failFromStatus = (
   response: HttpClientResponse.HttpClientResponse,
 ): Effect.Effect<never, GitlabGatewayError> =>
   readErrorBody(response).pipe(
-    Effect.flatMap((body) => Effect.fail(new Rejected({ message: parseGitlabErrorMessage(body) }))),
+    Effect.flatMap((body) =>
+      Effect.fail(new GitlabRejected({ message: parseGitlabErrorMessage(body) })),
+    ),
   )
 
 export const GitlabGatewayLive: Layer.Layer<
@@ -154,13 +161,13 @@ export const GitlabGatewayLive: Layer.Layer<
     ): Effect.Effect<T, GitlabGatewayError> =>
       client.execute(request).pipe(
         Effect.mapError(
-          (error) => new Rejected({ message: `GitLab request failed: ${error.message}` }),
+          (error) => new GitlabRejected({ message: `GitLab request failed: ${error.message}` }),
         ),
         Effect.flatMap((response) =>
           HttpClientResponse.matchStatus(response, {
             '2xx': (ok) => decodeJsonBody<T>(ok),
-            401: (): Effect.Effect<T, GitlabGatewayError> => Effect.fail(new Unauthorized()),
-            404: (): Effect.Effect<T, GitlabGatewayError> => Effect.fail(new NotFound()),
+            401: (): Effect.Effect<T, GitlabGatewayError> => Effect.fail(new GitlabUnauthorized()),
+            404: (): Effect.Effect<T, GitlabGatewayError> => Effect.fail(new GitlabNotFound()),
             orElse: (bad): Effect.Effect<T, GitlabGatewayError> => failFromStatus(bad),
           }),
         ),
@@ -169,7 +176,7 @@ export const GitlabGatewayLive: Layer.Layer<
     return GitlabGateway.of({
       getCurrentUser: () =>
         executeJson<WireUser>(get('/api/v4/user')).pipe(
-          Effect.map((u): GatewayUser => ({ username: u.username, displayName: u.name })),
+          Effect.map((u): GitlabUser => ({ username: u.username, displayName: u.name })),
         ),
 
       listMrs: (query: ListMrsQuery) => {

@@ -12,7 +12,7 @@
     "gen:routes": "tsr generate",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tests/e2e/tsconfig.json",
     "depcruise": "depcruise --config .dependency-cruiser.cjs src",
-    "check:arch": "npx fallow || true",
+    "check:arch": "npx fallow",
     "docs:arch": "depcruise --config .dependency-cruiser.cjs --output-type dot src | dot -Tsvg -o docs/architecture.svg",
     "test": "vitest run",
     "test:e2e": "playwright test",
@@ -20,7 +20,7 @@
     "postinstall": "simple-git-hooks"
   },
   "simple-git-hooks": {
-    "pre-commit": "pnpm exec lint-staged"
+    "pre-commit": "pnpm exec lint-staged && pnpm check:arch"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": [

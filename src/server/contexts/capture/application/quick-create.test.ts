@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@effect/vitest'
 import { Effect, Layer } from 'effect'
-import { Rejected, Unauthorized } from '../../../gateways/jira/errors'
+import { JiraRejected, JiraUnauthorized } from '../../../gateways/jira/errors'
 import { JiraGateway } from '../../../gateways/jira/port'
 import type { CreateIssueBody } from '../../../gateways/jira/types'
 import { CaptureConfig, type CaptureConfigShape } from '../config'
@@ -84,7 +84,7 @@ describe('quickCreate', () => {
   it.effect('propagates Unauthorized when getMyself fails with Unauthorized', () =>
     Effect.gen(function* () {
       const jira = fakeJiraGateway({
-        getMyself: () => Effect.fail(new Unauthorized()),
+        getMyself: () => Effect.fail(new JiraUnauthorized()),
       })
       const failure = yield* provide(quickCreate(SAMPLE_INPUT), jira).pipe(Effect.flip)
       expect(failure._tag).toBe('Unauthorized')
@@ -96,7 +96,7 @@ describe('quickCreate', () => {
       const jira = fakeJiraGateway({
         getMyself: () =>
           Effect.succeed({ accountId: 'acc-1', displayName: 'A', avatarUrl: 'https://a' }),
-        createIssue: () => Effect.fail(new Unauthorized()),
+        createIssue: () => Effect.fail(new JiraUnauthorized()),
       })
       const failure = yield* provide(quickCreate(SAMPLE_INPUT), jira).pipe(Effect.flip)
       expect(failure._tag).toBe('Unauthorized')
@@ -108,7 +108,7 @@ describe('quickCreate', () => {
       const jira = fakeJiraGateway({
         getMyself: () =>
           Effect.succeed({ accountId: 'acc-1', displayName: 'A', avatarUrl: 'https://a' }),
-        createIssue: () => Effect.fail(new Rejected({ message: 'parent missing' })),
+        createIssue: () => Effect.fail(new JiraRejected({ message: 'parent missing' })),
       })
       const failure = yield* provide(quickCreate(SAMPLE_INPUT), jira).pipe(Effect.flip)
       expect(failure._tag).toBe('Rejected')
@@ -121,7 +121,7 @@ describe('quickCreate', () => {
   it.effect('propagates Rejected when getMyself is rejected', () =>
     Effect.gen(function* () {
       const jira = fakeJiraGateway({
-        getMyself: () => Effect.fail(new Rejected({ message: 'service unavailable' })),
+        getMyself: () => Effect.fail(new JiraRejected({ message: 'service unavailable' })),
       })
       const failure = yield* provide(quickCreate(SAMPLE_INPUT), jira).pipe(Effect.flip)
       expect(failure._tag).toBe('Rejected')

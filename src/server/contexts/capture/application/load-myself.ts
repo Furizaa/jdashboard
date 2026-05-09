@@ -1,13 +1,13 @@
 import { Effect } from 'effect'
 import { JiraGateway } from '../../../gateways/jira/port'
-import type { GatewayUser } from '../../../gateways/jira/types'
-import type { GetMyselfError } from '../errors'
+import type { JiraUser } from '../../../gateways/jira/types'
+import type { LoadMyselfError } from '../errors'
 
-export type GetMyselfOk = {
-  readonly user: GatewayUser
+export type LoadMyselfOk = {
+  readonly user: JiraUser
 }
 
-export const getMyself: Effect.Effect<GetMyselfOk, GetMyselfError, JiraGateway> = Effect.gen(
+export const loadMyself: Effect.Effect<LoadMyselfOk, LoadMyselfError, JiraGateway> = Effect.gen(
   function* () {
     const jira = yield* JiraGateway
     const user = yield* jira.getMyself().pipe(

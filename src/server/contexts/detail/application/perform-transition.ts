@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { Rejected } from '../../../gateways/jira/errors'
+import { JiraRejected } from '../../../gateways/jira/errors'
 import { JiraGateway } from '../../../gateways/jira/port'
 import type { PerformTransitionError } from '../errors'
 
@@ -18,7 +18,9 @@ export const performTransition = (
       // Preserved from the legacy issue-service: a 404 from Jira's transition
       // endpoint surfaces to the user as "Issue not found", reusing the
       // Rejected error shape so the wire union stays { Unauthorized | Rejected }.
-      Effect.catchTag('NotFound', () => Effect.fail(new Rejected({ message: 'Issue not found' }))),
+      Effect.catchTag('NotFound', () =>
+        Effect.fail(new JiraRejected({ message: 'Issue not found' })),
+      ),
     )
     return {}
   })

@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@effect/vitest'
 import { Effect, Layer } from 'effect'
-import { NotFound, Unauthorized } from '../../../gateways/jira/errors'
+import { JiraNotFound, JiraUnauthorized } from '../../../gateways/jira/errors'
 import { JiraGateway } from '../../../gateways/jira/port'
 import { fakeJiraGateway } from './__fixtures__/fake-jira-gateway'
 import { loadTransitions } from './load-transitions'
@@ -33,7 +33,7 @@ describe('loadTransitions', () => {
   it.effect('propagates Unauthorized as a tagged failure', () =>
     Effect.gen(function* () {
       const jira = fakeJiraGateway({
-        getTransitions: () => Effect.fail(new Unauthorized()),
+        getTransitions: () => Effect.fail(new JiraUnauthorized()),
       })
       const failure = yield* provide(loadTransitions('HDR-1'), jira).pipe(Effect.flip)
       expect(failure._tag).toBe('Unauthorized')
@@ -43,7 +43,7 @@ describe('loadTransitions', () => {
   it.effect('propagates NotFound as a tagged failure', () =>
     Effect.gen(function* () {
       const jira = fakeJiraGateway({
-        getTransitions: () => Effect.fail(new NotFound()),
+        getTransitions: () => Effect.fail(new JiraNotFound()),
       })
       const failure = yield* provide(loadTransitions('HDR-NOPE'), jira).pipe(Effect.flip)
       expect(failure._tag).toBe('NotFound')

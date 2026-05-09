@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { Rejected } from '../../../../gateways/gitlab/errors'
+import { GitlabRejected } from '../../../../gateways/gitlab/errors'
 import type { GitlabGatewayShape } from '../../../../gateways/gitlab/port'
 
 const notImpl = (label: string) =>
@@ -17,4 +17,4 @@ export function fakeGitlabGateway(overrides: Partial<GitlabGatewayShape>): Gitla
   } as GitlabGatewayShape
 }
 
-export { Rejected }
+export { GitlabRejected }

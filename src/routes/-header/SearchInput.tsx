@@ -1,6 +1,21 @@
 import { useEffect, useRef } from 'react'
 import { Search } from 'lucide-react'
 
+function isModK(e: KeyboardEvent): boolean {
+  return (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k'
+}
+
+function isTextInput(el: Element | null): boolean {
+  if (el instanceof HTMLInputElement) return true
+  if (el instanceof HTMLTextAreaElement) return true
+  return el instanceof HTMLElement && el.isContentEditable
+}
+
+function isFocusedInOtherTextInput(self: HTMLInputElement | null): boolean {
+  const active = document.activeElement
+  return active !== self && isTextInput(active)
+}
+
 export function SearchInput({
   value,
   onChange,
@@ -12,15 +27,8 @@ export function SearchInput({
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      const isMod = e.metaKey || e.ctrlKey
-      if (!isMod || e.key.toLowerCase() !== 'k') return
-      const active = document.activeElement
-      const isOtherTextInput =
-        active !== inputRef.current &&
-        (active instanceof HTMLInputElement ||
-          active instanceof HTMLTextAreaElement ||
-          (active instanceof HTMLElement && active.isContentEditable))
-      if (isOtherTextInput) return
+      if (!isModK(e)) return
+      if (isFocusedInOtherTextInput(inputRef.current)) return
       e.preventDefault()
       inputRef.current?.focus()
       inputRef.current?.select()

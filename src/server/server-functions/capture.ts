@@ -1,10 +1,10 @@
 import { createServerFn } from '@tanstack/react-start'
 import { Effect, type Schema } from 'effect'
-import type { EpicRef, GatewayUser } from '../gateways/jira/types'
+import type { EpicRef, JiraUser } from '../gateways/jira/types'
 import { CaptureConfigLive } from '../contexts/capture/config'
-import { GetMyselfError, LoadMyEpicsError, QuickCreateError } from '../contexts/capture/errors'
-import { getMyself as getMyselfProgram } from '../contexts/capture/application/get-myself'
-import { loadMyEpics as loadMyEpicsProgram } from '../contexts/capture/application/load-my-epics'
+import { LoadMyEpicsError, LoadMyselfError, QuickCreateError } from '../contexts/capture/errors'
+import { loadMyself } from '../contexts/capture/application/load-myself'
+import { loadMyEpics } from '../contexts/capture/application/load-my-epics'
 import { quickCreate as quickCreateProgram } from '../contexts/capture/application/quick-create'
 import {
   quickCreateSchema,
@@ -13,11 +13,11 @@ import {
 import { appRuntime } from '../runtime/app-runtime'
 import { toWire, type WireResult } from '../wire/to-wire'
 
-type GetMyselfErrorWire = Schema.Schema.Encoded<typeof GetMyselfError>
+type LoadMyselfErrorWire = Schema.Schema.Encoded<typeof LoadMyselfError>
 type LoadMyEpicsErrorWire = Schema.Schema.Encoded<typeof LoadMyEpicsError>
 type QuickCreateErrorWire = Schema.Schema.Encoded<typeof QuickCreateError>
 
-export type GetMyselfResult = WireResult<{ readonly user: GatewayUser }, GetMyselfErrorWire>
+export type GetMyselfResult = WireResult<{ readonly user: JiraUser }, LoadMyselfErrorWire>
 
 export type GetMyEpicsResult = WireResult<
   { readonly epics: readonly EpicRef[] },
@@ -31,7 +31,7 @@ export type CreateIssueResult = WireResult<
 
 export const getMyself = createServerFn({ method: 'GET' }).handler(
   async (): Promise<GetMyselfResult> => {
-    const wire = await appRuntime.runPromise(toWire(getMyselfProgram, GetMyselfError))
+    const wire = await appRuntime.runPromise(toWire(loadMyself, LoadMyselfError))
     if (!wire.ok && wire.error._tag === 'InternalError') {
       throw new Error('getMyself: internal error')
     }
@@ -58,7 +58,7 @@ export const createIssue = createServerFn({ method: 'POST' })
 
 export const getMyEpics = createServerFn({ method: 'GET' }).handler(
   async (): Promise<GetMyEpicsResult> => {
-    const program = loadMyEpicsProgram.pipe(Effect.provide(CaptureConfigLive))
+    const program = loadMyEpics.pipe(Effect.provide(CaptureConfigLive))
     const wire = await appRuntime.runPromise(toWire(program, LoadMyEpicsError))
     if (!wire.ok && wire.error._tag === 'InternalError') {
       throw new Error('getMyEpics: internal error')

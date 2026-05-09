@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@effect/vitest'
 import { Effect, Layer } from 'effect'
-import { Unauthorized } from '../../../gateways/jira/errors'
+import { JiraUnauthorized } from '../../../gateways/jira/errors'
 import { JiraGateway } from '../../../gateways/jira/port'
 import type { RawSearchResponse } from '../../../gateways/jira/types'
 import { BoardConfig, type BoardConfigShape } from '../config'
@@ -127,7 +127,7 @@ describe('loadBoard', () => {
   it.effect('propagates Unauthorized as a tagged failure', () =>
     Effect.gen(function* () {
       const jira = fakeJiraGateway({
-        searchIssues: () => Effect.fail(new Unauthorized()),
+        searchIssues: () => Effect.fail(new JiraUnauthorized()),
       })
       const failure = yield* provide(loadBoard, jira).pipe(Effect.flip)
       expect(failure._tag).toBe('Unauthorized')

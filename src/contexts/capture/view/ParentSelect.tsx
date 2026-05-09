@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type RefObject } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { Skeleton } from '~/design-system'
 import { HARDCODED_PARENTS } from '../domain'
@@ -9,6 +9,72 @@ const TRIGGER_CLASS =
 
 const SECTION_LABEL_CLASS =
   'text-muted-foreground px-2.5 pt-1.5 pb-1 text-[10px] uppercase tracking-wide'
+
+function useDismissOnOutside(
+  active: boolean,
+  dismiss: () => void,
+  ref: RefObject<HTMLDivElement | null>,
+) {
+  useEffect(() => {
+    if (!active) return
+    const onPointerDown = (event: PointerEvent) => {
+      if (!ref.current) return
+      if (!ref.current.contains(event.target as Node)) dismiss()
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.stopPropagation()
+        dismiss()
+      }
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown, true)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown, true)
+    }
+  }, [active, dismiss, ref])
+}
+
+type ParentEntry = { key: string; label: string }
+
+function dynamicEpicsFrom(data: ReturnType<typeof useMyEpics>['data']): ReadonlyArray<ParentEntry> {
+  if (data?.ok !== true) return []
+  return data.epics.map((e) => ({ key: e.key, label: e.summary }))
+}
+
+function findSelected(value: string, dynamicEpics: ReadonlyArray<ParentEntry>): ParentEntry | null {
+  return (
+    HARDCODED_PARENTS.find((p) => p.key === value) ??
+    dynamicEpics.find((e) => e.key === value) ??
+    null
+  )
+}
+
+function ParentTrigger({
+  popoverOpen,
+  selected,
+  toggle,
+}: {
+  popoverOpen: boolean
+  selected: ParentEntry | null
+  toggle: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      aria-haspopup="listbox"
+      aria-expanded={popoverOpen}
+      className={TRIGGER_CLASS}
+    >
+      <span className={selected ? 'text-foreground' : 'text-muted-foreground'}>
+        {selected ? `${selected.key} · ${selected.label}` : 'Select a parent…'}
+      </span>
+      <ChevronDown size={14} className="text-muted-foreground ml-2 shrink-0" />
+    </button>
+  )
+}
 
 export function ParentSelect({
   value,
@@ -23,35 +89,11 @@ export function ParentSelect({
   const wrapperRef = useRef<HTMLDivElement>(null)
   const epicsQuery = useMyEpics(modalOpen)
 
-  useEffect(() => {
-    if (!popoverOpen) return
-    const onPointerDown = (event: PointerEvent) => {
-      if (!wrapperRef.current) return
-      if (!wrapperRef.current.contains(event.target as Node)) setPopoverOpen(false)
-    }
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.stopPropagation()
-        setPopoverOpen(false)
-      }
-    }
-    document.addEventListener('pointerdown', onPointerDown)
-    document.addEventListener('keydown', onKeyDown, true)
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown)
-      document.removeEventListener('keydown', onKeyDown, true)
-    }
-  }, [popoverOpen])
+  useDismissOnOutside(popoverOpen, () => setPopoverOpen(false), wrapperRef)
 
-  const dynamicEpics: ReadonlyArray<{ key: string; label: string }> =
-    epicsQuery.data?.ok === true
-      ? epicsQuery.data.epics.map((e) => ({ key: e.key, label: e.summary }))
-      : []
-
-  const selected =
-    HARDCODED_PARENTS.find((p) => p.key === value) ??
-    dynamicEpics.find((e) => e.key === value) ??
-    null
+  const dynamicEpics = dynamicEpicsFrom(epicsQuery.data)
+  const selected = findSelected(value, dynamicEpics)
+  const isError = epicsQuery.isError || epicsQuery.data?.ok === false
 
   const choose = (key: string) => {
     onChange(key)
@@ -60,50 +102,68 @@ export function ParentSelect({
 
   return (
     <div ref={wrapperRef} className="relative">
-      <button
-        type="button"
-        onClick={() => setPopoverOpen((v) => !v)}
-        aria-haspopup="listbox"
-        aria-expanded={popoverOpen}
-        className={TRIGGER_CLASS}
-      >
-        <span className={selected ? 'text-foreground' : 'text-muted-foreground'}>
-          {selected ? `${selected.key} · ${selected.label}` : 'Select a parent…'}
-        </span>
-        <ChevronDown size={14} className="text-muted-foreground ml-2 shrink-0" />
-      </button>
+      <ParentTrigger
+        popoverOpen={popoverOpen}
+        selected={selected}
+        toggle={() => setPopoverOpen((v) => !v)}
+      />
       {popoverOpen && (
-        // styled popover listbox; native <select> does not support sectioned/custom-rendered options
-        <div
-          role="listbox"
-          className="border-border bg-popover absolute top-full left-0 z-30 mt-1 w-full overflow-hidden rounded-md border py-1 text-xs shadow-lg"
-        >
-          <div className={SECTION_LABEL_CLASS}>Pinned</div>
-          <ul>
-            {HARDCODED_PARENTS.map((parent) => (
-              <ParentRow
-                key={parent.key}
-                entryKey={parent.key}
-                label={parent.label}
-                selected={parent.key === value}
-                onSelect={choose}
-              />
-            ))}
-          </ul>
-
-          <div className="border-border/50 my-1 border-t" />
-
-          <div className={SECTION_LABEL_CLASS}>My in-progress epics</div>
-          <DynamicSection
-            isLoading={epicsQuery.isLoading}
-            isError={epicsQuery.isError || epicsQuery.data?.ok === false}
-            epics={dynamicEpics}
-            selectedKey={value}
-            onSelect={choose}
-            onRetry={() => epicsQuery.refetch()}
-          />
-        </div>
+        <ParentPopover
+          value={value}
+          dynamicEpics={dynamicEpics}
+          isLoading={epicsQuery.isLoading}
+          isError={isError}
+          onSelect={choose}
+          onRetry={() => epicsQuery.refetch()}
+        />
       )}
+    </div>
+  )
+}
+
+function ParentPopover({
+  value,
+  dynamicEpics,
+  isLoading,
+  isError,
+  onSelect,
+  onRetry,
+}: {
+  value: string
+  dynamicEpics: ReadonlyArray<{ key: string; label: string }>
+  isLoading: boolean
+  isError: boolean
+  onSelect: (key: string) => void
+  onRetry: () => void
+}) {
+  // styled popover listbox; native <select> does not support sectioned/custom-rendered options
+  return (
+    <div
+      role="listbox"
+      className="border-border bg-popover absolute top-full left-0 z-30 mt-1 w-full overflow-hidden rounded-md border py-1 text-xs shadow-lg"
+    >
+      <div className={SECTION_LABEL_CLASS}>Pinned</div>
+      <ul>
+        {HARDCODED_PARENTS.map((parent) => (
+          <ParentRow
+            key={parent.key}
+            entryKey={parent.key}
+            label={parent.label}
+            selected={parent.key === value}
+            onSelect={onSelect}
+          />
+        ))}
+      </ul>
+      <div className="border-border/50 my-1 border-t" />
+      <div className={SECTION_LABEL_CLASS}>My in-progress epics</div>
+      <DynamicSection
+        isLoading={isLoading}
+        isError={isError}
+        epics={dynamicEpics}
+        selectedKey={value}
+        onSelect={onSelect}
+        onRetry={onRetry}
+      />
     </div>
   )
 }

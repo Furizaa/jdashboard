@@ -10,9 +10,25 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,css,md}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css,md}\"",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tests/e2e/tsconfig.json",
+    "depcruise": "depcruise --config .dependency-cruiser.cjs src",
+    "check:arch": "npx fallow || true",
+    "docs:arch": "depcruise --config .dependency-cruiser.cjs --output-type dot src | dot -Tsvg -o docs/architecture.svg",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "postinstall": "simple-git-hooks"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "pnpm exec lint-staged"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": [
+      "oxlint",
+      "prettier --check"
+    ],
+    "*.{css,md,json}": [
+      "prettier --check"
+    ]
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",
@@ -25,10 +41,12 @@
     "clsx": "2.1.1",
     "date-fns": "4.1.0",
     "lucide-react": "1.14.0",
+    "neverthrow": "8.2.0",
     "react": "19.2.5",
     "react-dom": "19.2.5",
     "sonner": "2.0.7",
     "tailwind-merge": "3.5.0",
+    "ts-pattern": "5.9.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -40,11 +58,14 @@
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.0.1",
+    "dependency-cruiser": "17.4.0",
     "jsdom": "29.1.1",
+    "lint-staged": "17.0.3",
     "msw": "^2.14.5",
     "oxlint": "1.63.0",
     "prettier": "3.8.3",
     "prettier-plugin-tailwindcss": "0.8.0",
+    "simple-git-hooks": "2.13.1",
     "srvx": "^0.11.15",
     "tailwindcss": "4.2.4",
     "typescript": "6.0.3",

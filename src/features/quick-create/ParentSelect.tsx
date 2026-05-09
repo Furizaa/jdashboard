@@ -72,6 +72,7 @@ export function ParentSelect({
         <ChevronDown size={14} className="text-muted-foreground ml-2 shrink-0" />
       </button>
       {popoverOpen && (
+        // styled popover listbox; native <select> does not support sectioned/custom-rendered options
         <div
           role="listbox"
           className="border-border bg-popover absolute top-full left-0 z-30 mt-1 w-full overflow-hidden rounded-md border py-1 text-xs shadow-lg"

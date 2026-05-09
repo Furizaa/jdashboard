@@ -49,6 +49,8 @@ export function TicketCard({
   }
 
   return (
+    // article (not button): a <button> cannot legally nest the block content this card holds
+    // (status pill, MR section). role + keyboard handlers preserve a11y.
     <article
       role="button"
       tabIndex={isLeaving ? -1 : 0}
@@ -77,6 +79,8 @@ export function TicketCard({
           keyClick={view.keyClick}
           keyOpenInJira={view.keyOpenInJira}
         />
+        {/* span wraps an interactive child only to stop propagation to the card; not itself actionable */}
+        {/* oxlint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events */}
         <span className="ml-auto" onClick={stopPropagation}>
           {view.pill.clickable ? (
             <StatusPillSelect
@@ -103,6 +107,8 @@ export function TicketCard({
       </div>
 
       {(view.epic !== null || view.labels.length > 0) && (
+        // div wraps interactive children only to stop propagation to the card; not itself actionable
+        // oxlint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
         <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1" onClick={stopPropagation}>
           {view.epic !== null && <EpicChip epic={view.epic} />}
           {visible.map((label) => (

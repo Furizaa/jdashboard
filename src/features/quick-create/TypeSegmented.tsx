@@ -53,6 +53,8 @@ export function TypeSegmented({
               buttonsRef.current[i] = el
             }}
             type="button"
+            // styled radio implemented as button + role="radio" + roving tabindex;
+            // native <input type="radio"> does not support custom layout/focus management here
             role="radio"
             aria-checked={selected}
             tabIndex={selected ? 0 : -1}

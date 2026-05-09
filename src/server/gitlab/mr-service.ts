@@ -136,9 +136,7 @@ export function createGitlabMrService(
         }
         const approvedUsernames = new Set(fo.approvals.value.approvedUsernames)
         const requestedChangesUsernames = new Set(
-          fo.reviewers.value
-            .filter((r) => r.state === 'requested_changes')
-            .map((r) => r.username),
+          fo.reviewers.value.filter((r) => r.state === 'requested_changes').map((r) => r.username),
         )
         byKey[fo.key] = summarizeMr(
           fo.detail.value,

@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import type { UseQueryResult } from '@tanstack/react-query'
-import { useBoardData, useMrStatuses, useReviewCards } from '~/dashboard'
+import { useBoardData, useMrStatuses, useReviewCards } from '~/coordinator'
 import { usePolling } from '~/lib/use-polling'
 import type { BoardIssue, SearchIssuesResult } from '~/server/jira'
 import type { ReviewCard } from '~/server/gitlab'

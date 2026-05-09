@@ -1,7 +1,7 @@
 import { MessageSquare } from 'lucide-react'
 import { cn } from '~/lib/cn'
 import type { Column } from '~/features/board/status-mapping'
-import { useMrFor, useMrMergedAction } from '~/dashboard'
+import { useMrFor, useMrMergedAction } from '~/coordinator'
 import { mrWarningKind, testIds } from '~/lib/testids'
 import { MrCiIndicator } from './MrCiIndicator'
 import { MrWarning } from './MrWarning'

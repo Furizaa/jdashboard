@@ -3,7 +3,7 @@ import { ChevronDown, ChevronUp, ExternalLink, X } from 'lucide-react'
 import { StatusPillSelect } from '~/features/status-pill'
 import { FixasapRibbon, TypeIcon, colorForLabel, hasFixasapLabel } from '~/features/ticket-card'
 import { MrPanelBlock } from '~/features/mr-status'
-import { useMrFor, useReviewCards } from '~/dashboard'
+import { useMrFor, useReviewCards } from '~/coordinator'
 import type { DetailIssue } from '~/server/jira'
 import { RenderAdf } from './adf'
 import { Activity } from './Activity'
@@ -22,6 +22,8 @@ export function IssueDetailPanel({ issueKey }: { issueKey: string | null }) {
 function Panel({ panel }: { panel: OpenPanel }) {
   const issue = panel.phase === 'ready' ? panel.issue : null
   return (
+    // outer dialog backdrop: click closes; keyboard close (Escape) is wired via useIssuePanel
+    // oxlint-disable-next-line jsx-a11y/click-events-have-key-events
     <div
       className="fixed inset-0 z-50 flex justify-end"
       onClick={panel.close}
@@ -30,6 +32,8 @@ function Panel({ panel }: { panel: OpenPanel }) {
       aria-label={issue !== null ? `${panel.issueKey} — ${issue.summary}` : panel.issueKey}
     >
       <div className="bg-background/40 absolute inset-0 backdrop-blur-[1px]" aria-hidden />
+      {/* inner panel stops backdrop clicks from closing the dialog; not itself actionable */}
+      {/* oxlint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events */}
       <div
         className="border-border bg-card relative my-4 mr-4 flex h-[calc(100dvh-2rem)] w-[760px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-xl border shadow-2xl"
         onClick={(e) => e.stopPropagation()}
@@ -93,13 +97,7 @@ function PanelHeader({ panel }: { panel: OpenPanel }) {
 
 const COPIED_INDICATOR_MS = 1500
 
-function CopyableIssueKey({
-  issueKey,
-  onCopy,
-}: {
-  issueKey: string
-  onCopy: (() => void) | null
-}) {
+function CopyableIssueKey({ issueKey, onCopy }: { issueKey: string; onCopy: (() => void) | null }) {
   const [copied, setCopied] = useState(false)
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 

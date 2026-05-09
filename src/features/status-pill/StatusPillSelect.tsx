@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type MouseEvent } from 'react'
 import { Check } from 'lucide-react'
 import { cn } from '~/lib/cn'
-import { useTransitionAction, useTransitions } from '~/dashboard'
+import { useTransitionAction, useTransitions } from '~/coordinator'
 import { StatusPill } from './StatusPill'
 import { StatusIcon } from './StatusIcon'
 import { styleForStatus } from './status-color'
@@ -73,6 +73,8 @@ function ClickableStatusPill({
   }
 
   return (
+    // wrapper stops propagation to ticket-card click handlers; not itself actionable
+    // oxlint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
     <div ref={wrapperRef} className="relative inline-block" onClick={stopBubble}>
       <button
         type="button"

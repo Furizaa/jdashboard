@@ -1,0 +1,39 @@
+name: PR
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+jobs:
+  pr:
+    name: typecheck · lint · depcruise · fallow · vitest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.0.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: typecheck (app + e2e)
+        run: pnpm typecheck
+
+      - name: oxlint
+        run: pnpm lint
+
+      - name: dependency-cruiser
+        run: pnpm depcruise
+
+      - name: fallow
+        run: pnpm check:arch
+
+      - name: vitest
+        run: pnpm test

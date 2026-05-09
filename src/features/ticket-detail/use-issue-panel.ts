@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { toast } from 'sonner'
-import { useBoardData, useTicket } from '~/dashboard'
+import { useBoardData, useTicket } from '~/coordinator'
 import { usePolling } from '~/lib/use-polling'
 import type { DetailIssue } from '~/server/jira'
 import { findSiblings } from './find-siblings'
@@ -93,6 +93,9 @@ export function useIssuePanelWithDeps(
   const { prevKey, nextKey } = useMemo(() => {
     if (issue === null || issueKey === null) return { prevKey: null, nextKey: null }
     return findSiblings(issueKey, issue.statusName, board)
+    // board is a fresh array reference each render when boardQuery.data is undefined;
+    // the useMemo body short-circuits in that case so the spurious recompute is harmless.
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [issue, issueKey, board])
 
   useEffect(() => {

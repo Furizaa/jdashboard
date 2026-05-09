@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
-import { useCreateAction } from '~/dashboard'
-import type { CreateIssueResultWithTimeout } from '~/dashboard/service'
+import { useCreateAction } from '~/coordinator'
+import type { CreateIssueResultWithTimeout } from '~/coordinator/service'
 import type { QuickCreateInput } from '~/server/jira/quick-create-schema'
 
 export type QuickCreateDeps = {

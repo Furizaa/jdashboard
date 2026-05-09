@@ -1,7 +1,7 @@
 import { useEffect, type RefObject } from 'react'
 import { useForm } from '@tanstack/react-form'
 import { quickCreateSchema, type QuickCreateInput } from '~/server/jira/quick-create-schema'
-import type { CreateIssueResultWithTimeout } from '~/dashboard/service'
+import type { CreateIssueResultWithTimeout } from '~/coordinator/service'
 import { ParentSelect } from './ParentSelect'
 import { SummaryInput } from './SummaryInput'
 import { TypeSegmented } from './TypeSegmented'
@@ -58,19 +58,17 @@ export function QuickCreateForm({
       }}
       className="flex flex-col gap-3"
     >
-      <form.Field
-        name="type"
-        children={(field) => (
+      <form.Field name="type">
+        {(field) => (
           <div>
             <span className={REQUIRED_LABEL_CLASS}>Type{REQUIRED_ASTERISK}</span>
             <TypeSegmented value={field.state.value} onChange={field.handleChange} />
           </div>
         )}
-      />
+      </form.Field>
 
-      <form.Field
-        name="parentKey"
-        children={(field) => (
+      <form.Field name="parentKey">
+        {(field) => (
           <div>
             <label className={REQUIRED_LABEL_CLASS}>Parent{REQUIRED_ASTERISK}</label>
             <ParentSelect
@@ -83,11 +81,10 @@ export function QuickCreateForm({
             />
           </div>
         )}
-      />
+      </form.Field>
 
-      <form.Field
-        name="summary"
-        children={(field) => (
+      <form.Field name="summary">
+        {(field) => (
           <div>
             <label htmlFor="quick-create-summary" className={REQUIRED_LABEL_CLASS}>
               Summary{REQUIRED_ASTERISK}
@@ -99,11 +96,10 @@ export function QuickCreateForm({
             />
           </div>
         )}
-      />
+      </form.Field>
 
-      <form.Field
-        name="description"
-        children={(field) => (
+      <form.Field name="description">
+        {(field) => (
           <div>
             <label htmlFor="quick-create-description" className={REQUIRED_LABEL_CLASS}>
               Description{REQUIRED_ASTERISK}
@@ -118,7 +114,7 @@ export function QuickCreateForm({
             />
           </div>
         )}
-      />
+      </form.Field>
 
       <div className="mt-2 flex items-center justify-end gap-2">
         <button
@@ -129,9 +125,8 @@ export function QuickCreateForm({
         >
           Cancel
         </button>
-        <form.Subscribe
-          selector={(state) => [state.canSubmit, state.isSubmitting] as const}
-          children={([canSubmit, isSubmitting]) => (
+        <form.Subscribe selector={(state) => [state.canSubmit, state.isSubmitting] as const}>
+          {([canSubmit, isSubmitting]) => (
             <button
               type="submit"
               disabled={!canSubmit || isSubmitting || isPending}
@@ -140,7 +135,7 @@ export function QuickCreateForm({
               Create
             </button>
           )}
-        />
+        </form.Subscribe>
       </div>
     </form>
   )

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { formatDistanceToNow } from 'date-fns'
 import { RefreshCw } from 'lucide-react'
-import { useBoardData, useRefreshAll } from '~/dashboard'
+import { useBoardData, useRefreshAll } from '~/coordinator'
 import { QuickCreateButton } from '~/features/quick-create'
 import { testIds } from '~/lib/testids'
 import { GitlabIndicator } from './GitlabIndicator'

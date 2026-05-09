@@ -1,9 +1,15 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "import", "react", "jsx-a11y"],
   "categories": {
     "correctness": "error",
     "suspicious": "warn",
+    "pedantic": "warn",
     "perf": "warn"
+  },
+  "rules": {
+    "react/react-in-jsx-scope": "off",
+    "jsx-a11y/prefer-tag-over-role": "warn"
   },
   "env": {
     "browser": true,
@@ -17,6 +23,7 @@
     ".vite",
     ".agents",
     ".claude",
+    ".fallow",
     "src/routeTree.gen.ts"
   ]
 }

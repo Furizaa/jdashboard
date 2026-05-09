@@ -74,6 +74,12 @@
       }
     },
     {
+      "files": ["src/server/wire/**", "src/server/server-functions/**"],
+      "rules": {
+        "eslint/no-underscore-dangle": "off"
+      }
+    },
+    {
       "files": [
         "src/contexts/**/view/**/*.tsx",
         "src/widgets/**/view/**/*.tsx",

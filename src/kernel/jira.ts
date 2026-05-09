@@ -1,14 +1,16 @@
 export type {
   AdfNode,
   BoardIssue,
-  CreateIssueResult,
   DetailIssue,
   EpicRef,
+  IssueLink,
+  LinkedIssueRef,
+} from '~/server/gateways/jira'
+export type {
+  CreateIssueResult,
   GetIssueResult,
   GetMyEpicsResult,
   GetTransitionsResult,
-  IssueLink,
-  LinkedIssueRef,
-  SearchIssuesResult,
 } from '~/server/jira'
 export { quickCreateSchema, type QuickCreateInput } from '~/server/jira'
+export type { SearchIssuesResult } from '~/server/server-functions/board'

@@ -1,10 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query'
-import {
-  getTransitions,
-  type GetIssueResult,
-  type GetTransitionsResult,
-  type SearchIssuesResult,
-} from '~/server/jira'
+import { getTransitions, type GetIssueResult, type GetTransitionsResult } from '~/server/jira'
+import type { SearchIssuesResult } from '~/server/server-functions/board'
 import type { GetMrStatusesResult, GetReviewCardsResult } from '~/server/gitlab'
 import type { Cache, Patch, Rollback } from '../ports'
 

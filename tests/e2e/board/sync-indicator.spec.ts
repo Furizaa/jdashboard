@@ -32,7 +32,7 @@ test('manual refresh fan-out picks up world mutations without a poll', async ({ 
   await expect(page.locator('[data-issue-key="HDR-612"]')).toBeVisible()
 })
 
-test('one-shot 5xx flips indicator to failed state with tooltip', async ({
+test('repeated 5xx flips indicator to failed state with tooltip', async ({
   page,
   world,
   mocks,
@@ -42,6 +42,11 @@ test('one-shot 5xx flips indicator to failed state with tooltip', async ({
   await page.goto('/?e2e=1')
   await expect(page.locator('[data-issue-key="HDR-621"]')).toBeVisible()
 
+  // The Effect HttpClient retries transient (5xx) failures up to 2 times,
+  // so a one-shot 500 is recovered. Queue enough 500s to exhaust the retry
+  // budget on the refresh request (1 initial attempt + 2 retries).
+  mocks.failNext('POST', '*/rest/api/3/search/jql', { status: 500, body: 'boom' })
+  mocks.failNext('POST', '*/rest/api/3/search/jql', { status: 500, body: 'boom' })
   mocks.failNext('POST', '*/rest/api/3/search/jql', { status: 500, body: 'boom' })
 
   await page.getByRole('button', { name: 'Refresh' }).click()

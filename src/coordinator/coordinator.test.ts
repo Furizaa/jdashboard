@@ -3,9 +3,9 @@ import type {
   CreateIssueResult,
   GetIssueResult,
   GetTransitionsResult,
-  SearchIssuesResult,
   TransitionIssueResult,
 } from '~/server/jira'
+import type { SearchIssuesResult } from '~/server/server-functions/board'
 import type { QuickCreateInput } from '~/server/jira/quick-create-schema'
 import { createCoordinator, type CoordinatorDeps } from './coordinator'
 import type { Browser, Cache, Navigate, Patch, Rollback, Toast, ToastFn } from './ports'

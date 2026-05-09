@@ -41,8 +41,6 @@ function requireKey(label: string, value: unknown): string {
 
 export const getMyself = createServerFn({ method: 'GET' }).handler(() => service().getMyself())
 
-export const searchIssues = createServerFn({ method: 'GET' }).handler(() => service().loadBoard())
-
 export const getIssue = createServerFn({ method: 'GET' })
   .inputValidator((data: { key: string }) => ({ key: requireKey('getIssue', data?.key) }))
   .handler(({ data }) => service().loadIssue(data.key))

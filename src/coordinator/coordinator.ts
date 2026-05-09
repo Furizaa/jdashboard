@@ -1,11 +1,7 @@
 import { err, ok, Result, ResultAsync } from 'neverthrow'
 import { match } from 'ts-pattern'
-import type {
-  CreateIssueResult,
-  GetIssueResult,
-  SearchIssuesResult,
-  TransitionIssueResult,
-} from '~/server/jira'
+import type { CreateIssueResult, GetIssueResult, TransitionIssueResult } from '~/server/jira'
+import type { SearchIssuesResult } from '~/server/server-functions/board'
 import type { QuickCreateInput } from '~/server/jira/quick-create-schema'
 import {
   CreateIssueNetworkError,

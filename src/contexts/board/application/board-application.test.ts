@@ -39,10 +39,10 @@ describe('BoardApplicationService.loadBoard', () => {
     expect(gateway.callCount()).toBe(1)
   })
 
-  it('returns err BoardUnauthorized when the gateway returns { ok: false, reason: "unauthorized" }', async () => {
+  it('returns err BoardUnauthorized when the gateway returns { ok: false, error: { _tag: "Unauthorized" } }', async () => {
     const gateway = createFakeBoardGateway()
     const cache = createFakeBoardCache()
-    gateway.setResult({ ok: false, reason: 'unauthorized' })
+    gateway.setResult({ ok: false, error: { _tag: 'Unauthorized' } })
     const service = createBoardApplicationService({ gateway, cache })
 
     const result = await service.loadBoard()

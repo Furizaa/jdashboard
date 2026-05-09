@@ -4,7 +4,6 @@ export {
   getMyEpics,
   getMyself,
   getTransitions,
-  searchIssues,
   transitionIssue,
 } from './server-functions'
 export type {
@@ -15,7 +14,6 @@ export type {
   EpicRef,
   IssueLink,
   LinkedIssueRef,
-  LoadBoardResult as SearchIssuesResult,
   LoadIssueResult as GetIssueResult,
   LoadMyEpicsResult as GetMyEpicsResult,
   LoadTransitionsResult as GetTransitionsResult,

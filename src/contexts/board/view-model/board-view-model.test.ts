@@ -62,7 +62,7 @@ function errorQuery(message: string): QueryData {
 
 function unauthorizedQuery(): QueryData {
   return {
-    data: { ok: false, reason: 'unauthorized' },
+    data: { ok: false, error: { _tag: 'Unauthorized' } },
     isPending: false,
     isError: false,
     error: undefined,

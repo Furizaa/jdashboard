@@ -1,5 +1,7 @@
 import { FetchHttpClient, HttpClient, HttpClientError } from '@effect/platform'
 import { Effect, Layer, Schedule } from 'effect'
+import { JiraGatewayLive } from '../gateways/jira/http-adapter'
+import { JiraGateway } from '../gateways/jira/port'
 import { ServerEnv, ServerEnvLive } from './server-env'
 
 const RETRY_ATTEMPTS = 2
@@ -31,7 +33,10 @@ const HttpClientLive: Layer.Layer<HttpClient.HttpClient> = Layer.effect(
   ),
 ).pipe(Layer.provide(FetchHttpClient.layer))
 
-export const appLayer: Layer.Layer<ServerEnv | HttpClient.HttpClient> = Layer.mergeAll(
+const InfraLive: Layer.Layer<ServerEnv | HttpClient.HttpClient> = Layer.mergeAll(
   ServerEnvLive,
   HttpClientLive,
 )
+
+export const appLayer: Layer.Layer<ServerEnv | HttpClient.HttpClient | JiraGateway> =
+  JiraGatewayLive.pipe(Layer.provideMerge(InfraLive))

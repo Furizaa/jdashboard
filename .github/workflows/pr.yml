@@ -23,6 +23,9 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - name: generate route tree
+        run: pnpm gen:routes
+
       - name: typecheck (app + e2e)
         run: pnpm typecheck
 

@@ -303,6 +303,18 @@ export class World {
     return this.mrs.filter((m) => m.authorUsername === username)
   }
 
+  listMrsByReviewer(username: string): GitlabMr[] {
+    return this.mrs.filter((m) => {
+      const reviewers = this.mrReviewers.get(m.iid) ?? []
+      return reviewers.some((r) => r.username === username)
+    })
+  }
+
+  bulkLoadIssues(keys: readonly string[]): RawIssue[] {
+    const requested = new Set(keys)
+    return this.issues.filter((i) => requested.has(i.key))
+  }
+
   searchIssues(jql: string): RawSearchResponse {
     const trimmed = jql.trim()
     let issues: RawIssue[]
@@ -314,13 +326,11 @@ export class World {
     } else {
       const keyInMatch = /key\s+in\s*\(([^)]+)\)/i.exec(trimmed)
       if (keyInMatch) {
-        const requestedKeys = new Set(
-          keyInMatch[1]!
-            .split(',')
-            .map((s) => s.trim().replace(/^"|"$/g, ''))
-            .filter((s) => s.length > 0),
-        )
-        issues = this.issues.filter((i) => requestedKeys.has(i.key))
+        const requestedKeys = keyInMatch[1]!
+          .split(',')
+          .map((s) => s.trim().replace(/^"|"$/g, ''))
+          .filter((s) => s.length > 0)
+        issues = this.bulkLoadIssues(requestedKeys)
       } else {
         issues = this.issues.slice()
       }

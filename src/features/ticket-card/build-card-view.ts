@@ -3,6 +3,7 @@ import type { ReviewCard, ReviewCardReal } from '~/server/gitlab'
 import type { Column } from '~/features/board/status-mapping'
 import { isDeemphasized } from '~/features/board/deemphasize'
 import type { CiVisualState, ReviewerVisualState } from '~/features/mr-status'
+import type { CardKind } from '~/lib/testids'
 import { hasFixasapLabel } from './fixasap'
 
 type ReviewerVisual = {
@@ -13,6 +14,7 @@ type ReviewerVisual = {
 }
 
 export type TicketCardViewModel = {
+  cardKind: CardKind
   keyDisplay: string
   keyClick: { kind: 'copy-jira'; url: string } | { kind: 'open-mr'; url: string }
   keyOpenInJira: string | null
@@ -51,6 +53,7 @@ export function buildCardView(input: BuildCardViewInput): TicketCardViewModel {
     const { issue, column, baseUrl } = input
     const jiraUrl = `${baseUrl}/browse/${issue.key}`
     return {
+      cardKind: 'jira',
       keyDisplay: issue.key,
       keyClick: { kind: 'copy-jira', url: jiraUrl },
       keyOpenInJira: jiraUrl,
@@ -80,6 +83,7 @@ export function buildCardView(input: BuildCardViewInput): TicketCardViewModel {
   if (card.kind === 'review-real') {
     const jiraUrl = `${baseUrl}/browse/${card.jira.key}`
     return {
+      cardKind: 'review-real',
       keyDisplay: card.jira.key,
       keyClick: { kind: 'copy-jira', url: jiraUrl },
       keyOpenInJira: jiraUrl,
@@ -96,6 +100,7 @@ export function buildCardView(input: BuildCardViewInput): TicketCardViewModel {
   }
 
   return {
+    cardKind: 'review-fake',
     keyDisplay: `MR !${card.iid}`,
     keyClick: { kind: 'open-mr', url: card.webUrl },
     keyOpenInJira: null,

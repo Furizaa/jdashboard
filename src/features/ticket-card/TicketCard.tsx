@@ -57,6 +57,7 @@ export function TicketCard({
       aria-label={`Open ${view.keyDisplay}`}
       data-testid={testIds.ticketCard}
       data-issue-key={view.keyDisplay}
+      data-card-kind={view.cardKind}
       data-animation={animationState === 'idle' ? undefined : animationState}
       aria-hidden={isLeaving || undefined}
       className={cn(
@@ -154,6 +155,7 @@ function EpicChip({ epic }: { epic: { key: string; summary: string } }) {
   const color = colorForLabel(epic.key)
   return (
     <span
+      data-testid={testIds.epicChip}
       title={`${epic.key} — ${epic.summary}`}
       className="inline-flex max-w-[140px] items-center gap-1 rounded-sm px-1.5 py-0.5 text-[10px] leading-none font-medium"
       style={{ backgroundColor: `${color}26`, color }}

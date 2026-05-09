@@ -2,6 +2,7 @@ export const testIds = Object.freeze({
   ticketCard: 'ticket-card',
   labelDot: 'label-dot',
   labelOverflowChip: 'label-overflow-chip',
+  epicChip: 'epic-chip',
   syncIndicator: 'sync-indicator',
   refreshButton: 'refresh-button',
   subIssueRow: 'sub-issue-row',
@@ -12,6 +13,14 @@ export const testIds = Object.freeze({
   unresolvedThreadChip: 'unresolved-thread-chip',
   mrWarningRow: 'mr-warning-row',
 } as const)
+
+/** `data-card-kind` discriminator on `ticketCard`. */
+export const cardKind = Object.freeze({
+  jira: 'jira',
+  reviewReal: 'review-real',
+  reviewFake: 'review-fake',
+} as const)
+export type CardKind = (typeof cardKind)[keyof typeof cardKind]
 
 /** `data-kind` discriminator on `mrWarningRow`. */
 export const mrWarningKind = Object.freeze({

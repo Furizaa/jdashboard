@@ -65,11 +65,9 @@ export function buildHandlers(getWorld: () => World): HttpHandler[] {
       const reviewer = url.searchParams.get('reviewer_username')
       const state = url.searchParams.get('state')
       const world = getWorld()
-      let mrs = author !== null ? world.listMrsByAuthor(author) : []
-      // reviewer-mode listing is owned by slice 49; for now serve an empty
-      // list so the review-cards query doesn't error out on a card-less
-      // author-mode test.
-      if (reviewer !== null && author === null) mrs = []
+      let mrs: ReturnType<typeof world.listMrsByAuthor> = []
+      if (author !== null) mrs = world.listMrsByAuthor(author)
+      else if (reviewer !== null) mrs = world.listMrsByReviewer(reviewer)
       if (state === 'opened' || state === 'closed' || state === 'merged' || state === 'locked') {
         mrs = mrs.filter((m) => m.state === state)
       }

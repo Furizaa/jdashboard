@@ -1,5 +1,19 @@
 export { COLUMNS, columnForStatus, isDeemphasized, statusesForColumn, type Column } from './columns'
 export { normalizeStatus, statusesEqual } from './status'
+export {
+  ciVisualState,
+  countUnresolvedThreads,
+  reviewBucket,
+  reviewerVisualState,
+  REVIEWER_BADGE_LABEL,
+  REVIEWER_STATE_LABEL,
+  type CiVisualState,
+  type MrState,
+  type MyReviewerState,
+  type ReviewBucket,
+  type ReviewerApprovalStatus,
+  type ReviewerVisualState,
+} from './mr'
 export type {
   AdfNode,
   AllowedTransition,

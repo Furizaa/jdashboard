@@ -1,5 +1,6 @@
 import { useEffect, useReducer, useRef } from 'react'
-import { useBoardData, useMrStatuses, useReviewCards } from '~/coordinator'
+import { useBoardData, useMrStatuses } from '~/coordinator'
+import { reviewCardId, useReviewCards } from '~/contexts/review'
 import { usePolling } from '~/lib/use-polling'
 import type { BoardIssue, ReviewCard } from '~/kernel'
 import { diffChange, indexBy, type ChangeOptions } from '../domain'
@@ -20,7 +21,7 @@ const JIRA_OPTIONS: ChangeOptions<BoardIssue> = {
 }
 
 const REVIEW_OPTIONS: ChangeOptions<ReviewCard> = {
-  id: (c) => `review:${c.iid}`,
+  id: (c) => reviewCardId(c),
   equals: (a, b) => a.bucket === b.bucket,
 }
 

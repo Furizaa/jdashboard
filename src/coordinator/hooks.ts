@@ -8,8 +8,8 @@ import type {
   TransitionIssueResult,
 } from '~/server/jira'
 import type { QuickCreateInput } from '~/server/jira/quick-create-schema'
-import { getMrStatuses, getReviewCards } from '~/server/gitlab'
-import type { GetMrStatusesResult, GetReviewCardsResult, MrSummary } from '~/server/gitlab'
+import { getMrStatuses } from '~/server/gitlab'
+import type { GetMrStatusesResult, MrSummary } from '~/server/gitlab'
 import { usePolling } from '~/lib/use-polling'
 import { useDashboardService } from './context'
 import { DASHBOARD_QUERY_KEYS, DASHBOARD_STALE_TIMES } from './tanstack-cache'
@@ -63,30 +63,6 @@ export function useMrStatuses(): UseQueryResult<GetMrStatusesResult> {
     retryDelay: GITLAB_QUERY_RETRY_DELAY_MS,
     refetchOnWindowFocus: true,
     staleTime: DASHBOARD_STALE_TIMES.mrStatuses,
-  })
-  useEffect(() => {
-    if (query.data && query.data.ok === false && query.data.reason === 'unauthorized') {
-      service.notifyUnauthorizedOnce('gitlab')
-    }
-  }, [query.data, service])
-  usePolling(() => {
-    if (jiraReady) query.refetch()
-  }, MR_POLL_INTERVAL_MS)
-  return query
-}
-
-export function useReviewCards(): UseQueryResult<GetReviewCardsResult> {
-  const service = useDashboardService()
-  const board = useBoardData()
-  const jiraReady = board.data !== undefined
-  const query = useQuery({
-    queryKey: DASHBOARD_QUERY_KEYS.reviewCards,
-    queryFn: () => getReviewCards(),
-    enabled: jiraReady,
-    retry: GITLAB_QUERY_RETRY,
-    retryDelay: GITLAB_QUERY_RETRY_DELAY_MS,
-    refetchOnWindowFocus: true,
-    staleTime: DASHBOARD_STALE_TIMES.reviewCards,
   })
   useEffect(() => {
     if (query.data && query.data.ok === false && query.data.reason === 'unauthorized') {

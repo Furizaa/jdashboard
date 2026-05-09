@@ -1,7 +1,7 @@
 import { AlertTriangle, CheckCircle, Loader2, XCircle } from 'lucide-react'
 import { cn } from '~/lib/cn'
 import { testIds } from '~/lib/testids'
-import type { CiVisualState } from './ci-state'
+import type { CiVisualState } from '~/kernel'
 
 const ICON_CLASS = 'h-3 w-3 shrink-0'
 

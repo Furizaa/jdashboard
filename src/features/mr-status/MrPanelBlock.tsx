@@ -1,12 +1,10 @@
 import { AlertTriangle, MessageSquare } from 'lucide-react'
 import { cn } from '~/lib/cn'
-import { columnForStatus } from '~/kernel'
+import { columnForStatus, REVIEWER_BADGE_LABEL, type CiVisualState } from '~/kernel'
 import { useBoardData, useMrFor } from '~/coordinator'
 import type { MrReviewerState } from '~/server/gitlab'
-import type { CiVisualState } from './ci-state'
 import { MrCiIndicator } from './MrCiIndicator'
 import { ReviewerAvatar } from './ReviewerAvatar'
-import { REVIEWER_BADGE_LABEL } from './reviewer-state'
 
 const MERGED_TARGET_STATUS = 'In STG'
 

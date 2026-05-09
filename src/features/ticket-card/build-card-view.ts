@@ -1,7 +1,6 @@
 import type { BoardIssue } from '~/server/jira'
 import type { ReviewCard, ReviewCardReal } from '~/server/gitlab'
-import { isDeemphasized, type Column } from '~/kernel'
-import type { CiVisualState, ReviewerVisualState } from '~/features/mr-status'
+import { isDeemphasized, type Column, type CiVisualState, type ReviewerVisualState } from '~/kernel'
 import type { CardKind } from '~/lib/testids'
 import { hasFixasapLabel } from './fixasap'
 

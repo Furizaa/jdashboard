@@ -4,12 +4,26 @@ module.exports = {
     {
       name: 'no-cross-context',
       comment:
-        'a bounded context cannot import another bounded context — cross-context coordination belongs in coordinator/',
+        'a bounded context cannot import another bounded context — cross-context coordination belongs in coordinator/. Graduated exception below for contexts/board → contexts/review.',
       severity: 'error',
-      from: { path: '^src/contexts/([^/]+)/' },
+      from: {
+        path: '^src/contexts/([^/]+)/',
+        pathNot: '^src/contexts/board/',
+      },
       to: {
         path: '^src/contexts/([^/]+)/',
         pathNot: '^src/contexts/$1/',
+      },
+    },
+    {
+      name: 'board-may-only-cross-import-review',
+      comment:
+        'graduated exception: contexts/board imports contexts/review for the cards-on-the-board projection (the projection helpers + the review cache hook). Slice 58 (lockdown) revisits whether the projection should move to kernel/ to remove this cross-context edge entirely.',
+      severity: 'error',
+      from: { path: '^src/contexts/board/' },
+      to: {
+        path: '^src/contexts/[^/]+/',
+        pathNot: ['^src/contexts/board/', '^src/contexts/review/'],
       },
     },
     {
@@ -65,12 +79,12 @@ module.exports = {
     {
       name: 'board-domain-only-imports-kernel',
       comment:
-        "board's domain layer is pure: it may only import from ~/kernel and its own peers — graduated rule active now that contexts/board/ exists",
+        "board's domain layer is pure: it may only import from ~/kernel, its own peers, and contexts/review (graduated cross-context exception for the review-card projection — see slice 58 lockdown).",
       severity: 'error',
       from: { path: '^src/contexts/board/domain/' },
       to: {
         path: '^src/',
-        pathNot: '^(src/contexts/board/domain/|src/kernel/)',
+        pathNot: '^(src/contexts/board/domain/|src/kernel/|src/contexts/review/)',
       },
     },
     {
@@ -171,6 +185,31 @@ module.exports = {
         path: '^src/',
         pathNot:
           '^(src/contexts/capture/view-model/|src/contexts/capture/domain/|src/kernel/)',
+      },
+    },
+    {
+      name: 'review-domain-only-imports-kernel',
+      comment:
+        "review's domain layer is pure: it may only import from ~/kernel and its own peers — graduated rule active now that contexts/review/ exists",
+      severity: 'error',
+      from: { path: '^src/contexts/review/domain/' },
+      to: {
+        path: '^src/',
+        pathNot: '^(src/contexts/review/domain/|src/kernel/)',
+      },
+    },
+    {
+      name: 'review-application-only-imports-kernel-and-self',
+      comment:
+        "review's application layer talks to gateway/cache ports declared inside the context — it may only import ~/kernel and its own peers",
+      severity: 'error',
+      from: {
+        path: '^src/contexts/review/application/',
+        pathNot: '/__fixtures__/',
+      },
+      to: {
+        path: '^src/',
+        pathNot: '^(src/contexts/review/application/|src/kernel/)',
       },
     },
   ],

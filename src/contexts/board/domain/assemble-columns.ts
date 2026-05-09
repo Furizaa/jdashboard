@@ -1,6 +1,12 @@
 import { match } from 'ts-pattern'
-import type { BoardIssue, Column, ReviewCard, ReviewCardReal } from '~/kernel'
+import type { BoardIssue, Column, ReviewCard } from '~/kernel'
 import { COLUMNS, columnForStatus } from '~/kernel'
+import {
+  REVIEW_BUCKET_STATUS_NAME,
+  reviewBucketColumn,
+  reviewCardId,
+  reviewSearchHaystack,
+} from '~/contexts/review'
 import type { AnimationState } from './animation-state'
 import type { ChangeVisual } from './change-indication'
 import { filterIssues } from './filter-issues'
@@ -15,27 +21,10 @@ export type ColumnItem = {
   state: AnimationState
 }
 
-function reviewBucketColumn(bucket: ReviewCard['bucket']): Column {
-  return bucket === 'accepted' ? 'Done' : 'TO DO'
-}
-
-const REVIEW_BUCKET_STATUS_NAME: Record<ReviewCardReal['bucket'], string> = {
-  'needs-review': 'Needs Review',
-  rejected: 'Review Rejected',
-  accepted: 'Review Accepted',
-}
-
 function statusNameForItem(item: ColumnItem): string {
   return match(item.card)
     .with({ kind: 'jira' }, ({ issue }) => issue.statusName)
     .with({ kind: 'review' }, ({ card }) => REVIEW_BUCKET_STATUS_NAME[card.bucket])
-    .exhaustive()
-}
-
-function reviewSearchHaystack(card: ReviewCard): string {
-  return match(card)
-    .with({ kind: 'review-real' }, (c) => `${c.jira.key} ${c.jira.summary}`.toLowerCase())
-    .with({ kind: 'review-fake' }, (c) => `MR !${c.iid} ${c.title}`.toLowerCase())
     .exhaustive()
 }
 
@@ -93,7 +82,7 @@ export function assembleColumns(input: {
     for (const rc of reviewCards) {
       const cardInput: CardSource = { kind: 'review', card: rc }
       if (!matchesSearch(cardInput, searchQuery)) continue
-      const id = `review:${rc.iid}`
+      const id = reviewCardId(rc)
       result[reviewBucketColumn(rc.bucket)].push({
         card: cardInput,
         id,
@@ -107,7 +96,7 @@ export function assembleColumns(input: {
       if (!matchesSearch(cardInput, searchQuery)) continue
       result[reviewBucketColumn(leavingCard.bucket)].push({
         card: cardInput,
-        id: `review:${leavingCard.iid}`,
+        id: reviewCardId(leavingCard),
         state: 'leaving',
       })
     }

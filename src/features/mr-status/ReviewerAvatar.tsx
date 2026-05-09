@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react'
 import { testIds } from '~/lib/testids'
-import { REVIEWER_STATE_LABEL, type ReviewerVisualState } from './reviewer-state'
+import { REVIEWER_STATE_LABEL, type ReviewerVisualState } from '~/kernel'
 
 const RING_STYLES: Record<ReviewerVisualState, { color: string; style: 'solid' | 'dashed' }> = {
   'gray-dashed': { color: 'var(--color-muted-foreground)', style: 'dashed' },

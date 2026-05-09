@@ -6,14 +6,16 @@ import type {
   ReviewerEndpointState,
 } from './gateway'
 import { extractKeysFromTitle } from './mr-key-map'
-import { ciVisualState, type CiVisualState } from '~/features/mr-status/ci-state'
-import { countUnresolvedThreads } from '~/features/mr-status/count-unresolved'
 import {
+  ciVisualState,
+  countUnresolvedThreads,
+  reviewBucket,
   reviewerVisualState,
+  type CiVisualState,
+  type MrState,
   type ReviewerApprovalStatus,
   type ReviewerVisualState,
-} from '~/features/mr-status/reviewer-state'
-import { reviewBucket, type MrState } from '~/features/mr-status/review-state'
+} from '~/kernel'
 import type { JiraIssueService } from '~/server/jira/issue-service'
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000

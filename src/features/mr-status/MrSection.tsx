@@ -1,13 +1,11 @@
 import { MessageSquare } from 'lucide-react'
 import { cn } from '~/lib/cn'
-import type { Column } from '~/kernel'
+import type { CiVisualState, Column, ReviewerVisualState } from '~/kernel'
 import { useMrFor, useMrMergedAction } from '~/coordinator'
 import { mrWarningKind, testIds } from '~/lib/testids'
 import { MrCiIndicator } from './MrCiIndicator'
 import { MrWarning } from './MrWarning'
 import { ReviewerAvatar } from './ReviewerAvatar'
-import type { CiVisualState } from './ci-state'
-import type { ReviewerVisualState } from './reviewer-state'
 
 const MAX_VISIBLE_REVIEWERS = 4
 const MERGED_TARGET_STATUS = 'In STG'

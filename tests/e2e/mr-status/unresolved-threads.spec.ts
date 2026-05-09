@@ -38,7 +38,7 @@ test('unresolved-thread chip count follows the count rule', async ({ page, world
   world.seedMrPipeline(MR_IID, makePipeline({ status: 'success' }))
 
   // Discussions exercising every limb of the rule
-  // (`countUnresolvedThreads` in `~/features/mr-status/count-unresolved.ts`):
+  // (`countUnresolvedThreads` in `~/kernel/mr/count-unresolved.ts`):
   //   - resolvable + !resolved + non-system → counted
   //   - !resolvable + non-system → counted (general MR comments)
   //   - resolvable + resolved → excluded

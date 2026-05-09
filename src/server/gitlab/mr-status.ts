@@ -1,11 +1,12 @@
 import type { RawDiscussion, RawMrDetail, RawMrSummary } from './gateway'
-import { ciVisualState, type CiVisualState } from '~/features/mr-status/ci-state'
-import { countUnresolvedThreads } from '~/features/mr-status/count-unresolved'
 import {
+  ciVisualState,
+  countUnresolvedThreads,
   reviewerVisualState,
+  type CiVisualState,
   type ReviewerApprovalStatus,
   type ReviewerVisualState,
-} from '~/features/mr-status/reviewer-state'
+} from '~/kernel'
 
 export type MrReviewerState = {
   username: string

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { getGitlabUser } from '~/server/gitlab'
+import { getGitlabUser } from '~/server/server-functions/review'
 
 export function GitlabIndicator() {
   const query = useQuery({

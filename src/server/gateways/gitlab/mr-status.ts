@@ -1,37 +1,18 @@
-import type { RawDiscussion, RawMrDetail, RawMrSummary } from './gateway'
 import {
   ciVisualState,
   countUnresolvedThreads,
   reviewerVisualState,
-  type CiVisualState,
   type ReviewerApprovalStatus,
-  type ReviewerVisualState,
-} from '~/kernel'
+} from './mr'
+import type { MrReviewerState, MrSummary, RawDiscussion, RawMrDetail, RawMrSummary } from './types'
 
-export type MrReviewerState = {
-  username: string
-  displayName: string
-  avatarUrl: string | null
-  visualState: ReviewerVisualState
-}
+export type { MrReviewerState, MrSummary }
 
 type CommonMrFields = {
   iid: number
   title: string
   webUrl: string
 }
-
-export type MrSummary =
-  | ({ kind: 'merged' } & CommonMrFields)
-  | ({ kind: 'draft' } & CommonMrFields)
-  | ({ kind: 'no-reviewers' } & CommonMrFields)
-  | ({
-      kind: 'review'
-      reviewers: MrReviewerState[]
-      unresolvedCount: number
-      allApprovedAndClean: boolean
-      ciState: CiVisualState
-    } & CommonMrFields)
 
 function commonFields(mr: RawMrSummary): CommonMrFields {
   return { iid: mr.iid, title: mr.title, webUrl: mr.webUrl }

@@ -5,7 +5,7 @@ import { useBoardData } from '~/coordinator/hooks'
 import { useCoordinator } from '~/coordinator/provider'
 import type { GetReviewCardsResult } from '~/kernel'
 import { usePolling } from '~/lib/use-polling'
-import { getReviewCards } from '~/server/gitlab'
+import { getReviewCards } from '~/server/server-functions/review'
 
 const REVIEW_POLL_INTERVAL_MS = 60_000
 const GITLAB_QUERY_RETRY = 2
@@ -25,7 +25,12 @@ export function useReviewCards(): UseQueryResult<GetReviewCardsResult> {
     staleTime: DASHBOARD_STALE_TIMES.reviewCards,
   })
   useEffect(() => {
-    if (query.data && query.data.ok === false && query.data.reason === 'unauthorized') {
+    if (
+      query.data &&
+      query.data.ok === false &&
+      // oxlint-disable-next-line no-underscore-dangle -- `_tag` is the standard discriminator on Effect Schema tagged errors
+      query.data.error._tag === 'Unauthorized'
+    ) {
       coord.notifyUnauthorizedOnce('gitlab')
     }
   }, [query.data, coord])

@@ -46,7 +46,7 @@ describe('ReviewApplicationService.loadReviewCards', () => {
   it('returns err ReviewUnauthorized when the gateway returns { ok: false, reason: "unauthorized" }', async () => {
     const gateway = createFakeReviewGateway()
     const cache = createFakeReviewCache()
-    gateway.setResult({ ok: false, reason: 'unauthorized' })
+    gateway.setResult({ ok: false, error: { _tag: 'Unauthorized' } })
     const service = createReviewApplicationService({ gateway, cache })
 
     const result = await service.loadReviewCards()

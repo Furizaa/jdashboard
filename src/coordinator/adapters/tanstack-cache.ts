@@ -1,11 +1,11 @@
 import type { QueryClient } from '@tanstack/react-query'
-import type { SearchIssuesResult } from '~/server/server-functions/board'
+import type { GetMrStatusesResult, SearchIssuesResult } from '~/server/server-functions/board'
 import {
   getTransitions,
   type GetIssueResult,
   type GetTransitionsResult,
 } from '~/server/server-functions/detail'
-import type { GetMrStatusesResult, GetReviewCardsResult } from '~/server/gitlab'
+import type { GetReviewCardsResult } from '~/server/server-functions/review'
 import type { Cache, Patch, Rollback } from '../ports'
 
 const KEY_BOARD = ['jira', 'board', 'issues'] as const

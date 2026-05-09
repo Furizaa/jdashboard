@@ -1,4 +1,4 @@
-import type { RawMrSummary } from './gateway'
+import type { RawMrSummary } from './types'
 
 function escapeRegex(value: string): string {
   return value.replaceAll(/[.*+?^${}()|[\]\\]/gu, '\\$&')

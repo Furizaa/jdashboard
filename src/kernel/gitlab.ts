@@ -1,7 +1,8 @@
 export type {
-  GetMrStatusesResult,
-  GetReviewCardsResult,
   MrSummary,
   ReviewCard,
+  ReviewCardFake,
   ReviewCardReal,
-} from '~/server/gitlab'
+} from '~/server/gateways/gitlab'
+export type { GetMrStatusesResult } from '~/server/server-functions/board'
+export type { GetReviewCardsResult } from '~/server/server-functions/review'

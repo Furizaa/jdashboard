@@ -1,7 +1,12 @@
 import { useEffect } from 'react'
 import { useMutation, useQuery, type UseQueryResult } from '@tanstack/react-query'
 import type { Result } from 'neverthrow'
-import { searchIssues, type SearchIssuesResult } from '~/server/server-functions/board'
+import {
+  getMrStatuses,
+  searchIssues,
+  type GetMrStatusesResult,
+  type SearchIssuesResult,
+} from '~/server/server-functions/board'
 import {
   getIssue,
   getTransitions,
@@ -9,8 +14,7 @@ import {
   type GetTransitionsResult,
 } from '~/server/server-functions/detail'
 import type { QuickCreateInput } from '~/server/contexts/capture/application/quick-create-schema'
-import { getMrStatuses } from '~/server/gitlab'
-import type { GetMrStatusesResult, MrSummary } from '~/server/gitlab'
+import type { MrSummary } from '~/server/gateways/gitlab/types'
 import { usePolling } from '~/lib/use-polling'
 import { useCoordinator } from './provider'
 import { DASHBOARD_QUERY_KEYS, DASHBOARD_STALE_TIMES } from './adapters/tanstack-cache'
@@ -67,7 +71,12 @@ export function useMrStatuses(): UseQueryResult<GetMrStatusesResult> {
     staleTime: DASHBOARD_STALE_TIMES.mrStatuses,
   })
   useEffect(() => {
-    if (query.data && query.data.ok === false && query.data.reason === 'unauthorized') {
+    if (
+      query.data &&
+      query.data.ok === false &&
+      // oxlint-disable-next-line no-underscore-dangle -- `_tag` is the standard discriminator on Effect Schema tagged errors
+      query.data.error._tag === 'Unauthorized'
+    ) {
       coord.notifyUnauthorizedOnce('gitlab')
     }
   }, [query.data, coord])

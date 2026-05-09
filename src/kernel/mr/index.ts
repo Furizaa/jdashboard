@@ -1,10 +1,12 @@
-export { ciVisualState, type CiVisualState } from './ci-state'
-export { countUnresolvedThreads } from './count-unresolved'
-export { reviewBucket, type MrState } from './review-state'
 export {
+  ciVisualState,
+  countUnresolvedThreads,
+  reviewBucket,
   reviewerVisualState,
   REVIEWER_BADGE_LABEL,
   REVIEWER_STATE_LABEL,
+  type CiVisualState,
+  type MrState,
   type ReviewerApprovalStatus,
   type ReviewerVisualState,
-} from './reviewer-state'
+} from '~/server/gateways/gitlab/mr'

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { RawDiscussion, RawMrDetail, RawReviewer } from './gateway'
+import type { RawDiscussion, RawMrDetail, RawReviewer } from './types'
 import { summarizeMr } from './mr-status'
 
 function reviewer(username: string): RawReviewer {

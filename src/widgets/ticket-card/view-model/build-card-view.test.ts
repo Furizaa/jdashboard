@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { BoardIssue } from '~/server/gateways/jira'
-import type { ReviewCardFake, ReviewCardReal } from '~/server/gitlab'
+import type { ReviewCardFake, ReviewCardReal } from '~/server/gateways/gitlab'
 import { buildCardView } from './build-card-view'
 
 const BASE_URL = 'https://j.example'

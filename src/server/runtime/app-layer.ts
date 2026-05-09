@@ -1,5 +1,7 @@
 import { FetchHttpClient, HttpClient, HttpClientError } from '@effect/platform'
 import { Effect, Layer, Schedule } from 'effect'
+import { GitlabGatewayLive } from '../gateways/gitlab/http-adapter'
+import { GitlabGateway } from '../gateways/gitlab/port'
 import { JiraGatewayLive } from '../gateways/jira/http-adapter'
 import { JiraGateway } from '../gateways/jira/port'
 import { ServerEnv, ServerEnvLive } from './server-env'
@@ -38,5 +40,12 @@ const InfraLive: Layer.Layer<ServerEnv | HttpClient.HttpClient> = Layer.mergeAll
   HttpClientLive,
 )
 
-export const appLayer: Layer.Layer<ServerEnv | HttpClient.HttpClient | JiraGateway> =
-  JiraGatewayLive.pipe(Layer.provideMerge(InfraLive))
+const GatewaysLive: Layer.Layer<
+  JiraGateway | GitlabGateway,
+  never,
+  ServerEnv | HttpClient.HttpClient
+> = Layer.mergeAll(JiraGatewayLive, GitlabGatewayLive)
+
+export const appLayer: Layer.Layer<
+  ServerEnv | HttpClient.HttpClient | JiraGateway | GitlabGateway
+> = GatewaysLive.pipe(Layer.provideMerge(InfraLive))

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { RawMrSummary } from './gateway'
+import type { RawMrSummary } from './types'
 import { buildMrKeyMap } from './mr-key-map'
 
 function mr(overrides: Partial<RawMrSummary> & { iid: number; title: string }): RawMrSummary {

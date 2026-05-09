@@ -253,6 +253,56 @@ module.exports = {
       from: { path: '^src/' },
       to: { path: '^src/features/' },
     },
+    {
+      name: 'no-effect-on-client',
+      comment:
+        'effect is server-only — client code (contexts, widgets, coordinator, routes, kernel) consumes the wire shape via neverthrow, not Effect values directly.',
+      severity: 'error',
+      from: {
+        path: '^src/(contexts|widgets|coordinator|routes|kernel)/',
+      },
+      to: {
+        path: '^effect($|/)',
+        dependencyTypes: ['npm', 'npm-dev', 'npm-peer'],
+      },
+    },
+    {
+      name: 'no-neverthrow-on-server',
+      comment:
+        'neverthrow is client-only — server code uses Effect for result handling and turns it into the wire shape at the boundary via toWire.',
+      severity: 'error',
+      from: { path: '^src/server/' },
+      to: {
+        path: '^neverthrow($|/)',
+        dependencyTypes: ['npm', 'npm-dev', 'npm-peer'],
+      },
+    },
+    {
+      name: 'no-cross-context-server',
+      comment:
+        'a server bounded context cannot import another server bounded context — cross-context composition for reads happens at the server-function layer.',
+      severity: 'error',
+      from: {
+        path: '^src/server/contexts/([^/]+)/',
+      },
+      to: {
+        path: '^src/server/contexts/([^/]+)/',
+        pathNot: '^src/server/contexts/$1/',
+      },
+    },
+    {
+      name: 'no-cross-gateway-adapter',
+      comment:
+        'a server gateway adapter must not import another gateway — gateways are peers, and cross-system orchestration belongs in a context application service that depends on both gateway ports.',
+      severity: 'error',
+      from: {
+        path: '^src/server/gateways/([^/]+)/',
+      },
+      to: {
+        path: '^src/server/gateways/([^/]+)/',
+        pathNot: '^src/server/gateways/$1/',
+      },
+    },
   ],
   options: {
     doNotFollow: { path: 'node_modules' },

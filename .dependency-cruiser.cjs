@@ -322,6 +322,13 @@ module.exports = {
           graph: { rankdir: 'LR', splines: 'ortho' },
         },
       },
+      archi: {
+        collapsePattern:
+          '^src/server/contexts/[^/]+/[^/]+|^src/server/gateways/[^/]+|^src/server/[^/]+|^src/contexts/[^/]+/[^/]+|^src/widgets/[^/]+|^src/[^/]+',
+        theme: {
+          graph: { rankdir: 'LR', splines: 'ortho' },
+        },
+      },
     },
   },
 }

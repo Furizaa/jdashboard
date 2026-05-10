@@ -13,7 +13,7 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p tests/e2e/tsconfig.json",
     "depcruise": "depcruise --config .dependency-cruiser.cjs src",
     "check:arch": "npx fallow",
-    "docs:arch": "depcruise --config .dependency-cruiser.cjs --output-type dot src | dot -Tsvg -o docs/architecture.svg",
+    "docs:arch": "depcruise --config .dependency-cruiser.cjs --output-type archi src | dot -Tsvg -o docs/architecture.svg",
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",

@@ -5,6 +5,7 @@ import type {
   DetailIssue,
   IssueLink,
   LinkedIssueRef,
+  MediaMetadata,
   RawComment,
   RawDetailedIssue,
   RawIssueLink,
@@ -13,6 +14,7 @@ import type {
   StatusCategoryKey,
 } from '../../../gateways/jira/types'
 import { DetailConfig } from '../config'
+import { collectMediaIds, enrichAdfWithMedia } from '../domain/enrich-adf-with-media'
 import type { LoadIssueError } from '../errors'
 
 export type LoadIssueOk = {
@@ -152,6 +154,38 @@ function shapeIssue(input: {
   }
 }
 
+function collectIssueMediaIds(issue: DetailIssue): readonly string[] {
+  const ids: string[] = []
+  for (const id of collectMediaIds(issue.description)) ids.push(id)
+  for (const comment of issue.comments) {
+    for (const id of collectMediaIds(comment.body)) ids.push(id)
+  }
+  return ids
+}
+
+function dedupe(ids: readonly string[]): readonly string[] {
+  return Array.from(new Set(ids))
+}
+
+function buildMediaMap(metadata: readonly MediaMetadata[]): ReadonlyMap<string, MediaMetadata> {
+  return new Map(metadata.map((m) => [m.id, m]))
+}
+
+function applyMediaEnrichment(
+  issue: DetailIssue,
+  mediaUrlMap: ReadonlyMap<string, MediaMetadata>,
+): DetailIssue {
+  if (mediaUrlMap.size === 0) return issue
+  return {
+    ...issue,
+    description: enrichAdfWithMedia(issue.description, mediaUrlMap),
+    comments: issue.comments.map((c) => ({
+      ...c,
+      body: enrichAdfWithMedia(c.body, mediaUrlMap),
+    })),
+  }
+}
+
 export const loadIssue = (
   key: string,
 ): Effect.Effect<LoadIssueOk, LoadIssueError, JiraGateway | DetailConfig> =>
@@ -174,5 +208,20 @@ export const loadIssue = (
       ],
       { concurrency: 'unbounded' },
     )
-    return { baseUrl: config.baseUrl, issue: shapeIssue({ detailed, subSearch }) }
+    const issue = shapeIssue({ detailed, subSearch })
+    const ids = dedupe(collectIssueMediaIds(issue))
+    const metadata =
+      ids.length === 0
+        ? []
+        : yield* jira
+            .getMediaMetadata(ids)
+            .pipe(
+              Effect.catchAll((error) =>
+                Effect.logWarning(
+                  `[loadIssue] media metadata resolution failed for ${ids.length} id(s): ${error.message}`,
+                ).pipe(Effect.as([] as readonly MediaMetadata[])),
+              ),
+            )
+    const enriched = applyMediaEnrichment(issue, buildMediaMap(metadata))
+    return { baseUrl: config.baseUrl, issue: enriched }
   })

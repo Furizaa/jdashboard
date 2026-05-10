@@ -291,6 +291,43 @@ module.exports = {
       },
     },
     {
+      name: 'api-routes-cant-import-server-functions',
+      comment:
+        'src/routes/api/* are HTTP-shaped binary endpoints — they must not import the JSON-RPC server-functions/ layer. If the same Effect is needed in both shapes, it lives in server/contexts/<name>/application/ and both call sites import from there. (ADR-0006)',
+      severity: 'error',
+      from: { path: '^src/routes/api/' },
+      to: { path: '^src/server/server-functions/' },
+    },
+    {
+      name: 'api-routes-cant-import-wire',
+      comment:
+        'toWire is the JSON-RPC envelope used by server-functions/. API routes return raw HTTP responses — importing toWire here is an architecture smell. (ADR-0006)',
+      severity: 'error',
+      from: { path: '^src/routes/api/' },
+      to: { path: '^src/server/wire/' },
+    },
+    {
+      name: 'non-api-routes-cant-import-api',
+      comment:
+        'the user-facing route tree never imports the API tree — the browser hits API URLs as strings, not via typed route imports. (ADR-0006)',
+      severity: 'error',
+      from: {
+        path: '^src/routes/',
+        pathNot: ['^src/routes/api/', '^src/routeTree\\.gen\\.ts$'],
+      },
+      to: { path: '^src/routes/api/' },
+    },
+    {
+      name: 'client-cant-import-api-routes',
+      comment:
+        'API routes are HTTP entry points, not a library — contexts, widgets, coordinator, and kernel must not import them. (ADR-0006)',
+      severity: 'error',
+      from: {
+        path: '^src/(contexts|widgets|coordinator|kernel)/',
+      },
+      to: { path: '^src/routes/api/' },
+    },
+    {
       name: 'no-cross-gateway-adapter',
       comment:
         'a server gateway adapter must not import another gateway — gateways are peers, and cross-system orchestration belongs in a context application service that depends on both gateway ports.',

@@ -1,10 +1,12 @@
 import { Context, type Effect } from 'effect'
-import type { JiraGatewayError } from './errors'
+import type { JiraGatewayError, MediaNotFound, MediaResolutionError } from './errors'
 import type {
   AllowedTransition,
   CreateIssueBody,
   GatewayCreatedIssue,
   JiraUser,
+  MediaMetadata,
+  MediaStream,
   RawDetailedIssue,
   RawSearchResponse,
 } from './types'
@@ -27,6 +29,12 @@ export type JiraGatewayShape = {
   readonly createIssue: (
     body: CreateIssueBody,
   ) => Effect.Effect<GatewayCreatedIssue, JiraGatewayError>
+  readonly getMediaMetadata: (
+    ids: readonly string[],
+  ) => Effect.Effect<readonly MediaMetadata[], MediaResolutionError>
+  readonly streamMedia: (
+    id: string,
+  ) => Effect.Effect<MediaStream, MediaResolutionError | MediaNotFound>
 }
 
 export class JiraGateway extends Context.Tag('JiraGateway')<JiraGateway, JiraGatewayShape>() {}

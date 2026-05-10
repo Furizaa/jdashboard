@@ -1,8 +1,13 @@
 import { describe, expect, it } from '@effect/vitest'
 import { Effect, Layer } from 'effect'
-import { JiraNotFound, JiraUnauthorized } from '../../../gateways/jira/errors'
+import { JiraNotFound, JiraUnauthorized, MediaResolutionError } from '../../../gateways/jira/errors'
 import { JiraGateway } from '../../../gateways/jira/port'
-import type { RawDetailedIssue, RawSearchResponse } from '../../../gateways/jira/types'
+import type {
+  AdfNode,
+  MediaMetadata,
+  RawDetailedIssue,
+  RawSearchResponse,
+} from '../../../gateways/jira/types'
 import { DetailConfig, type DetailConfigShape } from '../config'
 import { fakeJiraGateway } from './__fixtures__/fake-jira-gateway'
 import { loadIssue } from './load-issue'
@@ -266,6 +271,117 @@ describe('loadIssue', () => {
       })
       const failure = yield* provide(loadIssue('HDR-1'), jira).pipe(Effect.flip)
       expect(failure._tag).toBe('Unauthorized')
+    }),
+  )
+
+  it.effect(
+    'enriches description and comment-body media nodes whose ids resolve, leaves others alone',
+    () =>
+      Effect.gen(function* () {
+        const description: AdfNode = {
+          type: 'doc',
+          content: [
+            { type: 'media', attrs: { id: 'media-desc-known' } },
+            { type: 'media', attrs: { id: 'media-desc-unknown' } },
+          ],
+        }
+        const commentBody: AdfNode = {
+          type: 'doc',
+          content: [
+            {
+              type: 'paragraph',
+              content: [{ type: 'media', attrs: { id: 'media-comment-known' } }],
+            },
+          ],
+        }
+        let receivedIds: readonly string[] = []
+        const jira = fakeJiraGateway({
+          getIssue: () =>
+            Effect.succeed<RawDetailedIssue>({
+              id: '1',
+              key: 'HDR-1',
+              fields: {
+                summary: 'with-media',
+                status: { name: 'To Do' },
+                description,
+                comment: {
+                  comments: [
+                    {
+                      id: 'c1',
+                      created: '2026-01-01T00:00:00.000Z',
+                      body: commentBody,
+                    },
+                  ],
+                },
+              },
+            }),
+          searchIssues: () => Effect.succeed(emptySearchResponse()),
+          getMediaMetadata: (ids) => {
+            receivedIds = ids
+            const known: MediaMetadata[] = [
+              { id: 'media-desc-known', mimeType: 'image/png' },
+              { id: 'media-comment-known', mimeType: 'video/mp4' },
+            ]
+            return Effect.succeed(known)
+          },
+        })
+        const result = yield* provide(loadIssue('HDR-1'), jira)
+        expect(receivedIds).toEqual([
+          'media-desc-known',
+          'media-desc-unknown',
+          'media-comment-known',
+        ])
+        const descContent = result.issue.description?.content
+        expect(descContent?.[0]?.attrs?.url).toBe('/api/jira-media/media-desc-known')
+        expect(descContent?.[0]?.attrs?.mimeType).toBe('image/png')
+        expect(descContent?.[1]?.attrs?.url).toBeUndefined()
+        const commentMedia = result.issue.comments[0]?.body?.content?.[0]?.content?.[0]
+        expect(commentMedia?.attrs?.url).toBe('/api/jira-media/media-comment-known')
+        expect(commentMedia?.attrs?.mimeType).toBe('video/mp4')
+      }),
+  )
+
+  it.effect('still loads the issue (with no enrichment) when getMediaMetadata fails entirely', () =>
+    Effect.gen(function* () {
+      const description: AdfNode = {
+        type: 'doc',
+        content: [{ type: 'media', attrs: { id: 'media-1' } }],
+      }
+      const jira = fakeJiraGateway({
+        getIssue: () =>
+          Effect.succeed<RawDetailedIssue>({
+            id: '1',
+            key: 'HDR-1',
+            fields: {
+              summary: 'with-media',
+              status: { name: 'To Do' },
+              description,
+            },
+          }),
+        searchIssues: () => Effect.succeed(emptySearchResponse()),
+        getMediaMetadata: () =>
+          Effect.fail(new MediaResolutionError({ message: 'upstream down', status: 502 })),
+      })
+      const result = yield* provide(loadIssue('HDR-1'), jira)
+      const m = result.issue.description?.content?.[0]
+      expect(m?.attrs?.id).toBe('media-1')
+      expect(m?.attrs?.url).toBeUndefined()
+    }),
+  )
+
+  it.effect('does not call getMediaMetadata when the issue has no media nodes', () =>
+    Effect.gen(function* () {
+      let called = false
+      const jira = fakeJiraGateway({
+        getIssue: () => Effect.succeed(emptyDetailedIssue('HDR-1')),
+        searchIssues: () => Effect.succeed(emptySearchResponse()),
+        getMediaMetadata: () => {
+          called = true
+          return Effect.succeed([])
+        },
+      })
+      yield* provide(loadIssue('HDR-1'), jira)
+      expect(called).toBe(false)
     }),
   )
 })

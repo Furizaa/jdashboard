@@ -133,6 +133,19 @@ export type RawDetailedIssue = {
   }
 }
 
+export type MediaMetadata = {
+  readonly id: string
+  readonly mimeType: string
+  readonly width?: number
+  readonly height?: number
+}
+
+export type MediaStream = {
+  readonly stream: ReadableStream<Uint8Array>
+  readonly mimeType: string
+  readonly contentLength?: number
+}
+
 export type CreateIssueBody = {
   fields: {
     project: { key: string }

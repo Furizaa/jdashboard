@@ -1,13 +1,22 @@
 import { HttpClient, HttpClientRequest, HttpClientResponse } from '@effect/platform'
-import { Effect, Layer } from 'effect'
+import { Effect, Layer, Stream } from 'effect'
 import { ServerEnv } from '../../runtime/server-env'
-import { JiraNotFound, JiraRejected, JiraUnauthorized, type JiraGatewayError } from './errors'
+import {
+  JiraNotFound,
+  JiraRejected,
+  JiraUnauthorized,
+  MediaNotFound,
+  MediaResolutionError,
+  type JiraGatewayError,
+} from './errors'
 import { JiraGateway } from './port'
 import type {
   AllowedTransition,
   CreateIssueBody,
   GatewayCreatedIssue,
   JiraUser,
+  MediaMetadata,
+  MediaStream,
   RawDetailedIssue,
   RawSearchResponse,
 } from './types'
@@ -54,6 +63,129 @@ const failFromStatus = (
       Effect.fail(new JiraRejected({ message: parseJiraErrorMessage(body) })),
     ),
   )
+
+type MediaTokensResponse = {
+  readonly endpointUrl: string
+  readonly token: string
+  readonly items: ReadonlyArray<{
+    readonly id: string
+    readonly mimeType: string
+    readonly width?: number
+    readonly height?: number
+  }>
+}
+
+const mediaResolutionFromStatus = (
+  response: HttpClientResponse.HttpClientResponse,
+): Effect.Effect<never, MediaResolutionError> =>
+  readErrorBody(response).pipe(
+    Effect.flatMap((body) =>
+      Effect.fail(
+        new MediaResolutionError({
+          message: parseJiraErrorMessage(body),
+          status: response.status,
+        }),
+      ),
+    ),
+  )
+
+function decodeMediaBinary(
+  ok: HttpClientResponse.HttpClientResponse,
+): Effect.Effect<MediaStream, MediaResolutionError | MediaNotFound> {
+  return Effect.sync(() => {
+    const mimeType = ok.headers['content-type'] ?? 'application/octet-stream'
+    const lengthHeader = ok.headers['content-length']
+    const contentLength =
+      typeof lengthHeader === 'string' && lengthHeader.length > 0
+        ? Number.parseInt(lengthHeader, 10)
+        : undefined
+    return {
+      stream: Stream.toReadableStream(ok.stream),
+      mimeType,
+      ...(typeof contentLength === 'number' && Number.isFinite(contentLength)
+        ? { contentLength }
+        : {}),
+    }
+  })
+}
+
+function fetchMediaTokens(
+  client: HttpClient.HttpClient,
+  baseUrl: string,
+  baseHeaders: Readonly<Record<string, string>>,
+  ids: readonly string[],
+): Effect.Effect<MediaTokensResponse, MediaResolutionError> {
+  return HttpClientRequest.post(`${baseUrl}/rest/api/3/media-tokens`).pipe(
+    HttpClientRequest.setHeaders(baseHeaders),
+    HttpClientRequest.bodyJson({ ids }),
+    Effect.mapError(
+      (err) =>
+        new MediaResolutionError({
+          message: `Encoding media-tokens body failed: ${err}`,
+          status: 0,
+        }),
+    ),
+    Effect.flatMap((req) =>
+      client.execute(req).pipe(
+        Effect.mapError(
+          (error) =>
+            new MediaResolutionError({
+              message: `Jira media-tokens request failed: ${error.message}`,
+              status: 0,
+            }),
+        ),
+        Effect.flatMap((response) =>
+          HttpClientResponse.matchStatus(response, {
+            '2xx': (ok) =>
+              ok.json.pipe(
+                Effect.mapError(
+                  (err) =>
+                    new MediaResolutionError({
+                      message: err.message,
+                      status: ok.status,
+                    }),
+                ),
+                Effect.map((value) => value as MediaTokensResponse),
+              ),
+            orElse: (bad): Effect.Effect<MediaTokensResponse, MediaResolutionError> =>
+              mediaResolutionFromStatus(bad),
+          }),
+        ),
+      ),
+    ),
+  )
+}
+
+function fetchMediaBinary(
+  client: HttpClient.HttpClient,
+  endpointUrl: string,
+  token: string,
+  id: string,
+): Effect.Effect<MediaStream, MediaResolutionError | MediaNotFound> {
+  const request = HttpClientRequest.get(
+    `${endpointUrl}/file/${encodeURIComponent(id)}/binary`,
+  ).pipe(HttpClientRequest.setHeaders({ Authorization: `Bearer ${token}` }))
+  return client.execute(request).pipe(
+    Effect.mapError(
+      (error) =>
+        new MediaResolutionError({
+          message: `Jira media binary request failed: ${error.message}`,
+          status: 0,
+        }),
+    ),
+    Effect.flatMap(
+      (response): Effect.Effect<MediaStream, MediaResolutionError | MediaNotFound> =>
+        HttpClientResponse.matchStatus(response, {
+          '2xx': (ok): Effect.Effect<MediaStream, MediaResolutionError | MediaNotFound> =>
+            decodeMediaBinary(ok),
+          404: (): Effect.Effect<MediaStream, MediaResolutionError | MediaNotFound> =>
+            Effect.fail(new MediaNotFound()),
+          orElse: (bad): Effect.Effect<MediaStream, MediaResolutionError | MediaNotFound> =>
+            mediaResolutionFromStatus(bad),
+        }),
+    ),
+  )
+}
 
 export const JiraGatewayLive: Layer.Layer<JiraGateway, never, HttpClient.HttpClient | ServerEnv> =
   Layer.effect(
@@ -158,6 +290,27 @@ export const JiraGatewayLive: Layer.Layer<JiraGateway, never, HttpClient.HttpCli
           postJson('/rest/api/3/issue', body).pipe(
             Effect.flatMap((req) => executeJson<{ id: string; key: string; self: string }>(req)),
             Effect.map((created): GatewayCreatedIssue => ({ key: created.key })),
+          ),
+
+        getMediaMetadata: (ids) =>
+          ids.length === 0
+            ? Effect.succeed([] as readonly MediaMetadata[])
+            : fetchMediaTokens(client, baseUrl, baseHeaders, ids).pipe(
+                Effect.map((tokens): readonly MediaMetadata[] =>
+                  tokens.items.map((item) => ({
+                    id: item.id,
+                    mimeType: item.mimeType,
+                    ...(item.width !== undefined ? { width: item.width } : {}),
+                    ...(item.height !== undefined ? { height: item.height } : {}),
+                  })),
+                ),
+              ),
+
+        streamMedia: (id) =>
+          fetchMediaTokens(client, baseUrl, baseHeaders, [id]).pipe(
+            Effect.flatMap((tokens) =>
+              fetchMediaBinary(client, tokens.endpointUrl, tokens.token, id),
+            ),
           ),
       })
     }),

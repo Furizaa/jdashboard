@@ -7,5 +7,10 @@ export class JiraNotFound extends Schema.TaggedError<JiraNotFound>()('NotFound',
 export class JiraRejected extends Schema.TaggedError<JiraRejected>()('Rejected', {
   message: Schema.String,
 }) {}
+export class MediaResolutionError extends Schema.TaggedError<MediaResolutionError>()(
+  'MediaResolutionError',
+  { message: Schema.String, status: Schema.Number },
+) {}
+export class MediaNotFound extends Schema.TaggedError<MediaNotFound>()('MediaNotFound', {}) {}
 
 export type JiraGatewayError = JiraUnauthorized | JiraNotFound | JiraRejected

@@ -111,6 +111,7 @@ src/
 ├── coordinator/           # cross-context workflows
 ├── design-system/         # domain-agnostic primitives
 ├── routes/                # the only place multiple contexts are wired together
+│   └── api/                 # HTTP-shaped server entry points (binary streams, etc.) — see ADR-0006
 ├── lib/                   # framework-level utilities
 └── server/                # Effect-TS server (see "Server architecture" below)
     ├── gateways/<system>/   # one folder per external system: port + adapter + types + errors
@@ -127,6 +128,7 @@ src/
 The import graph is a strict DAG. Edges that exist:
 
 - `routes` → `contexts/<name>` (via barrel), `coordinator/provider`
+- `routes/api/<name>` → `server/runtime/*`, `server/gateways/<X>/{port, types, errors}`, `server/contexts/<name>/application` (HTTP-shaped entry points; see ADR-0006)
 - `contexts/<name>` → `kernel`, `coordinator`, `widgets/<name>`, `design-system`, `lib`
 - `widgets/<name>` → `kernel`, `coordinator`, `design-system`, `lib`, sibling widgets _only_ within the same widget family (e.g. `mr-section` and `fixasap-ribbon` may compose inside `ticket-card`)
 - `coordinator` → `contexts/<name>/application` (per-context use-cases), `kernel`, `lib`
@@ -141,6 +143,9 @@ Edges that **do not exist** (enforced by fallow / dependency-cruiser):
 - `coordinator` → `contexts/<name>/{view, presenter, view-model}` (coordinator only sees application services)
 - `contexts/<name>/{domain, application, view-model}` → React, TanStack Query, TanStack Router, sonner, window/document
 - `widgets/<name>` → React-Query / Router _outside its own presenter file_
+- `routes/api/<name>` → `server/server-functions/*` or `server/wire/*` (API routes are HTTP-shaped; the JSON-RPC envelope and `toWire` are not theirs to use — ADR-0006)
+- `routes/<anything-not-api>` → `routes/api/<name>` (the user-facing route tree never imports the API tree; the browser hits API URLs as strings)
+- `contexts/<name>`, `widgets/<name>`, `coordinator/`, `kernel/` → `routes/api/<name>` (API routes are entry points, not a library)
 
 ## Component patterns
 
@@ -251,16 +256,17 @@ Server contexts mirror client contexts where the use-case maps to a UI surface. 
 
 ### Server layer vocabulary
 
-| Layer                            | What it is                                                                 | What it knows                                                         |
-| -------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| **Domain** (server)              | Pure functions over gateway-output types.                                  | Domain rules.                                                         |
-| **Gateway port**                 | `Context.Tag` + interface.                                                 | The external API contract.                                            |
-| **Gateway adapter**              | `Layer.effect(Tag, …)` using `@effect/platform`'s `HttpClient`.            | Wire format of the external system; HTTP error mapping.               |
-| **Application service** (server) | One file per use-case, exporting `Effect<A, E, R>`.                        | Its context's gateways + config + domain.                             |
-| **Wire boundary mapper**         | `toWire(program, errorSchema)` — the only place Effect values become JSON. | `effect/Schema` only.                                                 |
-| **Server-function handler**      | `createServerFn(...).handler(() => appRuntime.runPromise(toWire(...)))`.   | TanStack Start, `appRuntime`, the per-request program + error schema. |
+| Layer                            | What it is                                                                                                                                                     | What it knows                                                                |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| **Domain** (server)              | Pure functions over gateway-output types.                                                                                                                      | Domain rules.                                                                |
+| **Gateway port**                 | `Context.Tag` + interface.                                                                                                                                     | The external API contract.                                                   |
+| **Gateway adapter**              | `Layer.effect(Tag, …)` using `@effect/platform`'s `HttpClient`.                                                                                                | Wire format of the external system; HTTP error mapping.                      |
+| **Application service** (server) | One file per use-case, exporting `Effect<A, E, R>`.                                                                                                            | Its context's gateways + config + domain.                                    |
+| **Wire boundary mapper**         | `toWire(program, errorSchema)` — the only place Effect values become JSON.                                                                                     | `effect/Schema` only.                                                        |
+| **Server-function handler**      | `createServerFn(...).handler(() => appRuntime.runPromise(toWire(...)))`.                                                                                       | TanStack Start, `appRuntime`, the per-request program + error schema.        |
+| **API route handler** (ADR-0006) | TanStack Start file-route at `src/routes/api/<name>.ts`; runs an `Effect` against `appRuntime` and writes a `Response` (binary stream, custom HTTP semantics). | `appRuntime`, gateway ports, `effect`, `@effect/platform`. **Not** `toWire`. |
 
-The server has no view-model, presenter, view, or coordinator layer (those are client-side). Cross-context composition for _reads_ happens at the server-function layer (the route equivalent on the client).
+The server has no view-model, presenter, view, or coordinator layer (those are client-side). Cross-context composition for _reads_ happens at the server-function layer (the route equivalent on the client). Endpoints whose response is a binary stream — or that need HTTP semantics the JSON envelope can't express (range requests, content-type negotiation, redirects) — live in `src/routes/api/` as a parallel layer beside the JSON-RPC handlers; ADR-0006 names the rules.
 
 ### Server-side dependency law (additive to client rules)
 

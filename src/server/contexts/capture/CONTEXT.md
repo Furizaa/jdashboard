@@ -40,9 +40,9 @@ The `InternalError` tag is added by `toWire` for any unhandled defect — client
 `src/server/contexts/capture/application/`:
 
 ```ts
-loadMyself: Effect.Effect<LoadMyselfOk, Unauthorized, JiraGateway>
-loadMyEpics: Effect.Effect<LoadMyEpicsOk, Unauthorized, JiraGateway | CaptureConfig>
-quickCreate(input): Effect.Effect<QuickCreateOk, Unauthorized | Rejected, JiraGateway | CaptureConfig>
+loadMyself: Effect.Effect<LoadMyselfOk, JiraUnauthorized, JiraGateway>
+loadMyEpics: Effect.Effect<LoadMyEpicsOk, JiraUnauthorized, JiraGateway | CaptureConfig>
+quickCreate(input): Effect.Effect<QuickCreateOk, JiraUnauthorized | JiraRejected, JiraGateway | CaptureConfig>
 ```
 
 What they do:
@@ -57,9 +57,9 @@ What they do:
 
 ## Error unions
 
-- `LoadMyselfError = Schema.Union(Unauthorized)`
-- `LoadMyEpicsError = Schema.Union(Unauthorized)`
-- `QuickCreateError = Schema.Union(Unauthorized, Rejected)`
+- `LoadMyselfError = Schema.Union(JiraUnauthorized)`
+- `LoadMyEpicsError = Schema.Union(JiraUnauthorized)`
+- `QuickCreateError = Schema.Union(JiraUnauthorized, JiraRejected)`
 
 Each handler hands its error union to `toWire`, which encodes the tagged failure on the wire and adds `InternalError` for any uncaught defect.
 

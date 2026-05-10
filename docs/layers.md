@@ -41,51 +41,31 @@ What to notice:
 
 Port + adapter to an external system.
 
-The port — what the application service sees — is a TypeScript interface in [`src/server/jira/gateway.ts`](../src/server/jira/gateway.ts):
+On the **client**, each context owns the port shape its application service depends on. The Board context's port lives in [`src/contexts/board/application/ports.ts`](../src/contexts/board/application/ports.ts):
 
 ```ts
-export type JiraResult<T> =
-  | { ok: true; value: T }
-  | { ok: false; reason: 'unauthorized' }
-  | { ok: false; reason: 'not-found' }
-  | { ok: false; reason: 'rejected'; message: string }
+import type { SearchIssuesResult } from '~/kernel'
 
-export interface JiraGateway {
-  getMyself(): Promise<JiraResult<GatewayUser>>
-  searchIssues(jql: string, fields: readonly string[]): Promise<JiraResult<RawSearchResponse>>
-  getIssue(key: string, fields: readonly string[]): Promise<JiraResult<RawDetailedIssue>>
-  getTransitions(key: string): Promise<JiraResult<GatewayTransition[]>>
-  transitionIssue(key: string, transitionId: string): Promise<JiraResult<void>>
-  createIssue(body: CreateIssueBody): Promise<JiraResult<GatewayCreatedIssue>>
+export interface BoardGateway {
+  loadBoard(): Promise<SearchIssuesResult>
+}
+
+export interface BoardCachePort {
+  invalidateBoard(): void
 }
 ```
 
-The adapter — the only thing that knows about HTTP — is a factory in [`src/server/jira/http-gateway.ts`](../src/server/jira/http-gateway.ts):
+`SearchIssuesResult` is the wire shape from the server: `{ ok: true, baseUrl, issues } | { ok: false, error: { _tag: 'Unauthorized' } }` (see [ADR 0004](./adr/0004-neverthrow-client-effect-server.md)). The application service unwraps this tagged JSON into `ResultAsync<BoardSnapshot, BoardLoadError>` (section 3).
 
-```ts
-export function createHttpJiraGateway(deps: Deps): JiraGateway {
-  const fetchFn: FetchFn = deps.fetch ?? fetch
-  const baseAuth = authHeader(deps.email, deps.apiToken)
-  // ...
-  return {
-    transitionIssue(key, transitionId) {
-      return call<void>(async () => {
-        await request<void>(`/rest/api/3/issue/${encodeURIComponent(key)}/transitions`, {
-          method: 'POST',
-          body: { transition: { id: transitionId } },
-        })
-      })
-    },
-    /* ...other methods... */
-  }
-}
-```
+There is no client-side HTTP adapter because the network call is handled by TanStack Start server functions; the only adapters in production are the server functions themselves (see sections 8–13 below for the server side of the same call). The test adapter — a hand-rolled fake — lives in [`src/contexts/board/application/__fixtures__/fake-gateway.ts`](../src/contexts/board/application/__fixtures__/fake-gateway.ts) and matches the same `BoardGateway` shape.
 
 What to notice:
 
 1. The port is a plain TypeScript interface — no class, no inheritance. Application services depend on this shape; nothing else.
-2. `JiraResult<T>` is a tagged union of success + named failure modes (`unauthorized`, `not-found`, `rejected`). Failures are values, not exceptions.
-3. The adapter is a factory taking `Deps` (base URL, credentials, an injected `fetch`). HTTP-isms (`Buffer`, status codes, error parsing) live inside the adapter and never leak into the port.
+2. The port is **per-context**: `BoardGateway` exposes only `loadBoard`, narrowed to what Board needs. Other contexts (`detail`, `capture`) declare their own narrowed ports. Per [ADR 0005](./adr/0005-effect-server-architecture.md), the server diverges and uses one shared port per gateway.
+3. The wire-shape tagged union (`SearchIssuesResult` from `~/kernel`) is what the client unwraps via neverthrow + ts-pattern. Failures are values, not exceptions.
+
+The fuller Port + Adapter example — with both a port (`Context.Tag`) and an HTTP adapter (`Layer`) implementing it — lives on the server side: see sections 9 (Gateway port) and 10 (Gateway adapter) below.
 
 ## 3. Application service
 
@@ -325,7 +305,7 @@ What to notice:
 import { Context, type Effect } from 'effect'
 
 export type JiraGatewayShape = {
-  readonly getMyself: () => Effect.Effect<GatewayUser, JiraGatewayError>
+  readonly getMyself: () => Effect.Effect<JiraUser, JiraGatewayError>
   readonly searchIssues: (
     jql: string,
     fields: readonly string[],
@@ -350,7 +330,7 @@ export class JiraGateway extends Context.Tag('JiraGateway')<JiraGateway, JiraGat
 What to notice:
 
 1. The Tag pattern — `class JiraGateway extends Context.Tag('JiraGateway')<JiraGateway, JiraGatewayShape>() {}` — declares a service identifier in Effect's `Context`. The string is its runtime key; the second type parameter is its surface. Consumers `yield* JiraGateway` and receive a `JiraGatewayShape`.
-2. Every method returns `Effect<A, E>` — never `Promise<A>`, never throwing. Failures are part of the type (`JiraGatewayError = Unauthorized | NotFound | Rejected`); thrown exceptions are not part of the contract.
+2. Every method returns `Effect<A, E>` — never `Promise<A>`, never throwing. Failures are part of the type (`JiraGatewayError = JiraUnauthorized | JiraNotFound | JiraRejected`); thrown exceptions are not part of the contract. Class names are gateway-prefixed so Jira and GitLab errors can co-exist in one file; the wire `_tag` strings stay un-prefixed (`'Unauthorized'`, `'NotFound'`, `'Rejected'`) because clients discriminate by gateway via the response envelope, not the tag string.
 3. **One gateway, all methods.** Per [ADR 0005](./adr/0005-effect-server-architecture.md), the server uses a shared port rather than the client's per-context-view rule, because Jira's methods are atomic I/O operations with identical signatures across consumers.
 
 ### 10. Gateway adapter
@@ -382,12 +362,14 @@ const executeJson = <T>(
   request: HttpClientRequest.HttpClientRequest,
 ): Effect.Effect<T, JiraGatewayError> =>
   client.execute(request).pipe(
-    Effect.mapError((error) => new Rejected({ message: `Jira request failed: ${error.message}` })),
+    Effect.mapError(
+      (error) => new JiraRejected({ message: `Jira request failed: ${error.message}` }),
+    ),
     Effect.flatMap((response) =>
       HttpClientResponse.matchStatus(response, {
         '2xx': (ok) => decodeJsonBody<T>(ok),
-        401: () => Effect.fail(new Unauthorized()),
-        404: () => Effect.fail(new NotFound()),
+        401: () => Effect.fail(new JiraUnauthorized()),
+        404: () => Effect.fail(new JiraNotFound()),
         orElse: (bad) => failFromStatus(bad),
       }),
     ),
@@ -397,7 +379,7 @@ const executeJson = <T>(
 What to notice:
 
 1. `client.execute(request)` is the only HTTP call. The `HttpClient` instance comes from the `R` channel — `Layer.effect(JiraGateway, ...)` declares it requires `HttpClient.HttpClient | ServerEnv`. Retry+timeout middleware lives in the `HttpClient` Layer one level up ([`src/server/runtime/app-layer.ts`](../src/server/runtime/app-layer.ts)), so every method here inherits it automatically.
-2. `HttpClientResponse.matchStatus` collapses HTTP-level branches into one expression. Each status arm produces an `Effect<T, JiraGatewayError>` — `Effect.fail(new Unauthorized())` for 401, `Effect.fail(new NotFound())` for 404, body-parse + `Rejected` for everything else. Failures are values, not throws.
+2. `HttpClientResponse.matchStatus` collapses HTTP-level branches into one expression. Each status arm produces an `Effect<T, JiraGatewayError>` — `Effect.fail(new JiraUnauthorized())` for 401, `Effect.fail(new JiraNotFound())` for 404, body-parse + `JiraRejected` for everything else. Failures are values, not throws.
 3. The adapter is a `Layer`, not a factory function. `JiraGatewayLive` is what `appRuntime` consumes; tests substitute `Layer.succeed(JiraGateway, fakeShape)` to swap in a hand-rolled fake without touching the application service.
 
 ### 11. Application service (server)
@@ -407,7 +389,7 @@ One file per use-case, exporting `Effect<A, E, R>`. The `R` channel lists the ga
 [`src/server/contexts/board/application/load-board.ts`](../src/server/contexts/board/application/load-board.ts):
 
 ```ts
-export const loadBoard: Effect.Effect<LoadBoardOk, Unauthorized, JiraGateway | BoardConfig> =
+export const loadBoard: Effect.Effect<LoadBoardOk, JiraUnauthorized, JiraGateway | BoardConfig> =
   Effect.gen(function* () {
     const jira = yield* JiraGateway
     const config = yield* BoardConfig
@@ -431,7 +413,7 @@ export const loadBoard: Effect.Effect<LoadBoardOk, Unauthorized, JiraGateway | B
 What to notice:
 
 1. The **`R` channel** — `JiraGateway | BoardConfig` — is the use-case's public requirements declaration. Anyone importing `loadBoard` sees, at the type level, exactly which Tags must be in scope before it can run. The handler discharges `BoardConfig` with `Effect.provide(BoardConfigLive)`; `appRuntime` discharges `JiraGateway` and the rest of the cross-cutting layers.
-2. The `E` channel — `Unauthorized` — names the failures `loadBoard` exposes to its caller. The gateway exposes three tags; this use-case re-classifies `NotFound` and `Rejected` as defects via `Effect.die` because they are not expected in the search-by-JQL flow. Tagged short-circuit: failures in the `E` channel are values to handle; defects bypass the wire mapper and become `InternalError`.
+2. The `E` channel — `JiraUnauthorized` — names the failures `loadBoard` exposes to its caller. The gateway exposes three tags; this use-case re-classifies `NotFound` and `Rejected` as defects via `Effect.die` because they are not expected in the search-by-JQL flow. Tagged short-circuit: failures in the `E` channel are values to handle; defects bypass the wire mapper and become `InternalError`. (`Effect.catchTags` matches against the wire `_tag`, so the keys are `NotFound` / `Rejected` even though the class names are gateway-prefixed.)
 3. `Effect.gen` reads like async/await: `yield* JiraGateway` resolves the Tag, `yield* jira.searchIssues(...)` runs the Effect and binds its success value. The function is pure data — nothing executes until `appRuntime.runPromise(...)` fires it. Tests use `@effect/vitest`'s `it.effect(...)` with a `Layer.succeed(JiraGateway, fake)` to drive the Effect directly, no `vi.mock`.
 
 ### 12. Wire boundary mapper
@@ -464,7 +446,7 @@ export const toWire = <A extends object, E, IE extends TaggedErrorPayload, R>(
 What to notice:
 
 1. **Success is pass-through** — `{ ok: true, ...value }` — because today's success types are JSON-flat per [ADR 0005](./adr/0005-effect-server-architecture.md). The upgrade to `Schema`-encoded success lands when types get richer (e.g. `Date` values in a future `code-health` context).
-2. **Failure runs `Schema.encodeUnknownSync(errorSchema)`** to produce `{ _tag, ...payload }`. Each handler passes its **per-context** error schema (e.g. `LoadBoardError = Schema.Union(Unauthorized)`); adding a new tag to the union surfaces here as a compile error. The wire codec is generated from the schema, not hand-written.
+2. **Failure runs `Schema.encodeUnknownSync(errorSchema)`** to produce `{ _tag, ...payload }`. Each handler passes its **per-context** error schema (e.g. `LoadBoardError = Schema.Union(JiraUnauthorized)`); adding a new tag to the union surfaces here as a compile error. The wire codec is generated from the schema, not hand-written.
 3. **`Effect.catchAllDefect`** is the failure-vs-defect distinction in code: tagged failures travel the `E` channel and round-trip cleanly; unexpected defects (escaping exceptions, OOMs) bypass the schema and become `{ _tag: 'InternalError' }`. The signature returns `Effect<WireResult<A>, never, R>` — after `toWire`, the error channel is empty and `runPromise` cannot reject for application reasons.
 
 ### 13. Server-function handler

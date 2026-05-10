@@ -4,12 +4,12 @@ clashboard is organised as **bounded contexts**, each with its own internal hexa
 
 ## Contexts
 
-| Context     | Lives in                            | Purpose                                  | Key concepts                                                             |
-| ----------- | ----------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------ |
-| **Board**   | `src/contexts/board/` _(planned)_   | Renders my work as columns               | `BoardView`, `Column`, status-mapping, deemphasis, sort, filter          |
-| **Detail**  | `src/contexts/detail/` _(planned)_  | Renders a single ticket in a side panel  | `IssuePanelState`, ADF rendering, sibling navigation, keyboard shortcuts |
-| **Review**  | `src/contexts/review/` _(planned)_  | Surfaces MRs waiting on me as fake cards | `ReviewCard`, review-state buckets                                       |
-| **Capture** | `src/contexts/capture/` _(planned)_ | Quick-create modal                       | `QuickCreateInput`, parent selection, type segmentation                  |
+| Context     | Lives in                | Purpose                                  | Key concepts                                                             |
+| ----------- | ----------------------- | ---------------------------------------- | ------------------------------------------------------------------------ |
+| **Board**   | `src/contexts/board/`   | Renders my work as columns               | `BoardView`, `Column`, status-mapping, deemphasis, sort, filter          |
+| **Detail**  | `src/contexts/detail/`  | Renders a single ticket in a side panel  | `IssuePanelState`, ADF rendering, sibling navigation, keyboard shortcuts |
+| **Review**  | `src/contexts/review/`  | Surfaces MRs waiting on me as fake cards | `ReviewCard`, review-state buckets                                       |
+| **Capture** | `src/contexts/capture/` | Quick-create modal                       | `QuickCreateInput`, parent selection, type segmentation                  |
 
 The **Board** and **Review** contexts both place items on the same column grid, so they share _Column_ as kernel terminology. **Detail** and **Capture** are independent surfaces that compose with Board.
 
@@ -23,7 +23,7 @@ Some workflows span contexts and don't belong inside any one of them:
 - **Handle MR merged** — Detail/Review surface the action; Board needs the resulting transition reflected. Touches Review + Board (+ Detail).
 - **Create issue** — Capture submits; Board invalidates so the new card appears.
 
-These live in a **cross-context coordinator** (`src/coordinator/` _(planned)_ — currently `src/dashboard/service.ts`, to be renamed). The coordinator depends on per-context application services; contexts never depend on the coordinator.
+These live in a **cross-context coordinator** (`src/coordinator/`). The coordinator depends on per-context application services; contexts never depend on the coordinator.
 
 ## Layer vocabulary (shared by every context)
 
@@ -61,12 +61,16 @@ Trivial hooks (one piece of `useState`, no derivation) stay as plain hooks. The 
 
 ## The kernel module
 
-The client owns its types via `~/kernel/`, which today re-exports from `~/server/...`. The day the server is rewritten (Effect-TS pass), only `~/kernel/` moves; presenters/view-models/views never reference `~/server/...` directly.
+The client owns its types via `~/kernel/`, which re-exports gateway-output types and server-function result types from `~/server/...`. Presenters / view-models / views never reference `~/server/...` directly — only `~/kernel/` does.
 
 ```
 src/kernel/
-├── jira.ts     # re-exports BoardIssue, DetailIssue, ... from ~/server/jira
-├── gitlab.ts   # re-exports MrSummary, ReviewCard, ... from ~/server/gitlab
+├── jira.ts     # re-exports BoardIssue, DetailIssue, ... from ~/server/gateways/jira and the server-function result types from ~/server/server-functions/{board,detail,capture}
+├── gitlab.ts   # re-exports MrSummary, ReviewCard, ... from ~/server/gateways/gitlab and the server-function result types from ~/server/server-functions/{board,review}
+├── columns.ts  # Column / columnForStatus / statusesForColumn / isDeemphasized / COLUMNS
+├── status.ts   # normalizeStatus
+├── review.ts   # reviewCardId / reviewBucketColumn / reviewSearchHaystack / REVIEW_BUCKET_STATUS_NAME
+├── mr/         # REVIEWER_STATE_LABEL / REVIEWER_BADGE_LABEL / CiVisualState / ReviewerVisualState
 └── index.ts
 ```
 
@@ -86,7 +90,7 @@ Kernel types are the lingua franca of cross-context dependencies (e.g. both Boar
 | Toasts                   | sonner                                | Adapter behind a `Toast` port owned by the coordinator. View-models and application services do not import `sonner`.                                                                                                                                                   |
 | Design-system primitives | Shadcn/ui (already configured)        | **Adopt-on-second-use** rule: when a primitive (button, dialog, popover, ...) is needed in 2+ places, pull in the shadcn version into `design-system/`. Single-use primitives stay inline at first.                                                                    |
 | Architecture analysis    | `fallow`                              | Local-only `npx fallow`; reads `.fallow/` cache. Used for unused-code, duplication, complexity, and architecture-drift signal.                                                                                                                                         |
-| Dependency rules         | `dependency-cruiser`                  | Codifies the dependency law as `forbidden` rules (see Q7 once resolved).                                                                                                                                                                                               |
+| Dependency rules         | `dependency-cruiser`                  | Codifies the dependency law as `forbidden` rules — one rule per edge in `.dependency-cruiser.cjs`. All rules are `error` post-lockdown.                                                                                                                                |
 
 Skipped, with reason:
 
@@ -108,7 +112,12 @@ src/
 ├── design-system/         # domain-agnostic primitives
 ├── routes/                # the only place multiple contexts are wired together
 ├── lib/                   # framework-level utilities
-└── server/                # out of scope this pass
+└── server/                # Effect-TS server (see "Server architecture" below)
+    ├── gateways/<system>/   # one folder per external system: port + adapter + types + errors
+    ├── contexts/<name>/     # one folder per use-case cluster: application/, domain/, errors, config
+    ├── runtime/             # ServerEnv Tag + Layer, appLayer, appRuntime (ManagedRuntime)
+    ├── wire/                # toWire(program, errorSchema)
+    └── server-functions/    # createServerFn handlers — appRuntime.runPromise(toWire(...))
 ```
 
 `kernel/` owns cross-context domain logic that previously lived in `features/board/`: `Column` type, `columnForStatus`, `statusesForColumn`, `deemphasize`, status-name normalisation. Board _uses_ these heavily but no longer _owns_ them.
@@ -301,4 +310,4 @@ Forbidden (codified as `dependency-cruiser` rules):
 
 ## Notes
 
-- **Server scope.** Effect-TS server pass is in flight (PRD `.agents/prds/effect-server-refactor.md`, ADR-0005). Old `server/jira/` and `server/gitlab/` paths cohabit with new `server/gateways/` + `server/contexts/` until lockdown (Phase 5). The client treats the server as a single "remote application" reachable through TanStack Start server functions; the wire shape is unchanged from ADR-0004 (`{ ok: true, ... } | { ok: false, error: { _tag, ... } }`). The future `code-health` context (database-backed coverage / lint trend indicators) is **out of scope this refactor** but informs the architecture's shape.
+- **Server scope.** Effect-TS server pass is merged (PRD `.agents/prds/effect-server-refactor.md`, ADR-0005). The legacy `server/jira/` and `server/gitlab/` folders were deleted at lockdown; everything lives in `server/gateways/{jira, gitlab}/` (port + adapter + types + errors) and `server/contexts/{board, detail, capture, review}/application/` (one file per use-case). The client treats the server as a single "remote application" reachable through TanStack Start server functions; the wire shape is unchanged from ADR-0004 (`{ ok: true, ... } | { ok: false, error: { _tag, ... } }`). The future `code-health` context (database-backed coverage / lint trend indicators) is **out of scope this refactor** but informs the architecture's shape.

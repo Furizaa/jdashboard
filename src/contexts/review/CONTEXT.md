@@ -1,6 +1,6 @@
 # Review
 
-Owns the cross-cutting GitLab merge-request review queue and the cache hook that subscribes to it. The server already builds `ReviewCard`s (`src/server/gitlab/review-service.ts`); this context owns the **client-side** loading + cache lifecycle and exposes the cards via a presenter hook so Board can render them.
+Owns the cross-cutting GitLab merge-request review queue and the cache hook that subscribes to it. The server already builds `ReviewCard`s (`src/server/contexts/review/application/load-review-cards.ts`); this context owns the **client-side** loading + cache lifecycle and exposes the cards via a presenter hook so Board can render them.
 
 Review has **no top-level view**. Its visible surfaces are cards rendered by the Board context (and the per-card MR section rendered by the `~/widgets/mr-section` compound API). The pure projection helpers (`reviewCardId`, `reviewBucketColumn`, `reviewSearchHaystack`, `REVIEW_BUCKET_STATUS_NAME`) live in `~/kernel/review` because they are cross-context primitives consumed by Board's `assembleColumns` — review owns the loading lifecycle, the kernel owns the projection vocabulary.
 
@@ -41,7 +41,7 @@ If a future change introduces a Review-only surface (e.g. a standalone "review q
 
 - `~/kernel` — `Column`, `ReviewCard`, `ReviewCardReal`, `GetReviewCardsResult` and the projection helpers (`reviewCardId`, `reviewBucketColumn`, `reviewSearchHaystack`, `REVIEW_BUCKET_STATUS_NAME`).
 - `~/coordinator` — `useBoardData`, `useCoordinator`, `DASHBOARD_QUERY_KEYS`, `DASHBOARD_STALE_TIMES` (presenter only).
-- `~/server/gitlab` — `getReviewCards` server function (presenter only).
+- `~/server/server-functions/review` — `getReviewCards` server function (presenter only).
 - `~/lib/use-polling` — visibility-aware refetch interval (presenter only).
 
 No imports from `~/contexts/<other>`. The cache hook is consumed by Board through the coordinator's re-export (`useReviewCards` from `~/coordinator`); the projection helpers are consumed directly from `~/kernel`. There is no cross-context edge.

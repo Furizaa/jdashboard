@@ -145,35 +145,39 @@ The TanStack Query implementation lives behind that port in [`src/coordinator/ad
 
 ## 6. The gateway call — the network boundary
 
-`jira.transitionIssue` is wired to a TanStack Start server function. From the client's point of view it is a normal async function returning a tagged union; under the hood, TanStack Start serialises the call across the network boundary. See [`src/server/jira/server-functions.ts`](../src/server/jira/server-functions.ts) and [`src/server/jira/http-gateway.ts`](../src/server/jira/http-gateway.ts).
+`jira.transitionIssue` is wired to a TanStack Start server function. From the client's point of view it is a normal async function returning a tagged union; under the hood, TanStack Start serialises the call across the network boundary into the Effect server. See [`src/server/server-functions/detail.ts`](../src/server/server-functions/detail.ts) and [`src/server/gateways/jira/http-adapter.ts`](../src/server/gateways/jira/http-adapter.ts).
 
 ```ts
-// src/server/jira/server-functions.ts (excerpt)
+// src/server/server-functions/detail.ts (excerpt)
 export const transitionIssue = createServerFn({ method: 'POST' })
   .inputValidator((data: { key: string; transitionId: string }) => ({
     key: requireKey('transitionIssue', data?.key),
     transitionId: requireKey('transitionIssue (transitionId)', data?.transitionId),
   }))
-  .handler(({ data }) => service().performTransition(data.key, data.transitionId))
+  .handler(async ({ data }): Promise<TransitionIssueResult> => {
+    const wire = await appRuntime.runPromise(
+      toWire(performTransition(data.key, data.transitionId), PerformTransitionError),
+    )
+    if (!wire.ok && wire.error._tag === 'InternalError') {
+      throw new Error('transitionIssue: internal error')
+    }
+    return wire as TransitionIssueResult
+  })
 ```
 
 ```ts
-// src/server/jira/http-gateway.ts (excerpt)
-transitionIssue(key, transitionId) {
-  return call<void>(async () => {
-    await request<void>(`/rest/api/3/issue/${encodeURIComponent(key)}/transitions`, {
-      method: 'POST',
-      body: { transition: { id: transitionId } },
-    })
-  })
-},
+// src/server/gateways/jira/http-adapter.ts (excerpt)
+transitionIssue: (key, transitionId) =>
+  postJson(`/rest/api/3/issue/${encodeURIComponent(key)}/transitions`, {
+    transition: { id: transitionId },
+  }).pipe(Effect.flatMap((req) => executeNoBody(req))),
 ```
 
 **What to notice:**
 
-- `call<T>` wraps the raw promise and returns a tagged JSON `JiraResult<T>`: `{ ok: true, value }` on success, `{ ok: false, reason: 'unauthorized' | 'not-found' | 'rejected', message }` on failure. Errors are values, not exceptions, the moment they cross the function boundary.
-- The result type is plain JSON. That is the bridge between client `neverthrow` and server `Effect`: nothing about the wire shape forces both sides to use the same library ([ADR 0004](./adr/0004-neverthrow-client-effect-server.md)).
-- The HTTP gateway is the only place in the codebase where Jira's REST URLs appear. The port lives in [`src/server/jira/gateway.ts`](../src/server/jira/gateway.ts); this file is one adapter implementing it.
+- The handler is a thin shell: pick a program (`performTransition(...)`), pick its error schema (`PerformTransitionError`), hand both to `toWire`, run on the process-scoped `appRuntime`. Section 10 of this tour walks the same skeleton end-to-end for `searchIssues`.
+- `toWire` produces tagged JSON: `{ ok: true }` on success, `{ ok: false, error: { _tag: 'Unauthorized' | 'Rejected', message? } }` on tagged failure, `{ ok: false, error: { _tag: 'InternalError' } }` on defect. The handler demotes `InternalError` to a thrown error so TanStack Query's `isError` flag flips on the client; tagged failures stay in the wire payload and are unwrapped by `ts-pattern` ([ADR 0004](./adr/0004-neverthrow-client-effect-server.md)).
+- The wire is plain JSON. That is the bridge between client `neverthrow` and server `Effect`: nothing about the wire shape forces both sides to use the same library. The HTTP adapter is the only place in the codebase where Jira's REST URLs appear; the port lives in [`src/server/gateways/jira/port.ts`](../src/server/gateways/jira/port.ts) (see section 10.4 for the Tag pattern).
 
 ## 7. The result — commit or rollback
 
@@ -186,20 +190,20 @@ return match(result)
     cache.invalidateTransitions(key)
     return ok(undefined)
   })
-  .with({ ok: false, reason: 'rejected' }, ({ message }) => {
+  .with({ ok: false, error: { _tag: 'Rejected' } }, ({ error }) => {
     rollbackBoard()
     rollbackIssue()
-    toast.error(message)
-    return err(new TransitionRejected(message))
+    toast.error(error.message)
+    return err(new TransitionRejected(error.message))
   })
-  .exhaustive() // … plus an `unauthorized` branch with the same shape
+  .exhaustive() // … plus an `Unauthorized` branch with the same shape
 ```
 
 **What to notice:**
 
 - The toast is a port. The coordinator calls `toast.error(message)`; behind the port, `createSonnerToastAdapter` calls `sonner`'s `toast.error`. View-models and contexts never import `sonner`.
 - The success branch invalidates two query keys: the issue (so the panel refetches its full payload) and the transitions for that issue (so the dropdown reflects the new status's allowed next steps). The board is not invalidated — the optimistic patch is the source of truth until the next poll.
-- Adding a new failure tag (e.g. `'rate-limited'`) becomes a compile error here. ts-pattern's `.exhaustive()` is how the architecture earns the "errors as values" claim.
+- Adding a new failure tag (e.g. `'RateLimited'`) becomes a compile error here. ts-pattern's `.exhaustive()` is how the architecture earns the "errors as values" claim. The match keys are the wire `_tag` literals encoded by `Schema.encodeUnknownSync` on the server (see section 10.6).
 
 ## 8. The re-derive — the round trip closes
 
@@ -376,12 +380,14 @@ const executeJson = <T>(
   request: HttpClientRequest.HttpClientRequest,
 ): Effect.Effect<T, JiraGatewayError> =>
   client.execute(request).pipe(
-    Effect.mapError((error) => new Rejected({ message: `Jira request failed: ${error.message}` })),
+    Effect.mapError(
+      (error) => new JiraRejected({ message: `Jira request failed: ${error.message}` }),
+    ),
     Effect.flatMap((response) =>
       HttpClientResponse.matchStatus(response, {
         '2xx': (ok) => decodeJsonBody<T>(ok),
-        401: () => Effect.fail(new Unauthorized()),
-        404: () => Effect.fail(new NotFound()),
+        401: () => Effect.fail(new JiraUnauthorized()),
+        404: () => Effect.fail(new JiraNotFound()),
         orElse: (bad) => failFromStatus(bad),
       }),
     ),
@@ -391,9 +397,11 @@ const executeJson = <T>(
 The tagged-error classes themselves, in [`src/server/gateways/jira/errors.ts`](../src/server/gateways/jira/errors.ts):
 
 ```ts
-export class Unauthorized extends Schema.TaggedError<Unauthorized>()('Unauthorized', {}) {}
-export class NotFound extends Schema.TaggedError<NotFound>()('NotFound', {}) {}
-export class Rejected extends Schema.TaggedError<Rejected>()('Rejected', {
+// Class names are gateway-prefixed; wire tags stay un-prefixed because clients
+// already discriminate by gateway via the response envelope, not the tag string.
+export class JiraUnauthorized extends Schema.TaggedError<JiraUnauthorized>()('Unauthorized', {}) {}
+export class JiraNotFound extends Schema.TaggedError<JiraNotFound>()('NotFound', {}) {}
+export class JiraRejected extends Schema.TaggedError<JiraRejected>()('Rejected', {
   message: Schema.String,
 }) {}
 ```
@@ -401,8 +409,8 @@ export class Rejected extends Schema.TaggedError<Rejected>()('Rejected', {
 **What to notice:**
 
 - `client.execute(request)` is the only place HTTP actually happens. It's the same `HttpClient` instance the runtime wrapped with retry+timeout in 10.2 — every method on this adapter inherits that middleware, with no per-method opt-in.
-- `HttpClientResponse.matchStatus` collapses status code branches into one expression: `2xx` decodes the body, `401`/`404` short-circuit to typed failures, `orElse` reads the error body and packs it into `Rejected.message`. HTTP-level cases are all expressed as `Effect.fail(new TaggedError(...))` — failures-as-values, not throws.
-- `Schema.TaggedError` does double duty: it gives `Effect.catchTag` / `Effect.catchTags` an ergonomic match (10.3's catch block uses it) _and_ it ships a `Schema` so the wire boundary mapper can encode each instance to JSON without a hand-written serialiser.
+- `HttpClientResponse.matchStatus` collapses status code branches into one expression: `2xx` decodes the body, `401`/`404` short-circuit to typed failures, `orElse` reads the error body and packs it into `JiraRejected.message`. HTTP-level cases are all expressed as `Effect.fail(new TaggedError(...))` — failures-as-values, not throws.
+- `Schema.TaggedError` does double duty: it gives `Effect.catchTag` / `Effect.catchTags` an ergonomic match (10.3's catch block uses it) _and_ it ships a `Schema` so the wire boundary mapper can encode each instance to JSON without a hand-written serialiser. The Jira and GitLab gateways co-exist because the class names are gateway-prefixed (`JiraUnauthorized`, `GitlabUnauthorized`), even though both encode to the same wire `_tag: 'Unauthorized'` — the response envelope already discriminates which gateway produced the error.
 
 ### 10.6. The wire boundary — `toWire`
 
@@ -433,14 +441,14 @@ export const toWire = <A extends object, E, IE extends TaggedErrorPayload, R>(
 **What to notice:**
 
 - Three arms: `onSuccess` is **pass-through** (`{ ok: true, ...value }` — today's success types are JSON-flat per [ADR 0005](./adr/0005-effect-server-architecture.md)); `onFailure` runs `Schema.encodeUnknownSync(errorSchema)` to produce `{ _tag, ...payload }`; `Effect.catchAllDefect` demotes anything that escapes the `E` channel to `{ _tag: 'InternalError' }` and logs it.
-- Each handler passes its **per-context** error schema (here `LoadBoardError = Schema.Union(Unauthorized)` from [`src/server/contexts/board/errors.ts`](../src/server/contexts/board/errors.ts)), not an app-wide one. Adding a new tag to the union surfaces here as a compile error; the wire codec is generated from the schema, not hand-written.
+- Each handler passes its **per-context** error schema (here `LoadBoardError = Schema.Union(JiraUnauthorized)` from [`src/server/contexts/board/errors.ts`](../src/server/contexts/board/errors.ts)), not an app-wide one. Adding a new tag to the union surfaces here as a compile error; the wire codec is generated from the schema, not hand-written.
 - The signature is `Effect<WireResult<A>, never, R>`: the error channel is erased. Once a program goes through `toWire`, every outcome is a value in the success channel; the handler's `runPromise` cannot reject for application reasons.
 
 ### 10.7. The trip back
 
 TanStack Start serialises the `WireResult` to JSON and sends it back. The client side is what sections 6–8 already cover from the other end: the client's `searchIssues()` returns a tagged JSON shape, neverthrow's `Result` wraps it, and `ts-pattern` matches the `_tag` exhaustively.
 
-The client's `BoardUnauthorized` (a neverthrow tagged-error class) and the server's `Unauthorized` (a `Schema.TaggedError`) are independent classes; they communicate only through the `_tag: 'Unauthorized'` literal in the JSON wire shape. Neither side imports the other's library, per [ADR 0004](./adr/0004-neverthrow-client-effect-server.md).
+The client's `BoardUnauthorized` (a neverthrow tagged-error class) and the server's `JiraUnauthorized` (a `Schema.TaggedError`) are independent classes; they communicate only through the `_tag: 'Unauthorized'` literal in the JSON wire shape. Neither side imports the other's library, per [ADR 0004](./adr/0004-neverthrow-client-effect-server.md).
 
 **What to notice:**
 

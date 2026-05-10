@@ -65,6 +65,11 @@ const description: AdfNode = {
       content: [{ type: 'text', text: 'code-block-content' }],
     },
     {
+      type: 'codeBlock',
+      attrs: { language: 'typescript' },
+      content: [{ type: 'text', text: 'const highlighted: number = 42' }],
+    },
+    {
       type: 'blockquote',
       content: [{ type: 'paragraph', content: [{ type: 'text', text: 'quoted-text' }] }],
     },
@@ -124,7 +129,15 @@ test('description renders every supported ADF node and an unsupported placeholde
   await expect(dialog.locator('hr')).toHaveCount(1)
   await expect(dialog.locator('ul li').filter({ hasText: 'bullet-item' })).toBeVisible()
   await expect(dialog.locator('ol li').filter({ hasText: 'ordered-item' })).toBeVisible()
-  await expect(dialog.locator('pre code')).toContainText('code-block-content')
+  await expect(dialog.locator('pre').filter({ hasText: 'code-block-content' })).toBeVisible()
+
+  // Code block with a recognised language renders Shiki-highlighted markup:
+  // a <pre> with the highlighted text and at least one Shiki-generated token
+  // <span style="..."> applying syntax colors.
+  const highlightedPre = dialog.locator('pre').filter({ hasText: 'const highlighted: number = 42' })
+  await expect(highlightedPre).toBeVisible()
+  await expect(highlightedPre.locator('span[style]').first()).toBeVisible()
+
   await expect(dialog.locator('blockquote')).toContainText('quoted-text')
 
   // Text marks

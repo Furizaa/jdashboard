@@ -200,17 +200,50 @@ describe('RenderAdf', () => {
     ).toMatchSnapshot()
   })
 
-  it('renders codeBlock', () => {
-    expect(
-      html(
-        wrap({
-          type: 'codeBlock',
-          content: [{ type: 'text', text: 'const x = 1' }],
-        }),
-      ),
-    ).toMatchInlineSnapshot(
-      `"<div class="space-y-3"><pre class="bg-muted/50 border-border text-foreground/90 overflow-x-auto rounded-md border p-3 font-mono text-xs leading-relaxed"><code>const x = 1</code></pre></div>"`,
-    )
+  describe('codeBlock', () => {
+    it('renders without language attribute as a plain block (no Shiki dependency loaded)', () => {
+      expect(
+        html(
+          wrap({
+            type: 'codeBlock',
+            content: [{ type: 'text', text: 'const x = 1' }],
+          }),
+        ),
+      ).toMatchInlineSnapshot(
+        `"<div class="space-y-3"><pre class="bg-muted/50 border-border text-foreground/90 overflow-x-auto rounded-md border p-3 font-mono text-xs leading-relaxed"><code>const x = 1</code></pre></div>"`,
+      )
+    })
+
+    it('renders the Suspense fallback (plain block) when a recognised language requires the lazy highlighter', () => {
+      // The lazy import does not resolve in jsdom without extra setup; the contract under
+      // test here is that the synchronous render is still the plain markup, so a code
+      // block never blanks the panel while Shiki is loading.
+      expect(
+        html(
+          wrap({
+            type: 'codeBlock',
+            attrs: { language: 'typescript' },
+            content: [{ type: 'text', text: 'const x: number = 1' }],
+          }),
+        ),
+      ).toMatchInlineSnapshot(
+        `"<div class="space-y-3"><pre class="bg-muted/50 border-border text-foreground/90 overflow-x-auto rounded-md border p-3 font-mono text-xs leading-relaxed"><code>const x: number = 1</code></pre></div>"`,
+      )
+    })
+
+    it('renders an unrecognised language as a plain block (no Shiki dependency loaded)', () => {
+      expect(
+        html(
+          wrap({
+            type: 'codeBlock',
+            attrs: { language: 'gobbledygook' },
+            content: [{ type: 'text', text: 'unknown content' }],
+          }),
+        ),
+      ).toMatchInlineSnapshot(
+        `"<div class="space-y-3"><pre class="bg-muted/50 border-border text-foreground/90 overflow-x-auto rounded-md border p-3 font-mono text-xs leading-relaxed"><code>unknown content</code></pre></div>"`,
+      )
+    })
   })
 
   it('renders blockquote', () => {

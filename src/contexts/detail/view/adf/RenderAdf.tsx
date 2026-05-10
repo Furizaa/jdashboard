@@ -50,7 +50,9 @@ function renderNode(node: AdfNode, key: number, jiraBaseUrl: string | undefined)
       <ListItem key={key}>{renderChildren(n, jiraBaseUrl)}</ListItem>
     ))
     .with({ type: 'codeBlock' }, (n) => (
-      <CodeBlock key={key}>{renderChildren(n, jiraBaseUrl)}</CodeBlock>
+      <CodeBlock key={key} node={n}>
+        {renderChildren(n, jiraBaseUrl)}
+      </CodeBlock>
     ))
     .with({ type: 'blockquote' }, (n) => (
       <Blockquote key={key}>{renderChildren(n, jiraBaseUrl)}</Blockquote>

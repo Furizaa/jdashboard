@@ -1,5 +1,6 @@
 export { extractPlainText } from './extract-plain-text'
 export { findSiblings } from './find-siblings'
+export { normalizeCodeLanguage } from './normalize-code-language'
 export { panelKeyIntent, type PanelKeyIntent } from './panel-key-intent'
 export { parseInlineCard } from './parse-inline-card'
 export { shouldHandleShortcut } from './should-handle-shortcut'

@@ -1,5 +1,5 @@
 import { HttpClient, HttpClientRequest, HttpClientResponse } from '@effect/platform'
-import { Effect, Layer } from 'effect'
+import { Effect, Layer, Schema } from 'effect'
 import { ServerEnv } from '../../runtime/server-env'
 import {
   GitlabNotFound,
@@ -17,56 +17,78 @@ import type {
   RawMrDetail,
   RawMrReviewerWithState,
   RawMrSummary,
-  ReviewerEndpointState,
 } from './types'
 
-type WireUser = { username: string; name: string }
+const WireUserSchema = Schema.Struct({
+  username: Schema.String,
+  name: Schema.String,
+})
 
-type WireMrSummary = {
-  iid: number
-  title: string
-  web_url: string
-  state: 'opened' | 'closed' | 'merged' | 'locked'
-  draft: boolean
-  updated_at: string
-}
+// GitLab MR `state` is a closed enum from the API; an unknown value should
+// fail loudly so we can assess the new state rather than silently accept it.
+const WireMrStateSchema = Schema.Literal('opened', 'closed', 'merged', 'locked')
 
-type WireReviewer = {
-  username: string
-  name: string
-  avatar_url?: string | null
-}
+const WireMrSummarySchema = Schema.Struct({
+  iid: Schema.Number,
+  title: Schema.String,
+  web_url: Schema.String,
+  state: WireMrStateSchema,
+  draft: Schema.Boolean,
+  updated_at: Schema.String,
+})
+type WireMrSummary = Schema.Schema.Type<typeof WireMrSummarySchema>
 
-type WireMrDetail = WireMrSummary & {
-  reviewers: WireReviewer[]
-  head_pipeline: { status: string } | null
-  has_conflicts: boolean
-}
+const WireReviewerSchema = Schema.Struct({
+  username: Schema.String,
+  name: Schema.String,
+  avatar_url: Schema.optional(Schema.NullOr(Schema.String)),
+})
 
-type WireNote = {
-  author: { username: string }
-  resolvable: boolean
-  resolved: boolean
-  system: boolean
-}
+// `head_pipeline.status` stays Schema.String — `ciVisualState` already
+// handles unknown pipeline statuses gracefully.
+const WireMrDetailSchema = Schema.Struct({
+  ...WireMrSummarySchema.fields,
+  reviewers: Schema.Array(WireReviewerSchema),
+  head_pipeline: Schema.NullOr(Schema.Struct({ status: Schema.String })),
+  has_conflicts: Schema.Boolean,
+})
+type WireMrDetail = Schema.Schema.Type<typeof WireMrDetailSchema>
 
-type WireDiscussion = {
-  id: string
-  notes: WireNote[]
-}
+const WireNoteSchema = Schema.Struct({
+  author: Schema.Struct({ username: Schema.String }),
+  resolvable: Schema.Boolean,
+  resolved: Schema.Boolean,
+  system: Schema.Boolean,
+})
 
-type WireApprovals = {
-  approved_by: Array<{ user: { username: string } }>
-}
+const WireDiscussionSchema = Schema.Struct({
+  id: Schema.String,
+  notes: Schema.Array(WireNoteSchema),
+})
+type WireDiscussion = Schema.Schema.Type<typeof WireDiscussionSchema>
 
-type WireReviewerWithState = {
-  user: {
-    username: string
-    name: string
-    avatar_url?: string | null
-  }
-  state: ReviewerEndpointState
-}
+const WireApprovalsSchema = Schema.Struct({
+  approved_by: Schema.Array(Schema.Struct({ user: Schema.Struct({ username: Schema.String }) })),
+})
+
+// The reviewer's review-state is a closed enum from the GitLab reviewers
+// endpoint; new states should fail loudly so we assess them.
+const WireReviewerEndpointStateSchema = Schema.Literal(
+  'unreviewed',
+  'review_started',
+  'reviewed',
+  'requested_changes',
+  'approved',
+)
+
+const WireReviewerWithStateSchema = Schema.Struct({
+  user: Schema.Struct({
+    username: Schema.String,
+    name: Schema.String,
+    avatar_url: Schema.optional(Schema.NullOr(Schema.String)),
+  }),
+  state: WireReviewerEndpointStateSchema,
+})
 
 function toRawMrSummary(wire: WireMrSummary): RawMrSummary {
   return {
@@ -121,12 +143,12 @@ function parseGitlabErrorMessage(body: string): string {
   return body || 'GitLab request was rejected'
 }
 
-const decodeJsonBody = <T>(
-  response: HttpClientResponse.HttpClientResponse,
-): Effect.Effect<T, GitlabGatewayError> =>
-  response.json.pipe(
-    Effect.mapError((error) => new GitlabTransportError({ message: error.message })),
-  ) as Effect.Effect<T, GitlabGatewayError>
+const decodeJsonAs =
+  <A, I>(schema: Schema.Schema<A, I>) =>
+  (response: HttpClientResponse.HttpClientResponse): Effect.Effect<A, GitlabGatewayError> =>
+    HttpClientResponse.schemaBodyJson(schema)(response).pipe(
+      Effect.mapError((error) => new GitlabTransportError({ message: error.message })),
+    )
 
 const readErrorBody = (response: HttpClientResponse.HttpClientResponse): Effect.Effect<string> =>
   response.text.pipe(Effect.catchAll(() => Effect.succeed('')))
@@ -157,27 +179,28 @@ export const GitlabGatewayLive: Layer.Layer<
     const get = (path: string): HttpClientRequest.HttpClientRequest =>
       HttpClientRequest.get(`${baseUrl}${path}`).pipe(HttpClientRequest.setHeaders(baseHeaders))
 
-    const executeJson = <T>(
-      request: HttpClientRequest.HttpClientRequest,
-    ): Effect.Effect<T, GitlabGatewayError> =>
-      client.execute(request).pipe(
-        Effect.mapError(
-          (error) =>
-            new GitlabTransportError({ message: `GitLab request failed: ${error.message}` }),
-        ),
-        Effect.flatMap((response) =>
-          HttpClientResponse.matchStatus(response, {
-            '2xx': (ok) => decodeJsonBody<T>(ok),
-            401: (): Effect.Effect<T, GitlabGatewayError> => Effect.fail(new GitlabUnauthorized()),
-            404: (): Effect.Effect<T, GitlabGatewayError> => Effect.fail(new GitlabNotFound()),
-            orElse: (bad): Effect.Effect<T, GitlabGatewayError> => failFromStatus(bad),
-          }),
-        ),
-      )
+    const executeJson =
+      <A, I>(schema: Schema.Schema<A, I>) =>
+      (request: HttpClientRequest.HttpClientRequest): Effect.Effect<A, GitlabGatewayError> =>
+        client.execute(request).pipe(
+          Effect.mapError(
+            (error) =>
+              new GitlabTransportError({ message: `GitLab request failed: ${error.message}` }),
+          ),
+          Effect.flatMap((response) =>
+            HttpClientResponse.matchStatus(response, {
+              '2xx': (ok): Effect.Effect<A, GitlabGatewayError> => decodeJsonAs(schema)(ok),
+              401: (): Effect.Effect<A, GitlabGatewayError> =>
+                Effect.fail(new GitlabUnauthorized()),
+              404: (): Effect.Effect<A, GitlabGatewayError> => Effect.fail(new GitlabNotFound()),
+              orElse: (bad): Effect.Effect<A, GitlabGatewayError> => failFromStatus(bad),
+            }),
+          ),
+        )
 
     return GitlabGateway.of({
       getCurrentUser: () =>
-        executeJson<WireUser>(get('/api/v4/user')).pipe(
+        executeJson(WireUserSchema)(get('/api/v4/user')).pipe(
           Effect.map((u): GitlabUser => ({ username: u.username, displayName: u.name })),
         ),
 
@@ -196,23 +219,23 @@ export const GitlabGatewayLive: Layer.Layer<
             order_by: 'updated_at',
             sort: 'desc',
           })
-          return executeJson<WireMrSummary[]>(
+          return executeJson(Schema.Array(WireMrSummarySchema))(
             get(`/api/v4/projects/${projectPath}/merge_requests?${params.toString()}`),
           )
         })
         return Effect.all(requests, { concurrency: 'unbounded' }).pipe(
-          Effect.map((results) => results.flat().map(toRawMrSummary)),
+          Effect.map((results) => results.flatMap((arr) => arr.map(toRawMrSummary))),
         )
       },
 
       getMr: (iid) =>
-        executeJson<WireMrDetail>(
+        executeJson(WireMrDetailSchema)(
           get(`/api/v4/projects/${projectPath}/merge_requests/${iid}`),
         ).pipe(Effect.map(toRawMrDetail)),
 
       getMrDiscussions: (iid) => {
         const params = new URLSearchParams({ per_page: '100' })
-        return executeJson<WireDiscussion[]>(
+        return executeJson(Schema.Array(WireDiscussionSchema))(
           get(
             `/api/v4/projects/${projectPath}/merge_requests/${iid}/discussions?${params.toString()}`,
           ),
@@ -220,7 +243,7 @@ export const GitlabGatewayLive: Layer.Layer<
       },
 
       getMrApprovals: (iid) =>
-        executeJson<WireApprovals>(
+        executeJson(WireApprovalsSchema)(
           get(`/api/v4/projects/${projectPath}/merge_requests/${iid}/approvals`),
         ).pipe(
           Effect.map(
@@ -231,7 +254,7 @@ export const GitlabGatewayLive: Layer.Layer<
         ),
 
       getMrReviewers: (iid) =>
-        executeJson<WireReviewerWithState[]>(
+        executeJson(Schema.Array(WireReviewerWithStateSchema))(
           get(`/api/v4/projects/${projectPath}/merge_requests/${iid}/reviewers`),
         ).pipe(
           Effect.map((wire): RawMrReviewerWithState[] =>

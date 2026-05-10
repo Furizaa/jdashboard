@@ -271,6 +271,113 @@ describe('GitlabGatewayLive — wire shape normalisation', () => {
   })
 })
 
+describe('GitlabGatewayLive — schema decode failures route to TransportError', () => {
+  it.effect('getCurrentUser: wrong-shape body decodes as TransportError', () => {
+    const client = fakeHttpClient(() => jsonResponse({ wrong: 'shape' }))
+    const program = Effect.gen(function* () {
+      const gateway = yield* GitlabGateway
+      const failure = yield* gateway.getCurrentUser().pipe(Effect.flip)
+      expect(failure._tag).toBe('TransportError')
+    })
+    return provideTestLayers(program, client)
+  })
+
+  it.effect('listMrs: wrong-shape body decodes as TransportError', () => {
+    const client = fakeHttpClient(() => jsonResponse([{ wrong: 'shape' }]))
+    const program = Effect.gen(function* () {
+      const gateway = yield* GitlabGateway
+      const failure = yield* gateway
+        .listMrs({
+          states: ['opened'],
+          reviewerUsername: 'me',
+          updatedAfter: new Date('2026-05-01T00:00:00Z'),
+        })
+        .pipe(Effect.flip)
+      expect(failure._tag).toBe('TransportError')
+    })
+    return provideTestLayers(program, client)
+  })
+
+  it.effect('listMrs: unknown state literal decodes as TransportError', () => {
+    const client = fakeHttpClient(() =>
+      jsonResponse([
+        {
+          iid: 1,
+          title: 't',
+          web_url: 'u',
+          state: 'reopened',
+          draft: false,
+          updated_at: '2026-05-01T00:00:00Z',
+        },
+      ]),
+    )
+    const program = Effect.gen(function* () {
+      const gateway = yield* GitlabGateway
+      const failure = yield* gateway
+        .listMrs({
+          states: ['opened'],
+          reviewerUsername: 'me',
+          updatedAfter: new Date('2026-05-01T00:00:00Z'),
+        })
+        .pipe(Effect.flip)
+      expect(failure._tag).toBe('TransportError')
+    })
+    return provideTestLayers(program, client)
+  })
+
+  it.effect('getMr: wrong-shape body decodes as TransportError', () => {
+    const client = fakeHttpClient(() => jsonResponse({ wrong: 'shape' }))
+    const program = Effect.gen(function* () {
+      const gateway = yield* GitlabGateway
+      const failure = yield* gateway.getMr(1).pipe(Effect.flip)
+      expect(failure._tag).toBe('TransportError')
+    })
+    return provideTestLayers(program, client)
+  })
+
+  it.effect('getMrDiscussions: wrong-shape body decodes as TransportError', () => {
+    const client = fakeHttpClient(() => jsonResponse([{ wrong: 'shape' }]))
+    const program = Effect.gen(function* () {
+      const gateway = yield* GitlabGateway
+      const failure = yield* gateway.getMrDiscussions(1).pipe(Effect.flip)
+      expect(failure._tag).toBe('TransportError')
+    })
+    return provideTestLayers(program, client)
+  })
+
+  it.effect('getMrApprovals: wrong-shape body decodes as TransportError', () => {
+    const client = fakeHttpClient(() => jsonResponse({ wrong: 'shape' }))
+    const program = Effect.gen(function* () {
+      const gateway = yield* GitlabGateway
+      const failure = yield* gateway.getMrApprovals(1).pipe(Effect.flip)
+      expect(failure._tag).toBe('TransportError')
+    })
+    return provideTestLayers(program, client)
+  })
+
+  it.effect('getMrReviewers: wrong-shape body decodes as TransportError', () => {
+    const client = fakeHttpClient(() => jsonResponse([{ wrong: 'shape' }]))
+    const program = Effect.gen(function* () {
+      const gateway = yield* GitlabGateway
+      const failure = yield* gateway.getMrReviewers(1).pipe(Effect.flip)
+      expect(failure._tag).toBe('TransportError')
+    })
+    return provideTestLayers(program, client)
+  })
+
+  it.effect('getMrReviewers: unknown reviewer state decodes as TransportError', () => {
+    const client = fakeHttpClient(() =>
+      jsonResponse([{ user: { username: 'a', name: 'A' }, state: 'pending' }]),
+    )
+    const program = Effect.gen(function* () {
+      const gateway = yield* GitlabGateway
+      const failure = yield* gateway.getMrReviewers(1).pipe(Effect.flip)
+      expect(failure._tag).toBe('TransportError')
+    })
+    return provideTestLayers(program, client)
+  })
+})
+
 describe('GitlabGatewayLive — listMrs', () => {
   it.effect('builds query strings per state and includes reviewer/author param', () => {
     const captured: Capture[] = []

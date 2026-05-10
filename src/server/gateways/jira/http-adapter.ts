@@ -64,17 +64,6 @@ const failFromStatus = (
     ),
   )
 
-type MediaTokensResponse = {
-  readonly endpointUrl: string
-  readonly token: string
-  readonly items: ReadonlyArray<{
-    readonly id: string
-    readonly mimeType: string
-    readonly width?: number
-    readonly height?: number
-  }>
-}
-
 const mediaResolutionFromStatus = (
   response: HttpClientResponse.HttpClientResponse,
 ): Effect.Effect<never, MediaResolutionError> =>
@@ -109,67 +98,77 @@ function decodeMediaBinary(
   })
 }
 
-function fetchMediaTokens(
+function shapeAttachmentMetadata(id: string, raw: unknown): MediaMetadata {
+  const obj = (raw ?? {}) as {
+    mimeType?: unknown
+    width?: unknown
+    height?: unknown
+  }
+  const mimeType = typeof obj.mimeType === 'string' ? obj.mimeType : 'application/octet-stream'
+  const width = typeof obj.width === 'number' ? obj.width : undefined
+  const height = typeof obj.height === 'number' ? obj.height : undefined
+  return {
+    id,
+    mimeType,
+    ...(width !== undefined ? { width } : {}),
+    ...(height !== undefined ? { height } : {}),
+  }
+}
+
+function fetchAttachmentMetadata(
   client: HttpClient.HttpClient,
   baseUrl: string,
   baseHeaders: Readonly<Record<string, string>>,
-  ids: readonly string[],
-): Effect.Effect<MediaTokensResponse, MediaResolutionError> {
-  return HttpClientRequest.post(`${baseUrl}/rest/api/3/media-tokens`).pipe(
-    HttpClientRequest.setHeaders(baseHeaders),
-    HttpClientRequest.bodyJson({ ids }),
-    Effect.mapError(
-      (err) =>
-        new MediaResolutionError({
-          message: `Encoding media-tokens body failed: ${err}`,
-          status: 0,
-        }),
-    ),
-    Effect.flatMap((req) =>
-      client.execute(req).pipe(
-        Effect.mapError(
-          (error) =>
-            new MediaResolutionError({
-              message: `Jira media-tokens request failed: ${error.message}`,
-              status: 0,
-            }),
-        ),
-        Effect.flatMap((response) =>
-          HttpClientResponse.matchStatus(response, {
-            '2xx': (ok) =>
-              ok.json.pipe(
-                Effect.mapError(
-                  (err) =>
-                    new MediaResolutionError({
-                      message: err.message,
-                      status: ok.status,
-                    }),
-                ),
-                Effect.map((value) => value as MediaTokensResponse),
-              ),
-            orElse: (bad): Effect.Effect<MediaTokensResponse, MediaResolutionError> =>
-              mediaResolutionFromStatus(bad),
-          }),
-        ),
-      ),
-    ),
-  )
-}
-
-function fetchMediaBinary(
-  client: HttpClient.HttpClient,
-  endpointUrl: string,
-  token: string,
   id: string,
-): Effect.Effect<MediaStream, MediaResolutionError | MediaNotFound> {
+): Effect.Effect<MediaMetadata | null, MediaResolutionError> {
   const request = HttpClientRequest.get(
-    `${endpointUrl}/file/${encodeURIComponent(id)}/binary`,
-  ).pipe(HttpClientRequest.setHeaders({ Authorization: `Bearer ${token}` }))
+    `${baseUrl}/rest/api/3/attachment/metadata/${encodeURIComponent(id)}`,
+  ).pipe(HttpClientRequest.setHeaders(baseHeaders))
   return client.execute(request).pipe(
     Effect.mapError(
       (error) =>
         new MediaResolutionError({
-          message: `Jira media binary request failed: ${error.message}`,
+          message: `Jira attachment metadata request failed: ${error.message}`,
+          status: 0,
+        }),
+    ),
+    Effect.flatMap(
+      (response): Effect.Effect<MediaMetadata | null, MediaResolutionError> =>
+        HttpClientResponse.matchStatus(response, {
+          '2xx': (ok): Effect.Effect<MediaMetadata | null, MediaResolutionError> =>
+            ok.json.pipe(
+              Effect.mapError(
+                (err) =>
+                  new MediaResolutionError({
+                    message: err.message,
+                    status: ok.status,
+                  }),
+              ),
+              Effect.map((value): MediaMetadata | null => shapeAttachmentMetadata(id, value)),
+            ),
+          404: (): Effect.Effect<MediaMetadata | null, MediaResolutionError> =>
+            Effect.succeed(null),
+          orElse: (bad): Effect.Effect<MediaMetadata | null, MediaResolutionError> =>
+            mediaResolutionFromStatus(bad),
+        }),
+    ),
+  )
+}
+
+function fetchAttachmentContent(
+  client: HttpClient.HttpClient,
+  baseUrl: string,
+  baseHeaders: Readonly<Record<string, string>>,
+  id: string,
+): Effect.Effect<MediaStream, MediaResolutionError | MediaNotFound> {
+  const request = HttpClientRequest.get(
+    `${baseUrl}/rest/api/3/attachment/content/${encodeURIComponent(id)}?redirect=false`,
+  ).pipe(HttpClientRequest.setHeaders(baseHeaders))
+  return client.execute(request).pipe(
+    Effect.mapError(
+      (error) =>
+        new MediaResolutionError({
+          message: `Jira attachment content request failed: ${error.message}`,
           status: 0,
         }),
     ),
@@ -295,23 +294,16 @@ export const JiraGatewayLive: Layer.Layer<JiraGateway, never, HttpClient.HttpCli
         getMediaMetadata: (ids) =>
           ids.length === 0
             ? Effect.succeed([] as readonly MediaMetadata[])
-            : fetchMediaTokens(client, baseUrl, baseHeaders, ids).pipe(
-                Effect.map((tokens): readonly MediaMetadata[] =>
-                  tokens.items.map((item) => ({
-                    id: item.id,
-                    mimeType: item.mimeType,
-                    ...(item.width !== undefined ? { width: item.width } : {}),
-                    ...(item.height !== undefined ? { height: item.height } : {}),
-                  })),
+            : Effect.all(
+                ids.map((id) => fetchAttachmentMetadata(client, baseUrl, baseHeaders, id)),
+                { concurrency: 5 },
+              ).pipe(
+                Effect.map((items): readonly MediaMetadata[] =>
+                  items.filter((m): m is MediaMetadata => m !== null),
                 ),
               ),
 
-        streamMedia: (id) =>
-          fetchMediaTokens(client, baseUrl, baseHeaders, [id]).pipe(
-            Effect.flatMap((tokens) =>
-              fetchMediaBinary(client, tokens.endpointUrl, tokens.token, id),
-            ),
-          ),
+        streamMedia: (id) => fetchAttachmentContent(client, baseUrl, baseHeaders, id),
       })
     }),
   )

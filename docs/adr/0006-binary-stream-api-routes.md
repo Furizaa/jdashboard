@@ -87,10 +87,12 @@ These also flow into `loadIssue`'s enrichment path; the application service catc
 The mirror-image of the proxy route is server-side ADF enrichment at `loadIssue` time. The application service `loadIssue`:
 
 1. Walks the loaded `DetailIssue.description` and every `comments[].body`, collecting all `media` node `id`s.
-2. Calls `JiraGateway.getMediaMetadata(ids)` once (Jira's `/rest/api/3/media-tokens` endpoint accepts arrays) with `Effect.all({ concurrency: 5 })`-bounded fan-out for any subsequent per-id calls.
+2. Calls `JiraGateway.getMediaMetadata(ids)`, which fans out one `GET /rest/api/3/attachment/metadata/<id>` per id with `Effect.all({ concurrency: 5 })`-bounded concurrency. Per-id `404`s are dropped silently from the result; other failures (`401`/`403`/`5xx`/network) fail the whole call with `MediaResolutionError`.
 3. Applies a pure walker — `src/server/contexts/detail/domain/enrich-adf-with-media.ts` — that injects `url: '/api/jira-media/<id>'` and `mimeType: '<resolved>'` into each `media` node's `attrs` before returning.
 
 Per-id resolution failures degrade to "node renders as the existing 'Media hosted in Jira' placeholder" — partial success is the contract. The walker is `(adf, mediaUrlMap) => AdfNode`, pure, table-driven, unit-tested.
+
+The proxy route's binary fetch is a single `GET /rest/api/3/attachment/content/<id>?redirect=false`. The `redirect=false` query parameter asks Jira to stream bytes directly rather than `303 See Other`-redirecting to a media-services CDN; this keeps the proxy a one-hop pipe.
 
 The two new `JiraGateway` methods:
 
@@ -117,17 +119,17 @@ type MediaStream = {
 }
 ```
 
-Each method handles its own Jira-side token fetch internally (token is a hidden gateway-internal concept). The application service and the API route both consume these methods atomically.
+The application service and the API route both consume these methods atomically.
 
 ## Policy menu (caching)
 
 Per ADR-0005's menu-with-upgrade-path framing:
 
-| Policy      | Phase 1                                              | Upgrade path                                                                                                                                            |
-| ----------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Token cache | **None** — every gateway call fetches a fresh token. | `Cache.make` Layer keyed on `(collection, idsHash)` with TTL ≈ token lifetime − 1 min. Adopted when Jira's 100 req/min rate limit gets hit in practice. |
+| Policy         | Phase 1                                        | Upgrade path                                                                                                                                                                                                                                             |
+| -------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Metadata cache | **None** — every gateway call hits Jira fresh. | `Cache.make` Layer keyed on attachment id with TTL ≈ minutes. Adopted when Jira's per-tenant rate limit gets hit in practice — earlier than under a bulk-token flow, since the metadata fan-out is now N calls per `loadIssue` instead of one bulk call. |
 
-Math: `loadIssue` makes 1 token call + 1 metadata call regardless of how many media nodes are present (the endpoint is bulk). The proxy route makes 1 token call + 1 binary call per media open. A panel opened, one media clicked, panel closed: 4 Jira calls. Comfortably under any reasonable rate limit. Caching is a real upgrade lever, not a Phase 1 requirement.
+Math: `loadIssue` makes N concurrency-bounded `attachment/metadata/<id>` calls, where N is the number of `media` nodes across the description and all comments (no separate token call). The proxy route makes 1 `attachment/content/<id>?redirect=false` call per media open. A panel with M media nodes opened, one media clicked, panel closed: M + 1 Jira calls. The fan-out lifts the per-`loadIssue` ceiling compared to a bulk endpoint, which is the relevant change for the rate-limit upgrade path; in absolute terms this still sits comfortably under any reasonable rate limit for typical issues. Caching is a real upgrade lever, not a Phase 1 requirement.
 
 ## Why this is a separate ADR (and not an addendum to ADR-0005)
 

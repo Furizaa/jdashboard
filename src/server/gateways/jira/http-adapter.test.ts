@@ -139,15 +139,6 @@ describe('JiraGatewayLive — error mapping', () => {
 })
 
 describe('JiraGatewayLive — getMediaMetadata', () => {
-  const tokenResponseBody = {
-    endpointUrl: 'https://media.example',
-    token: 'media-token-xyz',
-    items: [
-      { id: 'media-1', mimeType: 'image/png', width: 100, height: 50 },
-      { id: 'media-2', mimeType: 'video/mp4' },
-    ],
-  }
-
   it.effect('returns an empty array without making any HTTP call when ids is empty', () => {
     const captured: Capture[] = []
     const client = fakeHttpClient(
@@ -163,20 +154,73 @@ describe('JiraGatewayLive — getMediaMetadata', () => {
     return provideTestLayers(program, client)
   })
 
-  it.effect('POSTs ids to /rest/api/3/media-tokens and shapes the items into MediaMetadata', () => {
+  it.effect(
+    'fans out per-id GET /rest/api/3/attachment/metadata/<id> with basic auth and shapes the response',
+    () => {
+      const captured: Capture[] = []
+      const client = fakeHttpClient((req) => {
+        if (req.url.endsWith('/rest/api/3/attachment/metadata/media-1')) {
+          return jsonResponse({
+            id: 'media-1',
+            mimeType: 'image/png',
+            width: 100,
+            height: 50,
+            filename: 'pic.png',
+          })
+        }
+        if (req.url.endsWith('/rest/api/3/attachment/metadata/media-2')) {
+          return jsonResponse({ id: 'media-2', mimeType: 'video/mp4', filename: 'clip.mp4' })
+        }
+        return new Response('unexpected', { status: 500 })
+      }, captured)
+      const program = Effect.gen(function* () {
+        const gateway = yield* JiraGateway
+        const result = yield* gateway.getMediaMetadata(['media-1', 'media-2'])
+        expect(captured).toHaveLength(2)
+        const expected = `Basic ${Buffer.from('user@example.com:tok', 'utf8').toString('base64')}`
+        for (const c of captured) {
+          expect(c.method).toBe('GET')
+          expect(c.headers.authorization ?? c.headers.Authorization).toBe(expected)
+        }
+        const urls = captured.map((c) => c.url).toSorted()
+        expect(urls).toEqual([
+          'https://x.example/rest/api/3/attachment/metadata/media-1',
+          'https://x.example/rest/api/3/attachment/metadata/media-2',
+        ])
+        expect(result).toEqual([
+          { id: 'media-1', mimeType: 'image/png', width: 100, height: 50 },
+          { id: 'media-2', mimeType: 'video/mp4' },
+        ])
+      })
+      return provideTestLayers(program, client)
+    },
+  )
+
+  it.effect('encodes id segments to keep slashes/odd characters out of the path', () => {
     const captured: Capture[] = []
-    const client = fakeHttpClient(() => jsonResponse(tokenResponseBody), captured)
+    const client = fakeHttpClient(
+      () => jsonResponse({ id: 'a/b', mimeType: 'image/png' }),
+      captured,
+    )
     const program = Effect.gen(function* () {
       const gateway = yield* JiraGateway
-      const result = yield* gateway.getMediaMetadata(['media-1', 'media-2'])
-      expect(captured[0]?.method).toBe('POST')
-      expect(captured[0]?.url).toBe('https://x.example/rest/api/3/media-tokens')
-      const body = JSON.parse(captured[0]!.body!) as { ids: string[] }
-      expect(body.ids).toEqual(['media-1', 'media-2'])
-      expect(result).toEqual([
-        { id: 'media-1', mimeType: 'image/png', width: 100, height: 50 },
-        { id: 'media-2', mimeType: 'video/mp4' },
-      ])
+      yield* gateway.getMediaMetadata(['a/b'])
+      expect(captured[0]?.url).toBe('https://x.example/rest/api/3/attachment/metadata/a%2Fb')
+    })
+    return provideTestLayers(program, client)
+  })
+
+  it.effect('drops per-id 404s silently and returns the surviving ids', () => {
+    const client = fakeHttpClient((req) => {
+      if (req.url.endsWith('/rest/api/3/attachment/metadata/media-found')) {
+        return jsonResponse({ id: 'media-found', mimeType: 'image/png' })
+      }
+      return new Response('missing', { status: 404 })
+    })
+    const program = Effect.gen(function* () {
+      const gateway = yield* JiraGateway
+      const result = yield* gateway.getMediaMetadata(['media-found', 'media-missing'])
+      expect(result).toEqual([{ id: 'media-found', mimeType: 'image/png' }])
     })
     return provideTestLayers(program, client)
   })
@@ -203,17 +247,6 @@ describe('JiraGatewayLive — getMediaMetadata', () => {
     return provideTestLayers(program, client)
   })
 
-  it.effect('maps a 404 response to MediaResolutionError (no MediaNotFound on this method)', () => {
-    const client = fakeHttpClient(() => new Response('missing', { status: 404 }))
-    const program = Effect.gen(function* () {
-      const gateway = yield* JiraGateway
-      const failure = yield* gateway.getMediaMetadata(['media-1']).pipe(Effect.flip)
-      expect(failure._tag).toBe('MediaResolutionError')
-      expect(failure.status).toBe(404)
-    })
-    return provideTestLayers(program, client)
-  })
-
   it.effect('maps a 502 response to MediaResolutionError carrying the upstream status', () => {
     const client = fakeHttpClient(() => new Response('upstream down', { status: 502 }))
     const program = Effect.gen(function* () {
@@ -227,54 +260,44 @@ describe('JiraGatewayLive — getMediaMetadata', () => {
 })
 
 describe('JiraGatewayLive — streamMedia', () => {
-  const tokenResponseBody = {
-    endpointUrl: 'https://media.example',
-    token: 'media-token-xyz',
-    items: [{ id: 'media-1', mimeType: 'image/png' }],
-  }
-
   it.effect(
-    'POSTs the single id, then GETs the binary and returns the stream + mimeType + length',
+    'GETs /rest/api/3/attachment/content/<id>?redirect=false and returns the stream + mimeType + length',
     () => {
       const captured: Capture[] = []
       const binaryBytes = new Uint8Array([1, 2, 3, 4])
-      const client = fakeHttpClient((req) => {
-        if (req.url.endsWith('/rest/api/3/media-tokens')) {
-          return jsonResponse(tokenResponseBody)
-        }
-        return new Response(binaryBytes, {
-          status: 200,
-          headers: {
-            'content-type': 'image/png',
-            'content-length': '4',
-          },
-        })
-      }, captured)
+      const client = fakeHttpClient(
+        () =>
+          new Response(binaryBytes, {
+            status: 200,
+            headers: {
+              'content-type': 'image/png',
+              'content-length': '4',
+            },
+          }),
+        captured,
+      )
 
       const program = Effect.gen(function* () {
         const gateway = yield* JiraGateway
         const media = yield* gateway.streamMedia('media-1')
         expect(media.mimeType).toBe('image/png')
         expect(media.contentLength).toBe(4)
-        expect(captured[0]?.method).toBe('POST')
-        expect(captured[0]?.url).toBe('https://x.example/rest/api/3/media-tokens')
-        expect(captured[1]?.method).toBe('GET')
-        expect(captured[1]?.url).toBe('https://media.example/file/media-1/binary')
-        expect(captured[1]?.headers.authorization ?? captured[1]?.headers.Authorization).toBe(
-          'Bearer media-token-xyz',
+        expect(captured).toHaveLength(1)
+        expect(captured[0]?.method).toBe('GET')
+        expect(captured[0]?.url).toBe(
+          'https://x.example/rest/api/3/attachment/content/media-1?redirect=false',
+        )
+        const expected = `Basic ${Buffer.from('user@example.com:tok', 'utf8').toString('base64')}`
+        expect(captured[0]?.headers.authorization ?? captured[0]?.headers.Authorization).toBe(
+          expected,
         )
       })
       return provideTestLayers(program, client)
     },
   )
 
-  it.effect('maps a 404 from the binary endpoint to MediaNotFound', () => {
-    const client = fakeHttpClient((req) => {
-      if (req.url.endsWith('/rest/api/3/media-tokens')) {
-        return jsonResponse(tokenResponseBody)
-      }
-      return new Response('gone', { status: 404 })
-    })
+  it.effect('maps a 404 from the content endpoint to MediaNotFound', () => {
+    const client = fakeHttpClient(() => new Response('gone', { status: 404 }))
     const program = Effect.gen(function* () {
       const gateway = yield* JiraGateway
       const failure = yield* gateway.streamMedia('media-1').pipe(Effect.flip)
@@ -283,13 +306,8 @@ describe('JiraGatewayLive — streamMedia', () => {
     return provideTestLayers(program, client)
   })
 
-  it.effect('maps a 401 from the binary endpoint to MediaResolutionError', () => {
-    const client = fakeHttpClient((req) => {
-      if (req.url.endsWith('/rest/api/3/media-tokens')) {
-        return jsonResponse(tokenResponseBody)
-      }
-      return new Response('nope', { status: 401 })
-    })
+  it.effect('maps a 401 from the content endpoint to MediaResolutionError', () => {
+    const client = fakeHttpClient(() => new Response('nope', { status: 401 }))
     const program = Effect.gen(function* () {
       const gateway = yield* JiraGateway
       const failure = yield* gateway.streamMedia('media-1').pipe(Effect.flip)
@@ -301,13 +319,8 @@ describe('JiraGatewayLive — streamMedia', () => {
     return provideTestLayers(program, client)
   })
 
-  it.effect('maps a 403 from the binary endpoint to MediaResolutionError', () => {
-    const client = fakeHttpClient((req) => {
-      if (req.url.endsWith('/rest/api/3/media-tokens')) {
-        return jsonResponse(tokenResponseBody)
-      }
-      return new Response('forbidden', { status: 403 })
-    })
+  it.effect('maps a 403 from the content endpoint to MediaResolutionError', () => {
+    const client = fakeHttpClient(() => new Response('forbidden', { status: 403 }))
     const program = Effect.gen(function* () {
       const gateway = yield* JiraGateway
       const failure = yield* gateway.streamMedia('media-1').pipe(Effect.flip)
@@ -319,32 +332,14 @@ describe('JiraGatewayLive — streamMedia', () => {
     return provideTestLayers(program, client)
   })
 
-  it.effect('maps a 502 from the binary endpoint to MediaResolutionError', () => {
-    const client = fakeHttpClient((req) => {
-      if (req.url.endsWith('/rest/api/3/media-tokens')) {
-        return jsonResponse(tokenResponseBody)
-      }
-      return new Response('bad gateway', { status: 502 })
-    })
+  it.effect('maps a 502 from the content endpoint to MediaResolutionError', () => {
+    const client = fakeHttpClient(() => new Response('bad gateway', { status: 502 }))
     const program = Effect.gen(function* () {
       const gateway = yield* JiraGateway
       const failure = yield* gateway.streamMedia('media-1').pipe(Effect.flip)
       expect(failure._tag).toBe('MediaResolutionError')
       if (failure._tag === 'MediaResolutionError') {
         expect(failure.status).toBe(502)
-      }
-    })
-    return provideTestLayers(program, client)
-  })
-
-  it.effect('maps a 401 from the media-tokens fetch to MediaResolutionError', () => {
-    const client = fakeHttpClient(() => new Response('nope', { status: 401 }))
-    const program = Effect.gen(function* () {
-      const gateway = yield* JiraGateway
-      const failure = yield* gateway.streamMedia('media-1').pipe(Effect.flip)
-      expect(failure._tag).toBe('MediaResolutionError')
-      if (failure._tag === 'MediaResolutionError') {
-        expect(failure.status).toBe(401)
       }
     })
     return provideTestLayers(program, client)

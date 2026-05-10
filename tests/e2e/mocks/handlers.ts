@@ -145,20 +145,15 @@ export function buildHandlers(getWorld: () => World): HttpHandler[] {
       })
     }),
 
-    // Jira media-tokens endpoint — returned as a canned bundle so the
-    // server-side `getMediaMetadata` resolves with the expected shape during
-    // a Detail-panel load. The e2e fixture seeds `attrs.url` directly, so the
-    // proxy flow is bypassed end-to-end; this handler exists for parity with
-    // the production wire shape and so any future spec exercising the proxy
+    // Jira attachment metadata endpoint — per-id GET that returns a canned
+    // shape so the server-side `getMediaMetadata` resolves during a Detail-
+    // panel load. The e2e fixture seeds `attrs.url` directly, so the proxy
+    // flow is bypassed end-to-end; this handler exists for parity with the
+    // production wire shape and so any future spec exercising the proxy
     // route has a predictable response.
-    http.post('*/rest/api/3/media-tokens', async ({ request }) => {
-      const body = (await request.json().catch(() => ({}))) as { ids?: string[] }
-      const ids = Array.isArray(body.ids) ? body.ids : []
-      return HttpResponse.json({
-        endpointUrl: 'http://127.0.0.1:9999/media-binary',
-        token: 'canned-token',
-        items: ids.map((id) => ({ id, mimeType: 'image/png' })),
-      })
+    http.get('*/rest/api/3/attachment/metadata/:id', ({ params }) => {
+      const id = String(params.id)
+      return HttpResponse.json({ id, mimeType: 'image/png' })
     }),
 
     // Proxy URL injected into ADF media nodes after server-side enrichment.

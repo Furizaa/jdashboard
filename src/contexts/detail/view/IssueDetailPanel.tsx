@@ -26,7 +26,7 @@ function PanelContent({ panel }: { panel: OpenPanel }) {
     .with({ phase: 'loading' }, () => <PanelSkeleton />)
     .with({ phase: 'error' }, ({ message }) => <PanelMessage>{message}</PanelMessage>)
     .with({ phase: 'ready' }, (ready) => (
-      <PanelBody issue={ready.issue} jiraUrl={ready.jiraUrl} onOpen={ready.open} />
+      <PanelBody issue={ready.issue} jiraBaseUrl={ready.jiraBaseUrl} onOpen={ready.open} />
     ))
     .exhaustive()
 }

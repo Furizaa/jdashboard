@@ -1,7 +1,11 @@
-import { describe, expect, it } from 'vitest'
-import { render } from '@testing-library/react'
+import { afterEach, describe, expect, it } from 'vitest'
+import { cleanup, render } from '@testing-library/react'
 import type { AdfNode } from '~/kernel'
 import { RenderAdf } from './RenderAdf'
+
+afterEach(() => {
+  cleanup()
+})
 
 function html(doc: AdfNode | null): string {
   return render(<RenderAdf doc={doc} />).container.innerHTML
@@ -353,14 +357,13 @@ describe('RenderAdf', () => {
         content: [{ type: 'media', attrs: { type: 'file', id: 'abc' } }],
       })
       expect(
-        render(<RenderAdf doc={doc} jiraUrl="https://j.example.com/browse/X-1" />).container
-          .innerHTML,
+        render(<RenderAdf doc={doc} jiraBaseUrl="https://j.example.com" />).container.innerHTML,
       ).toMatchInlineSnapshot(
-        `"<div class="space-y-3"><div class="my-2"><span class="border-border bg-muted/40 text-muted-foreground inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs"><span>Media hosted in Jira</span><a href="https://j.example.com/browse/X-1" target="_blank" rel="noopener noreferrer" class="text-sky-400 hover:underline">Open in Jira</a></span></div></div>"`,
+        `"<div class="space-y-3"><div class="my-2"><span class="border-border bg-muted/40 text-muted-foreground inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs"><span>Media hosted in Jira</span><a href="https://j.example.com" target="_blank" rel="noopener noreferrer" class="text-sky-400 hover:underline">Open in Jira</a></span></div></div>"`,
       )
     })
 
-    it('renders a placeholder without a link when no jiraUrl is supplied', () => {
+    it('renders a placeholder without a link when no jiraBaseUrl is supplied', () => {
       expect(
         html(
           wrap({
@@ -393,6 +396,48 @@ describe('RenderAdf', () => {
       ).toMatchInlineSnapshot(
         `"<div class="space-y-3"><div class="my-2 flex flex-wrap gap-2"><img alt="" class="border-border max-w-full rounded-md border" src="https://example.com/a.png"><img alt="" class="border-border max-w-full rounded-md border" src="https://example.com/b.png"></div></div>"`,
       )
+    })
+  })
+
+  describe('inlineCard', () => {
+    const BASE = 'https://hexagon.atlassian.net'
+
+    it('renders a Jira-issue chip when the URL matches <jiraBaseUrl>/browse/<KEY>', () => {
+      const doc: AdfNode = wrap({
+        type: 'paragraph',
+        content: [{ type: 'inlineCard', attrs: { url: `${BASE}/browse/HDR-123` } }],
+      })
+      const { container, getByRole } = render(<RenderAdf doc={doc} jiraBaseUrl={BASE} />)
+      const link = getByRole('link', { name: 'HDR-123' })
+      expect(link).toHaveAttribute('href', `${BASE}/browse/HDR-123`)
+      expect(link).toHaveAttribute('target', '_blank')
+      expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+      expect(container.innerHTML).toContain('HDR-123')
+    })
+
+    it('renders a plain-URL chip with truncated host+path for non-Jira URLs', () => {
+      const doc: AdfNode = wrap({
+        type: 'paragraph',
+        content: [{ type: 'inlineCard', attrs: { url: 'https://github.com/foo/bar/issues/1' } }],
+      })
+      const { getByRole } = render(<RenderAdf doc={doc} jiraBaseUrl={BASE} />)
+      const link = getByRole('link', { name: /github\.com\/foo\/bar\/issues\/1/ })
+      expect(link).toHaveAttribute('href', 'https://github.com/foo/bar/issues/1')
+      expect(link).toHaveAttribute('target', '_blank')
+      expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+    })
+
+    it('falls through to PlainUrl when no jiraBaseUrl is supplied', () => {
+      const doc: AdfNode = wrap({
+        type: 'paragraph',
+        content: [{ type: 'inlineCard', attrs: { url: `${BASE}/browse/HDR-123` } }],
+      })
+      const { getByRole, queryByRole } = render(<RenderAdf doc={doc} />)
+      // Without a base URL, the chip is the plain-URL chip showing host+path,
+      // not the Jira issue chip showing 'HDR-123'.
+      expect(queryByRole('link', { name: 'HDR-123' })).toBeNull()
+      const link = getByRole('link', { name: /hexagon\.atlassian\.net\/browse\/HDR-123/ })
+      expect(link).toHaveAttribute('href', `${BASE}/browse/HDR-123`)
     })
   })
 

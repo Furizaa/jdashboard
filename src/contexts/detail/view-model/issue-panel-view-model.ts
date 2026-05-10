@@ -35,6 +35,7 @@ export type IssuePanelState =
       phase: 'ready'
       issue: DetailIssue
       jiraUrl: string
+      jiraBaseUrl: string
       prevKey: string | null
       nextKey: string | null
       /** No-op when jiraUrl is unavailable. */
@@ -89,6 +90,7 @@ export function derive(input: DeriveInput): IssuePanelState {
         phase: 'ready' as const,
         issue,
         jiraUrl,
+        jiraBaseUrl: baseUrl,
         prevKey,
         nextKey,
         openInJira: () => openInBrowser(jiraUrl),

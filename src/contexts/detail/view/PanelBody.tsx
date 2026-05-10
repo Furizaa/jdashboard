@@ -9,11 +9,11 @@ import { RenderAdf } from './adf'
 export function PanelBody({
   issue,
   onOpen,
-  jiraUrl,
+  jiraBaseUrl,
 }: {
   issue: DetailIssue
   onOpen: (key: string) => void
-  jiraUrl: string
+  jiraBaseUrl: string
 }) {
   const hasDescription = extractPlainText(issue.description).length > 0
 
@@ -23,7 +23,7 @@ export function PanelBody({
         <h1 className="text-foreground text-xl leading-tight font-semibold">{issue.summary}</h1>
         <div className="mt-5">
           {hasDescription ? (
-            <RenderAdf doc={issue.description} jiraUrl={jiraUrl} />
+            <RenderAdf doc={issue.description} jiraBaseUrl={jiraBaseUrl} />
           ) : (
             <NoDescription />
           )}
@@ -34,7 +34,7 @@ export function PanelBody({
           links={issue.links}
           onOpen={onOpen}
         />
-        <Activity comments={issue.comments} />
+        <Activity comments={issue.comments} jiraBaseUrl={jiraBaseUrl} />
       </div>
       <PropertiesRail issue={issue} />
     </div>

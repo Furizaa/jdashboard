@@ -3,6 +3,9 @@ import { makeIssue } from '../fixtures/factories'
 import type { AdfNode } from '~/server/gateways/jira'
 
 const KEY = 'HDR-450'
+const JIRA_BASE_URL = 'http://127.0.0.1:9999'
+const REFERENCED_KEY = 'HDR-449'
+const NON_JIRA_URL = 'https://github.com/foo/bar/issues/1'
 
 const description: AdfNode = {
   type: 'doc',
@@ -83,6 +86,19 @@ const description: AdfNode = {
         },
       ],
     },
+    {
+      type: 'paragraph',
+      content: [
+        { type: 'text', text: 'See ' },
+        {
+          type: 'inlineCard',
+          attrs: { url: `${JIRA_BASE_URL}/browse/${REFERENCED_KEY}` },
+        },
+        { type: 'text', text: ' and ' },
+        { type: 'inlineCard', attrs: { url: NON_JIRA_URL } },
+        { type: 'text', text: '.' },
+      ],
+    },
     // Unsupported fallback — surfaces as `[unsupported: <type>]`.
     { type: 'mysteryNode' },
   ],
@@ -128,6 +144,23 @@ test('description renders every supported ADF node and an unsupported placeholde
   // mediaSingle → <img> with the supplied URL/alt
   const img = dialog.getByRole('img', { name: 'media-alt' })
   await expect(img).toHaveAttribute('src', 'https://example.com/img.png')
+
+  // inlineCard → Jira-issue chip showing the issue key
+  const jiraChip = dialog.getByRole('link', { name: REFERENCED_KEY })
+  await expect(jiraChip).toBeVisible()
+  await expect(jiraChip).toHaveAttribute('href', `${JIRA_BASE_URL}/browse/${REFERENCED_KEY}`)
+  await expect(jiraChip).toHaveAttribute('target', '_blank')
+  await expect(jiraChip).toHaveAttribute('rel', 'noopener noreferrer')
+
+  // inlineCard → plain-URL chip showing host+path for non-Jira links
+  const plainChip = dialog.getByRole('link', { name: /github\.com\/foo\/bar\/issues\/1/ })
+  await expect(plainChip).toBeVisible()
+  await expect(plainChip).toHaveAttribute('href', NON_JIRA_URL)
+  await expect(plainChip).toHaveAttribute('target', '_blank')
+  await expect(plainChip).toHaveAttribute('rel', 'noopener noreferrer')
+
+  // The unsupported placeholder no longer appears for inlineCard nodes.
+  await expect(dialog.getByText('[unsupported: inlineCard]')).toHaveCount(0)
 
   // Unsupported fallback
   await expect(dialog.getByText('[unsupported: mysteryNode]')).toBeVisible()

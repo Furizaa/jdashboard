@@ -5,7 +5,7 @@ import { RenderAdf } from './adf'
 
 type Comment = DetailIssue['comments'][number]
 
-export function Activity({ comments }: { comments: Comment[] }) {
+export function Activity({ comments, jiraBaseUrl }: { comments: Comment[]; jiraBaseUrl: string }) {
   const ordered = useMemo(
     () =>
       comments.toSorted((a, b) => new Date(a.created).getTime() - new Date(b.created).getTime()),
@@ -22,7 +22,7 @@ export function Activity({ comments }: { comments: Comment[] }) {
           <ul className="flex flex-col gap-5">
             {ordered.map((comment) => (
               <li key={comment.id}>
-                <CommentRow comment={comment} />
+                <CommentRow comment={comment} jiraBaseUrl={jiraBaseUrl} />
               </li>
             ))}
           </ul>
@@ -32,7 +32,7 @@ export function Activity({ comments }: { comments: Comment[] }) {
   )
 }
 
-function CommentRow({ comment }: { comment: Comment }) {
+function CommentRow({ comment, jiraBaseUrl }: { comment: Comment; jiraBaseUrl: string }) {
   const name = comment.authorName ?? 'Unknown user'
   const initial = name.charAt(0).toUpperCase()
   return (
@@ -44,7 +44,7 @@ function CommentRow({ comment }: { comment: Comment }) {
           <RelativeTime iso={comment.created} />
         </div>
         <div className="mt-1.5 text-sm">
-          <RenderAdf doc={comment.body} />
+          <RenderAdf doc={comment.body} jiraBaseUrl={jiraBaseUrl} />
         </div>
       </div>
     </article>

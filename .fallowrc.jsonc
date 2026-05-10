@@ -10,6 +10,36 @@
   // srvx is invoked by playwright.config.ts as a CLI, not imported.
   "ignoreDependencies": ["srvx"],
 
+  // The shadcn Dialog primitive in design-system/ exposes the full standard
+  // composition surface so future consumers can reach for any part without
+  // re-running `pnpm dlx shadcn add dialog`. Today only Dialog/DialogContent/
+  // DialogTitle/DialogClose are imported (QuickCreateModal + MediaLightbox);
+  // the remaining surface is part of the documented design-system API.
+  "ignoreExports": [
+    {
+      "file": "src/design-system/dialog.tsx",
+      "exports": [
+        "DialogTrigger",
+        "DialogPortal",
+        "DialogOverlay",
+        "DialogHeader",
+        "DialogFooter",
+        "DialogDescription"
+      ]
+    },
+    {
+      "file": "src/design-system/index.ts",
+      "exports": [
+        "DialogTrigger",
+        "DialogPortal",
+        "DialogOverlay",
+        "DialogHeader",
+        "DialogFooter",
+        "DialogDescription"
+      ]
+    }
+  ],
+
   // Exports referenced only inside their own file are still legitimate top-level
   // declarations (e.g. constants used by hooks defined in the same file).
   "ignoreExportsUsedInFile": true,

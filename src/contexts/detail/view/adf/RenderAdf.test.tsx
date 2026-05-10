@@ -380,7 +380,7 @@ describe('RenderAdf', () => {
           }),
         ),
       ).toMatchInlineSnapshot(
-        `"<div class="space-y-3"><div class="my-2"><img alt="screenshot" width="320" height="200" class="border-border max-w-full rounded-md border" src="https://example.com/img.png"></div></div>"`,
+        `"<div class="space-y-3"><div class="my-2"><button type="button" class="border-border focus-visible:ring-ring relative inline-block max-w-full cursor-zoom-in overflow-hidden rounded-md border focus-visible:ring-2 focus-visible:outline-none"><img alt="screenshot" class="block max-w-full" src="https://example.com/img.png"></button></div></div>"`,
       )
     })
 
@@ -427,7 +427,7 @@ describe('RenderAdf', () => {
           }),
         ),
       ).toMatchInlineSnapshot(
-        `"<div class="space-y-3"><div class="my-2 flex flex-wrap gap-2"><img alt="" class="border-border max-w-full rounded-md border" src="https://example.com/a.png"><img alt="" class="border-border max-w-full rounded-md border" src="https://example.com/b.png"></div></div>"`,
+        `"<div class="space-y-3"><div class="my-2 flex flex-wrap gap-2"><button type="button" aria-label="View media" class="border-border focus-visible:ring-ring relative inline-block max-w-full cursor-zoom-in overflow-hidden rounded-md border focus-visible:ring-2 focus-visible:outline-none"><img alt="" class="block max-w-full" src="https://example.com/a.png"></button><button type="button" aria-label="View media" class="border-border focus-visible:ring-ring relative inline-block max-w-full cursor-zoom-in overflow-hidden rounded-md border focus-visible:ring-2 focus-visible:outline-none"><img alt="" class="block max-w-full" src="https://example.com/b.png"></button></div></div>"`,
       )
     })
   })

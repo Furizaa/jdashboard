@@ -1,7 +1,7 @@
 import { match } from 'ts-pattern'
 import { FixasapRibbon } from '~/widgets/fixasap-ribbon'
 import { hasFixasapLabel } from '~/widgets/ticket-card'
-import { useIssuePanel } from '../presenter'
+import { LightboxOpenProvider, useIssuePanel } from '../presenter'
 import type { IssuePanelState } from '../view-model'
 import { PanelBody } from './PanelBody'
 import { PanelHeader } from './PanelHeader'
@@ -11,6 +11,14 @@ import { PanelSkeleton } from './PanelSkeleton'
 type OpenPanel = Exclude<IssuePanelState, { phase: 'closed' }>
 
 export function IssueDetailPanel({ issueKey }: { issueKey: string | null }) {
+  return (
+    <LightboxOpenProvider>
+      <IssueDetailPanelInner issueKey={issueKey} />
+    </LightboxOpenProvider>
+  )
+}
+
+function IssueDetailPanelInner({ issueKey }: { issueKey: string | null }) {
   const panel = useIssuePanel(issueKey)
   if (panel.phase === 'closed') return null
   return <Panel panel={panel} />
@@ -33,12 +41,25 @@ function PanelContent({ panel }: { panel: OpenPanel }) {
 
 function Panel({ panel }: { panel: OpenPanel }) {
   const showFixasap = panel.phase === 'ready' && hasFixasapLabel(panel.issue.labels)
+  // Clicks on the dialog backdrop close the panel. React-synthetic events
+  // bubble through portals (e.g. nested MediaLightbox), so the handler ignores
+  // any click whose DOM target isn't a descendant of this element.
+  const onBackdropClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (
+      event.currentTarget instanceof Node &&
+      event.target instanceof Node &&
+      !event.currentTarget.contains(event.target)
+    ) {
+      return
+    }
+    panel.close()
+  }
   return (
     // outer dialog backdrop: click closes; keyboard close (Escape) is wired via useIssuePanel
     // oxlint-disable-next-line jsx-a11y/click-events-have-key-events
     <div
       className="fixed inset-0 z-50 flex justify-end"
-      onClick={panel.close}
+      onClick={onBackdropClick}
       role="dialog"
       aria-modal="true"
       aria-label={panelLabel(panel)}

@@ -5,6 +5,7 @@ import { useBoardData, useTicket } from '~/coordinator'
 import { usePolling } from '~/lib/use-polling'
 import { panelKeyIntent, shouldHandleShortcut, type PanelKeyIntent } from '../domain'
 import { derive, type IssuePanelState } from '../view-model'
+import { useLightboxOpen } from './lightbox-open-context'
 
 const ISSUE_PANEL_POLL_INTERVAL_MS = 60_000
 
@@ -30,17 +31,21 @@ function dispatchPanelIntent(intent: PanelKeyIntent, t: ShortcutTargets): boolea
   return runIfNotNull(t.jiraUrl, t.copyJiraLinkAndToast)
 }
 
-function useEscapeToClose(active: boolean, onClose: () => void): void {
+function useEscapeToClose(active: boolean, lightboxOpen: boolean, onClose: () => void): void {
   useEffect(() => {
     if (!active) return
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return
+      if (lightboxOpen) return
       event.preventDefault()
       onClose()
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [active, onClose])
+    // Capture phase: this fires before any nested portal/dialog listener,
+    // so the `lightboxOpen` closure is read before Radix's Escape handler
+    // tears down the lightbox and flips the context flag back to false.
+    window.addEventListener('keydown', onKey, { capture: true })
+    return () => window.removeEventListener('keydown', onKey, { capture: true })
+  }, [active, lightboxOpen, onClose])
 }
 
 function useShortcutTargets(
@@ -58,18 +63,21 @@ function useShortcutTargets(
   )
 }
 
-function usePanelShortcuts(active: boolean, targets: ShortcutTargets): void {
+function usePanelShortcuts(active: boolean, lightboxOpen: boolean, targets: ShortcutTargets): void {
   useEffect(() => {
     if (!active) return
     const onKey = (event: KeyboardEvent) => {
+      if (lightboxOpen) return
       if (!shouldHandleShortcut(event)) return
       const intent = panelKeyIntent(event)
       if (intent === null) return
       if (dispatchPanelIntent(intent, targets)) event.preventDefault()
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [active, targets])
+    // Capture phase mirrors useEscapeToClose so `lightboxOpen` is honored
+    // before any portal-rendered dialog listener runs.
+    window.addEventListener('keydown', onKey, { capture: true })
+    return () => window.removeEventListener('keydown', onKey, { capture: true })
+  }, [active, lightboxOpen, targets])
 }
 
 export function useIssuePanel(issueKey: string | null): IssuePanelState {
@@ -123,9 +131,10 @@ export function useIssuePanel(issueKey: string | null): IssuePanelState {
 
   const targets = useShortcutTargets(state, navigate, openInBrowser, copyJiraLinkAndToast)
 
+  const lightboxOpen = useLightboxOpen()
   const closeOnEscape = useMemo(() => () => navigate(null), [navigate])
-  useEscapeToClose(issueKey !== null, closeOnEscape)
-  usePanelShortcuts(issueKey !== null, targets)
+  useEscapeToClose(issueKey !== null, lightboxOpen, closeOnEscape)
+  usePanelShortcuts(issueKey !== null, lightboxOpen, targets)
 
   return state
 }

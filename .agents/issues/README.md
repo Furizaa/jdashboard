@@ -46,7 +46,8 @@ Tracer-bullet vertical slices derived from [the clashboard PRD](../prds/clashboa
 
 69
 70
-71 → 72
+71 ─┬─→ 72
+   └─→ 73
 ```
 
 ## Index
@@ -144,9 +145,10 @@ Tracer-bullet vertical slices derived from [the clashboard PRD](../prds/clashboa
 
 ### ADF rendering extensions (PRD: [adf-rendering-extensions.md](../prds/adf-rendering-extensions.md))
 
-| #   | File                                                                                                    | Type | Blocked by |
-| --- | ------------------------------------------------------------------------------------------------------- | ---- | ---------- |
-| 69  | [ADF inlineCard rendering](./69-adf-inline-card.md)                                                     | AFK  | —          |
-| 70  | [ADF code blocks with syntax highlighting](./70-adf-code-block-syntax-highlighting.md)                  | AFK  | —          |
-| 71  | [Server-side Jira media proxy + ADF media enrichment (lands ADR-0006)](./71-server-jira-media-proxy.md) | AFK  | —          |
-| 72  | [Media lightbox + shadcn Dialog adoption](./72-media-lightbox-and-dialog-adoption.md)                   | AFK  | 71         |
+| #   | File                                                                                                                  | Type | Blocked by |
+| --- | --------------------------------------------------------------------------------------------------------------------- | ---- | ---------- |
+| 69  | [ADF inlineCard rendering](./69-adf-inline-card.md)                                                                   | AFK  | —          |
+| 70  | [ADF code blocks with syntax highlighting](./70-adf-code-block-syntax-highlighting.md)                                | AFK  | —          |
+| 71  | [Server-side Jira media proxy + ADF media enrichment (lands ADR-0006)](./71-server-jira-media-proxy.md)               | AFK  | —          |
+| 72  | [Media lightbox + shadcn Dialog adoption](./72-media-lightbox-and-dialog-adoption.md)                                 | AFK  | 71         |
+| 73  | [Jira media gateway: real attachment endpoints (fixes the placeholder regression)](./73-jira-media-real-endpoints.md) | AFK  | 71         |

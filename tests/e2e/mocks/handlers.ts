@@ -1,5 +1,18 @@
-import { http, HttpResponse, type HttpHandler } from 'msw'
+import { delay, http, HttpResponse, type HttpHandler } from 'msw'
 import type { World } from '../world/World'
+
+// Tiny 1×1 transparent PNG (44 bytes) — used by the media-lightbox e2e to
+// satisfy the browser's image decoder when the lightbox opens an `<img>` so
+// the inline preview's `onerror` doesn't fire and swap in MediaUnavailable.
+const TINY_PNG_BASE64 =
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIW2NkYGD4DwABBAEAcCBlCwAAAABJRU5ErkJggg=='
+
+function tinyPngBytes(): Uint8Array {
+  const binary = atob(TINY_PNG_BASE64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.codePointAt(i) ?? 0
+  return bytes
+}
 
 // MSW path-only patterns are resolved against `location.origin` in browser
 // contexts. In Node — where we invoke handlers via `getResponse` — there is
@@ -129,6 +142,52 @@ export function buildHandlers(getWorld: () => World): HttpHandler[] {
       const approvals = getWorld().getMrApprovals(iid)
       return HttpResponse.json({
         approved_by: approvals.approvedUsernames.map((username) => ({ user: { username } })),
+      })
+    }),
+
+    // Jira media-tokens endpoint — returned as a canned bundle so the
+    // server-side `getMediaMetadata` resolves with the expected shape during
+    // a Detail-panel load. The e2e fixture seeds `attrs.url` directly, so the
+    // proxy flow is bypassed end-to-end; this handler exists for parity with
+    // the production wire shape and so any future spec exercising the proxy
+    // route has a predictable response.
+    http.post('*/rest/api/3/media-tokens', async ({ request }) => {
+      const body = (await request.json().catch(() => ({}))) as { ids?: string[] }
+      const ids = Array.isArray(body.ids) ? body.ids : []
+      return HttpResponse.json({
+        endpointUrl: 'http://127.0.0.1:9999/media-binary',
+        token: 'canned-token',
+        items: ids.map((id) => ({ id, mimeType: 'image/png' })),
+      })
+    }),
+
+    // Proxy URL injected into ADF media nodes after server-side enrichment.
+    // The e2e fixture seeds `attrs.url = http://127.0.0.1:9999/api/jira-media/<id>`
+    // so the browser's <img>/<video> fetch lands on this MSW handler instead
+    // of round-tripping through the clashboard server's binary route.
+    http.get('*/api/jira-media/:id', async ({ params }) => {
+      const id = String(params.id)
+      if (id === 'missing' || id.startsWith('missing-')) {
+        return new HttpResponse('Media not found', { status: 404 })
+      }
+      if (id.startsWith('video-')) {
+        // Hold the response open: the browser's <video preload="metadata">
+        // stays in loading state long enough for the spec to observe the
+        // element's attributes without `onerror` firing and swapping in
+        // MediaUnavailable. The test completes well within this window.
+        await delay(30_000)
+        return new HttpResponse(new Uint8Array(0), {
+          status: 200,
+          headers: { 'Content-Type': 'video/mp4' },
+        })
+      }
+      const bytes = tinyPngBytes()
+      return new HttpResponse(bytes, {
+        status: 200,
+        headers: {
+          'Content-Type': 'image/png',
+          'Content-Length': bytes.byteLength.toString(),
+        },
       })
     }),
 

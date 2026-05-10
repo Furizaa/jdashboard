@@ -87,7 +87,12 @@ const description: AdfNode = {
       content: [
         {
           type: 'media',
-          attrs: { url: 'https://example.com/img.png', alt: 'media-alt' },
+          attrs: {
+            // Resolved via the e2e MSW sidecar so the inline <img> loads
+            // successfully and `onerror` does not swap in MediaUnavailable.
+            url: 'http://127.0.0.1:9999/api/jira-media/img-1',
+            alt: 'media-alt',
+          },
         },
       ],
     },
@@ -154,9 +159,10 @@ test('description renders every supported ADF node and an unsupported placeholde
   await expect(dialog.getByText('STATUS-LABEL')).toBeVisible()
   await expect(dialog.getByText('panel-content')).toBeVisible()
 
-  // mediaSingle → <img> with the supplied URL/alt
+  // mediaSingle → button-wrapped <img> with the supplied URL/alt. The button's
+  // accessible name is supplied by the inner img's alt attribute.
   const img = dialog.getByRole('img', { name: 'media-alt' })
-  await expect(img).toHaveAttribute('src', 'https://example.com/img.png')
+  await expect(img).toHaveAttribute('src', 'http://127.0.0.1:9999/api/jira-media/img-1')
 
   // inlineCard → Jira-issue chip showing the issue key
   const jiraChip = dialog.getByRole('link', { name: REFERENCED_KEY })

@@ -3,6 +3,7 @@ import { JiraGateway } from '../../../gateways/jira/port'
 import type { BoardIssue, RawIssue } from '../../../gateways/jira/types'
 import { BoardConfig } from '../config'
 import type { JiraUnauthorized } from '../../../gateways/jira/errors'
+import { dieOn } from '../../../lib/die-on'
 import { quoteJqlString } from '../../../lib/jql'
 
 export type LoadBoardOk = {
@@ -53,12 +54,7 @@ export const loadBoard: Effect.Effect<LoadBoardOk, JiraUnauthorized, JiraGateway
       label: config.labelFilter,
       doneWindowDays: config.doneWindowDays,
     })
-    const response = yield* jira.searchIssues(jql, BOARD_FIELDS).pipe(
-      Effect.catchTags({
-        NotFound: (e) => Effect.die(e),
-        Rejected: (e) => Effect.die(e),
-      }),
-    )
+    const response = yield* jira.searchIssues(jql, BOARD_FIELDS).pipe(dieOn('NotFound', 'Rejected'))
     const hideSet = new Set(config.hideLabels.map((l) => l.toLowerCase()))
     const issues = response.issues.map((issue) => toBoardIssue(issue, hideSet))
     return { baseUrl: config.baseUrl, issues }

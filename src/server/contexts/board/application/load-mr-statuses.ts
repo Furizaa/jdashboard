@@ -4,6 +4,7 @@ import { GitlabGateway } from '../../../gateways/gitlab/port'
 import { buildMrKeyMap } from '../../../gateways/gitlab/mr-key-map'
 import { summarizeMr } from '../../../gateways/gitlab/mr-status'
 import type { MrSummary, RawMrSummary } from '../../../gateways/gitlab/types'
+import { dieOn } from '../../../lib/die-on'
 import { BoardConfig } from '../config'
 import type { LoadMrStatusesError } from '../errors'
 
@@ -24,12 +25,7 @@ export const loadMrStatuses: Effect.Effect<
   const gitlab = yield* GitlabGateway
   const config = yield* BoardConfig
 
-  const me = yield* gitlab.getCurrentUser().pipe(
-    Effect.catchTags({
-      NotFound: (e) => Effect.die(e),
-      Rejected: (e) => Effect.die(e),
-    }),
-  )
+  const me = yield* gitlab.getCurrentUser().pipe(dieOn('NotFound', 'Rejected'))
 
   const nowMs = yield* Clock.currentTimeMillis
   const updatedAfter = new Date(nowMs - config.doneWindowDays * MS_PER_DAY)
@@ -40,12 +36,7 @@ export const loadMrStatuses: Effect.Effect<
       authorUsername: me.username,
       updatedAfter,
     })
-    .pipe(
-      Effect.catchTags({
-        NotFound: (e) => Effect.die(e),
-        Rejected: (e) => Effect.die(e),
-      }),
-    )
+    .pipe(dieOn('NotFound', 'Rejected'))
 
   const matched = buildMrKeyMap(list, config.projectKey)
 

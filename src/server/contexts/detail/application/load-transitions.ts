@@ -1,6 +1,7 @@
 import { Effect } from 'effect'
 import { JiraGateway } from '../../../gateways/jira/port'
 import type { AllowedTransition } from '../../../gateways/jira/types'
+import { dieOn } from '../../../lib/die-on'
 import type { LoadTransitionsError } from '../errors'
 
 export type LoadTransitionsOk = {
@@ -12,10 +13,6 @@ export const loadTransitions = (
 ): Effect.Effect<LoadTransitionsOk, LoadTransitionsError, JiraGateway> =>
   Effect.gen(function* () {
     const jira = yield* JiraGateway
-    const transitions = yield* jira.getTransitions(key).pipe(
-      Effect.catchTags({
-        Rejected: (e) => Effect.die(e),
-      }),
-    )
+    const transitions = yield* jira.getTransitions(key).pipe(dieOn('Rejected'))
     return { transitions }
   })

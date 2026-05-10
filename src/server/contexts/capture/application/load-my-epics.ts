@@ -3,6 +3,7 @@ import { JiraGateway } from '../../../gateways/jira/port'
 import type { EpicRef } from '../../../gateways/jira/types'
 import { CaptureConfig } from '../config'
 import type { LoadMyEpicsError } from '../errors'
+import { dieOn } from '../../../lib/die-on'
 import { quoteJqlString } from '../../../lib/jql'
 
 export type LoadMyEpicsOk = {
@@ -34,12 +35,7 @@ export const loadMyEpics: Effect.Effect<
     projectKey: config.projectKey,
     statuses: config.epic.statuses,
   })
-  const response = yield* jira.searchIssues(jql, EPIC_FIELDS).pipe(
-    Effect.catchTags({
-      NotFound: (e) => Effect.die(e),
-      Rejected: (e) => Effect.die(e),
-    }),
-  )
+  const response = yield* jira.searchIssues(jql, EPIC_FIELDS).pipe(dieOn('NotFound', 'Rejected'))
   const epics: EpicRef[] = response.issues.map((issue) => ({
     key: issue.key,
     summary: issue.fields.summary,

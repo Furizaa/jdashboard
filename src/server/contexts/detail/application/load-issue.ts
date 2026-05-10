@@ -16,6 +16,7 @@ import type {
 import { DetailConfig } from '../config'
 import { type AttachmentRef, enrichAdfWithMedia } from '../domain/enrich-adf-with-media'
 import type { LoadIssueError } from '../errors'
+import { dieOn } from '../../../lib/die-on'
 import { quoteJqlString } from '../../../lib/jql'
 
 export type LoadIssueOk = {
@@ -194,17 +195,10 @@ export const loadIssue = (
     const config = yield* DetailConfig
     const [detailed, subSearch] = yield* Effect.all(
       [
-        jira.getIssue(key, DETAIL_ISSUE_FIELDS).pipe(
-          Effect.catchTags({
-            Rejected: (e) => Effect.die(e),
-          }),
-        ),
-        jira.searchIssues(`parent = ${quoteJqlString(key)}`, SUB_ISSUE_FIELDS).pipe(
-          Effect.catchTags({
-            NotFound: (e) => Effect.die(e),
-            Rejected: (e) => Effect.die(e),
-          }),
-        ),
+        jira.getIssue(key, DETAIL_ISSUE_FIELDS).pipe(dieOn('Rejected')),
+        jira
+          .searchIssues(`parent = ${quoteJqlString(key)}`, SUB_ISSUE_FIELDS)
+          .pipe(dieOn('NotFound', 'Rejected')),
       ],
       { concurrency: 'unbounded' },
     )

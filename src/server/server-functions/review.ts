@@ -6,6 +6,7 @@ import type { ReviewCard } from '../gateways/gitlab/types'
 import { loadReviewCards } from '../contexts/review/application/load-review-cards'
 import { ReviewConfigLive } from '../contexts/review/config'
 import { LoadReviewCardsError } from '../contexts/review/errors'
+import { dieOn } from '../lib/die-on'
 import { appRuntime } from '../runtime/app-runtime'
 import { toWire, type WireResult } from '../wire/to-wire'
 
@@ -36,12 +37,7 @@ const GitlabUserOnlyError = Schema.Union(GitlabUnauthorized)
 
 const getGitlabUserProgram = Effect.gen(function* () {
   const gitlab = yield* GitlabGateway
-  const me = yield* gitlab.getCurrentUser().pipe(
-    Effect.catchTags({
-      NotFound: (e) => Effect.die(e),
-      Rejected: (e) => Effect.die(e),
-    }),
-  )
+  const me = yield* gitlab.getCurrentUser().pipe(dieOn('NotFound', 'Rejected'))
   return { username: me.username, displayName: me.displayName }
 })
 

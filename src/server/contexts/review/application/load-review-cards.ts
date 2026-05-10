@@ -23,6 +23,7 @@ import {
 import { extractKeysFromTitle } from '../../../gateways/gitlab/mr-key-map'
 import { ReviewConfig } from '../config'
 import type { LoadReviewCardsError } from '../errors'
+import { dieOn } from '../../../lib/die-on'
 import { quoteJqlString } from '../../../lib/jql'
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000
@@ -161,10 +162,7 @@ const lookupBulkIssues = (
   if (uniqueKeys.length === 0) return Effect.succeed([])
   const hideSet = new Set(hideLabels.map((l) => l.toLowerCase()))
   return jira.searchIssues(buildBulkIssuesJql(uniqueKeys), BULK_FIELDS).pipe(
-    Effect.catchTags({
-      NotFound: (e) => Effect.die(e),
-      Rejected: (e) => Effect.die(e),
-    }),
+    dieOn('NotFound', 'Rejected'),
     Effect.map((response) => response.issues.map((issue) => toBoardIssue(issue, hideSet))),
   )
 }
@@ -206,24 +204,14 @@ export const loadReviewCards: Effect.Effect<
   const jira = yield* JiraGateway
   const config = yield* ReviewConfig
 
-  const me = yield* gitlab.getCurrentUser().pipe(
-    Effect.catchTags({
-      NotFound: (e) => Effect.die(e),
-      Rejected: (e) => Effect.die(e),
-    }),
-  )
+  const me = yield* gitlab.getCurrentUser().pipe(dieOn('NotFound', 'Rejected'))
 
   const nowMs = yield* Clock.currentTimeMillis
   const updatedAfter = new Date(nowMs - config.lookbackDays * MS_PER_DAY)
 
   const list = yield* gitlab
     .listMrs({ states: ['opened', 'merged'], reviewerUsername: me.username, updatedAfter })
-    .pipe(
-      Effect.catchTags({
-        NotFound: (e) => Effect.die(e),
-        Rejected: (e) => Effect.die(e),
-      }),
-    )
+    .pipe(dieOn('NotFound', 'Rejected'))
 
   const candidates = list.filter((mr) => !mr.draft)
 

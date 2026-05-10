@@ -11,7 +11,9 @@ export function GitlabIndicator() {
 
   if (query.isPending || query.isError) return null
 
-  if (query.data.ok === false) {
+  const wire = query.data
+  if (wire.ok === false) {
+    // The only failure tag in GitlabUserOnlyError is 'Unauthorized'.
     return (
       <span
         className="text-muted-foreground/60 rounded px-2 py-1 text-xs"
@@ -23,11 +25,8 @@ export function GitlabIndicator() {
   }
 
   return (
-    <span
-      className="text-muted-foreground rounded px-2 py-1 text-xs"
-      title={query.data.displayName}
-    >
-      GitLab ✓ {query.data.username}
+    <span className="text-muted-foreground rounded px-2 py-1 text-xs" title={wire.displayName}>
+      GitLab ✓ {wire.username}
     </span>
   )
 }

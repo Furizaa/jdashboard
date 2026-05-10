@@ -7,9 +7,8 @@ import { loadReviewCards } from '../contexts/review/application/load-review-card
 import { ReviewConfigLive } from '../contexts/review/config'
 import { LoadReviewCardsError } from '../contexts/review/errors'
 import { dieOn } from '../lib/die-on'
-import { appRuntime } from '../runtime/app-runtime'
 import { runWire } from './run-wire'
-import { toWire, type WireResult } from '../wire/to-wire'
+import type { WireResult } from '../wire/to-wire'
 
 type LoadReviewCardsErrorWire = Schema.Schema.Encoded<typeof LoadReviewCardsError>
 
@@ -18,9 +17,13 @@ export type GetReviewCardsResult = WireResult<
   LoadReviewCardsErrorWire
 >
 
-export type GetGitlabUserResult =
-  | { readonly ok: true; readonly username: string; readonly displayName: string }
-  | { readonly ok: false; readonly reason: 'unauthorized' }
+const GitlabUserOnlyError = Schema.Union(GitlabUnauthorized)
+type GitlabUserOnlyErrorWire = Schema.Schema.Encoded<typeof GitlabUserOnlyError>
+
+export type GetGitlabUserResult = WireResult<
+  { readonly username: string; readonly displayName: string },
+  GitlabUserOnlyErrorWire
+>
 
 const reviewCardsProgram = loadReviewCards.pipe(Effect.provide(ReviewConfigLive))
 
@@ -29,8 +32,6 @@ export const getReviewCards = createServerFn({ method: 'GET' }).handler(
     runWire(reviewCardsProgram, LoadReviewCardsError, 'getReviewCards'),
 )
 
-const GitlabUserOnlyError = Schema.Union(GitlabUnauthorized)
-
 const getGitlabUserProgram = Effect.gen(function* () {
   const gitlab = yield* GitlabGateway
   const me = yield* gitlab.getCurrentUser().pipe(dieOn('NotFound', 'Rejected'))
@@ -38,14 +39,6 @@ const getGitlabUserProgram = Effect.gen(function* () {
 })
 
 export const getGitlabUser = createServerFn({ method: 'GET' }).handler(
-  async (): Promise<GetGitlabUserResult> => {
-    const wire = await appRuntime.runPromise(toWire(getGitlabUserProgram, GitlabUserOnlyError))
-    if (!wire.ok && wire.error._tag === 'InternalError') {
-      throw new Error('getGitlabUser: internal error')
-    }
-    if (wire.ok) {
-      return { ok: true, username: wire.username, displayName: wire.displayName }
-    }
-    return { ok: false, reason: 'unauthorized' }
-  },
+  async (): Promise<GetGitlabUserResult> =>
+    runWire(getGitlabUserProgram, GitlabUserOnlyError, 'getGitlabUser'),
 )

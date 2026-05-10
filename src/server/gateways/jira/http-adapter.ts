@@ -15,7 +15,6 @@ import type {
   CreateIssueBody,
   GatewayCreatedIssue,
   JiraUser,
-  MediaMetadata,
   MediaStream,
   RawDetailedIssue,
   RawSearchResponse,
@@ -96,63 +95,6 @@ function decodeMediaBinary(
         : {}),
     }
   })
-}
-
-function shapeAttachmentMetadata(id: string, raw: unknown): MediaMetadata {
-  const obj = (raw ?? {}) as {
-    mimeType?: unknown
-    width?: unknown
-    height?: unknown
-  }
-  const mimeType = typeof obj.mimeType === 'string' ? obj.mimeType : 'application/octet-stream'
-  const width = typeof obj.width === 'number' ? obj.width : undefined
-  const height = typeof obj.height === 'number' ? obj.height : undefined
-  return {
-    id,
-    mimeType,
-    ...(width !== undefined ? { width } : {}),
-    ...(height !== undefined ? { height } : {}),
-  }
-}
-
-function fetchAttachmentMetadata(
-  client: HttpClient.HttpClient,
-  baseUrl: string,
-  baseHeaders: Readonly<Record<string, string>>,
-  id: string,
-): Effect.Effect<MediaMetadata | null, MediaResolutionError> {
-  const request = HttpClientRequest.get(
-    `${baseUrl}/rest/api/3/attachment/metadata/${encodeURIComponent(id)}`,
-  ).pipe(HttpClientRequest.setHeaders(baseHeaders))
-  return client.execute(request).pipe(
-    Effect.mapError(
-      (error) =>
-        new MediaResolutionError({
-          message: `Jira attachment metadata request failed: ${error.message}`,
-          status: 0,
-        }),
-    ),
-    Effect.flatMap(
-      (response): Effect.Effect<MediaMetadata | null, MediaResolutionError> =>
-        HttpClientResponse.matchStatus(response, {
-          '2xx': (ok): Effect.Effect<MediaMetadata | null, MediaResolutionError> =>
-            ok.json.pipe(
-              Effect.mapError(
-                (err) =>
-                  new MediaResolutionError({
-                    message: err.message,
-                    status: ok.status,
-                  }),
-              ),
-              Effect.map((value): MediaMetadata | null => shapeAttachmentMetadata(id, value)),
-            ),
-          404: (): Effect.Effect<MediaMetadata | null, MediaResolutionError> =>
-            Effect.succeed(null),
-          orElse: (bad): Effect.Effect<MediaMetadata | null, MediaResolutionError> =>
-            mediaResolutionFromStatus(bad),
-        }),
-    ),
-  )
 }
 
 function fetchAttachmentContent(
@@ -290,18 +232,6 @@ export const JiraGatewayLive: Layer.Layer<JiraGateway, never, HttpClient.HttpCli
             Effect.flatMap((req) => executeJson<{ id: string; key: string; self: string }>(req)),
             Effect.map((created): GatewayCreatedIssue => ({ key: created.key })),
           ),
-
-        getMediaMetadata: (ids) =>
-          ids.length === 0
-            ? Effect.succeed([] as readonly MediaMetadata[])
-            : Effect.all(
-                ids.map((id) => fetchAttachmentMetadata(client, baseUrl, baseHeaders, id)),
-                { concurrency: 5 },
-              ).pipe(
-                Effect.map((items): readonly MediaMetadata[] =>
-                  items.filter((m): m is MediaMetadata => m !== null),
-                ),
-              ),
 
         streamMedia: (id) => fetchAttachmentContent(client, baseUrl, baseHeaders, id),
       })

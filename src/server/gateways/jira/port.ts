@@ -5,7 +5,6 @@ import type {
   CreateIssueBody,
   GatewayCreatedIssue,
   JiraUser,
-  MediaMetadata,
   MediaStream,
   RawDetailedIssue,
   RawSearchResponse,
@@ -29,9 +28,6 @@ export type JiraGatewayShape = {
   readonly createIssue: (
     body: CreateIssueBody,
   ) => Effect.Effect<GatewayCreatedIssue, JiraGatewayError>
-  readonly getMediaMetadata: (
-    ids: readonly string[],
-  ) => Effect.Effect<readonly MediaMetadata[], MediaResolutionError>
   readonly streamMedia: (
     id: string,
   ) => Effect.Effect<MediaStream, MediaResolutionError | MediaNotFound>

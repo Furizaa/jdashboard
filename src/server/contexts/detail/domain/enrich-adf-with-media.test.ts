@@ -1,67 +1,91 @@
 import { describe, expect, it } from 'vitest'
-import type { AdfNode, MediaMetadata } from '../../../gateways/jira/types'
-import { collectMediaIds, enrichAdfWithMedia } from './enrich-adf-with-media'
+import type { AdfNode } from '../../../gateways/jira/types'
+import {
+  type AttachmentRef,
+  collectMediaFilenames,
+  enrichAdfWithMedia,
+} from './enrich-adf-with-media'
 
 function map(
-  ...entries: ReadonlyArray<readonly [string, MediaMetadata]>
-): ReadonlyMap<string, MediaMetadata> {
+  ...entries: ReadonlyArray<readonly [string, AttachmentRef]>
+): ReadonlyMap<string, AttachmentRef> {
   return new Map(entries)
 }
 
-const META_PNG: MediaMetadata = { id: 'a', mimeType: 'image/png', width: 100, height: 50 }
-const META_VIDEO: MediaMetadata = { id: 'b', mimeType: 'video/mp4' }
+const PNG_REF: AttachmentRef = { attachmentId: '10001', mimeType: 'image/png' }
+const VIDEO_REF: AttachmentRef = { attachmentId: '10002', mimeType: 'video/mp4' }
 
 describe('enrichAdfWithMedia', () => {
   it('returns null for null ADF', () => {
-    expect(enrichAdfWithMedia(null, map(['a', META_PNG]))).toBeNull()
+    expect(enrichAdfWithMedia(null, map(['pic.png', PNG_REF]))).toBeNull()
   })
 
-  it('returns the input unchanged when the metadata map is empty', () => {
-    const adf: AdfNode = { type: 'doc', content: [{ type: 'media', attrs: { id: 'a' } }] }
+  it('returns the input unchanged when the attachment map is empty', () => {
+    const adf: AdfNode = {
+      type: 'doc',
+      content: [{ type: 'media', attrs: { id: 'uuid', alt: 'pic.png' } }],
+    }
     const out = enrichAdfWithMedia(adf, map())
     expect(out).toBe(adf)
   })
 
-  it('enriches a top-level media node whose id is in the map', () => {
-    const adf: AdfNode = { type: 'media', attrs: { id: 'a' } }
-    const out = enrichAdfWithMedia(adf, map(['a', META_PNG]))
-    expect(out).toEqual({
-      type: 'media',
-      attrs: { id: 'a', url: '/api/jira-media/a', mimeType: 'image/png' },
-    })
-  })
-
-  it('preserves existing attrs (alt, width, height) and adds url + mimeType', () => {
-    const adf: AdfNode = {
-      type: 'media',
-      attrs: { id: 'a', alt: 'screenshot', width: 200, height: 100 },
-    }
-    const out = enrichAdfWithMedia(adf, map(['a', META_PNG]))
+  it('enriches a top-level media node whose alt filename is in the map', () => {
+    const adf: AdfNode = { type: 'media', attrs: { id: 'uuid-a', alt: 'pic.png' } }
+    const out = enrichAdfWithMedia(adf, map(['pic.png', PNG_REF]))
     expect(out).toEqual({
       type: 'media',
       attrs: {
-        id: 'a',
-        alt: 'screenshot',
-        width: 200,
-        height: 100,
-        url: '/api/jira-media/a',
+        id: 'uuid-a',
+        alt: 'pic.png',
+        url: '/api/jira-media/10001',
         mimeType: 'image/png',
       },
     })
   })
 
-  it('leaves a media node with an id missing from the map unchanged', () => {
-    const adf: AdfNode = { type: 'media', attrs: { id: 'unresolved' } }
-    const out = enrichAdfWithMedia(adf, map(['a', META_PNG]))
-    expect(out).toEqual({ type: 'media', attrs: { id: 'unresolved' } })
+  it('preserves existing attrs (id, width, height) and adds url + mimeType', () => {
+    const adf: AdfNode = {
+      type: 'media',
+      attrs: { id: 'uuid-a', alt: 'pic.png', width: 200, height: 100 },
+    }
+    const out = enrichAdfWithMedia(adf, map(['pic.png', PNG_REF]))
+    expect(out).toEqual({
+      type: 'media',
+      attrs: {
+        id: 'uuid-a',
+        alt: 'pic.png',
+        width: 200,
+        height: 100,
+        url: '/api/jira-media/10001',
+        mimeType: 'image/png',
+      },
+    })
+  })
+
+  it('leaves a media node with a filename missing from the map unchanged', () => {
+    const adf: AdfNode = { type: 'media', attrs: { id: 'uuid-x', alt: 'unknown.png' } }
+    const out = enrichAdfWithMedia(adf, map(['pic.png', PNG_REF]))
+    expect(out).toEqual({ type: 'media', attrs: { id: 'uuid-x', alt: 'unknown.png' } })
+  })
+
+  it('leaves a media node with no alt attribute unchanged', () => {
+    const adf: AdfNode = { type: 'media', attrs: { id: 'uuid-x' } }
+    expect(enrichAdfWithMedia(adf, map(['pic.png', PNG_REF]))).toEqual(adf)
+  })
+
+  it('leaves a media node with non-string alt unchanged', () => {
+    const adf: AdfNode = { type: 'media', attrs: { id: 'uuid-x', alt: null } }
+    expect(enrichAdfWithMedia(adf, map(['pic.png', PNG_REF]))).toEqual(adf)
   })
 
   it('walks media inside paragraphs', () => {
     const adf: AdfNode = {
       type: 'doc',
-      content: [{ type: 'paragraph', content: [{ type: 'media', attrs: { id: 'a' } }] }],
+      content: [
+        { type: 'paragraph', content: [{ type: 'media', attrs: { id: 'u', alt: 'pic.png' } }] },
+      ],
     }
-    const out = enrichAdfWithMedia(adf, map(['a', META_PNG]))
+    const out = enrichAdfWithMedia(adf, map(['pic.png', PNG_REF]))
     expect(out).toEqual({
       type: 'doc',
       content: [
@@ -70,7 +94,12 @@ describe('enrichAdfWithMedia', () => {
           content: [
             {
               type: 'media',
-              attrs: { id: 'a', url: '/api/jira-media/a', mimeType: 'image/png' },
+              attrs: {
+                id: 'u',
+                alt: 'pic.png',
+                url: '/api/jira-media/10001',
+                mimeType: 'image/png',
+              },
             },
           ],
         },
@@ -87,25 +116,27 @@ describe('enrichAdfWithMedia', () => {
           content: [
             {
               type: 'listItem',
-              content: [{ type: 'media', attrs: { id: 'a' } }],
+              content: [{ type: 'media', attrs: { id: 'u', alt: 'pic.png' } }],
             },
           ],
         },
       ],
     }
-    const out = enrichAdfWithMedia(adf, map(['a', META_PNG]))
+    const out = enrichAdfWithMedia(adf, map(['pic.png', PNG_REF]))
     const item = (out as AdfNode).content?.[0]?.content?.[0]?.content?.[0]
-    expect(item?.attrs?.url).toBe('/api/jira-media/a')
+    expect(item?.attrs?.url).toBe('/api/jira-media/10001')
   })
 
   it('walks media inside blockquote', () => {
     const adf: AdfNode = {
       type: 'doc',
-      content: [{ type: 'blockquote', content: [{ type: 'media', attrs: { id: 'a' } }] }],
+      content: [
+        { type: 'blockquote', content: [{ type: 'media', attrs: { id: 'u', alt: 'pic.png' } }] },
+      ],
     }
-    const out = enrichAdfWithMedia(adf, map(['a', META_PNG]))
+    const out = enrichAdfWithMedia(adf, map(['pic.png', PNG_REF]))
     const m = (out as AdfNode).content?.[0]?.content?.[0]
-    expect(m?.attrs?.url).toBe('/api/jira-media/a')
+    expect(m?.attrs?.url).toBe('/api/jira-media/10001')
   })
 
   it('walks media inside panel', () => {
@@ -115,23 +146,28 @@ describe('enrichAdfWithMedia', () => {
         {
           type: 'panel',
           attrs: { panelType: 'info' },
-          content: [{ type: 'media', attrs: { id: 'a' } }],
+          content: [{ type: 'media', attrs: { id: 'u', alt: 'pic.png' } }],
         },
       ],
     }
-    const out = enrichAdfWithMedia(adf, map(['a', META_PNG]))
+    const out = enrichAdfWithMedia(adf, map(['pic.png', PNG_REF]))
     const m = (out as AdfNode).content?.[0]?.content?.[0]
-    expect(m?.attrs?.url).toBe('/api/jira-media/a')
+    expect(m?.attrs?.url).toBe('/api/jira-media/10001')
   })
 
   it('walks media inside mediaSingle', () => {
     const adf: AdfNode = {
       type: 'doc',
-      content: [{ type: 'mediaSingle', content: [{ type: 'media', attrs: { id: 'a' } }] }],
+      content: [
+        {
+          type: 'mediaSingle',
+          content: [{ type: 'media', attrs: { id: 'u', alt: 'pic.png' } }],
+        },
+      ],
     }
-    const out = enrichAdfWithMedia(adf, map(['a', META_PNG]))
+    const out = enrichAdfWithMedia(adf, map(['pic.png', PNG_REF]))
     const m = (out as AdfNode).content?.[0]?.content?.[0]
-    expect(m?.attrs?.url).toBe('/api/jira-media/a')
+    expect(m?.attrs?.url).toBe('/api/jira-media/10001')
   })
 
   it('walks media inside mediaGroup', () => {
@@ -141,16 +177,18 @@ describe('enrichAdfWithMedia', () => {
         {
           type: 'mediaGroup',
           content: [
-            { type: 'media', attrs: { id: 'a' } },
-            { type: 'media', attrs: { id: 'b' } },
+            { type: 'media', attrs: { id: 'u-a', alt: 'pic.png' } },
+            { type: 'media', attrs: { id: 'u-b', alt: 'clip.mp4' } },
           ],
         },
       ],
     }
-    const out = enrichAdfWithMedia(adf, map(['a', META_PNG], ['b', META_VIDEO]))
+    const out = enrichAdfWithMedia(adf, map(['pic.png', PNG_REF], ['clip.mp4', VIDEO_REF]))
     const group = (out as AdfNode).content?.[0]
     expect(group?.content?.[0]?.attrs?.mimeType).toBe('image/png')
+    expect(group?.content?.[0]?.attrs?.url).toBe('/api/jira-media/10001')
     expect(group?.content?.[1]?.attrs?.mimeType).toBe('video/mp4')
+    expect(group?.content?.[1]?.attrs?.url).toBe('/api/jira-media/10002')
   })
 
   it('does not modify non-media nodes', () => {
@@ -161,42 +199,37 @@ describe('enrichAdfWithMedia', () => {
         { type: 'paragraph', content: [{ type: 'text', text: 'p' }] },
       ],
     }
-    const out = enrichAdfWithMedia(adf, map(['a', META_PNG]))
+    const out = enrichAdfWithMedia(adf, map(['pic.png', PNG_REF]))
     expect(out).toEqual(adf)
   })
 
   it('does not mutate the input ADF', () => {
     const original: AdfNode = {
       type: 'doc',
-      content: [{ type: 'media', attrs: { id: 'a' } }],
+      content: [{ type: 'media', attrs: { id: 'u', alt: 'pic.png' } }],
     }
     const snapshot = JSON.parse(JSON.stringify(original)) as AdfNode
-    enrichAdfWithMedia(original, map(['a', META_PNG]))
+    enrichAdfWithMedia(original, map(['pic.png', PNG_REF]))
     expect(original).toEqual(snapshot)
   })
 
-  it('leaves a media node with no id attribute unchanged', () => {
-    const adf: AdfNode = { type: 'media', attrs: { alt: 'no-id' } }
-    expect(enrichAdfWithMedia(adf, map(['a', META_PNG]))).toEqual(adf)
-  })
-
-  it('handles a partial-success map: known ids enriched, unknown ids passed through', () => {
+  it('handles a partial-success map: known filenames enriched, unknown filenames passed through', () => {
     const adf: AdfNode = {
       type: 'doc',
       content: [
-        { type: 'media', attrs: { id: 'a' } },
-        { type: 'media', attrs: { id: 'unknown' } },
+        { type: 'media', attrs: { id: 'u-1', alt: 'pic.png' } },
+        { type: 'media', attrs: { id: 'u-2', alt: 'unknown.png' } },
       ],
     }
-    const out = enrichAdfWithMedia(adf, map(['a', META_PNG]))
-    expect((out as AdfNode).content?.[0]?.attrs?.url).toBe('/api/jira-media/a')
+    const out = enrichAdfWithMedia(adf, map(['pic.png', PNG_REF]))
+    expect((out as AdfNode).content?.[0]?.attrs?.url).toBe('/api/jira-media/10001')
     expect((out as AdfNode).content?.[1]?.attrs?.url).toBeUndefined()
   })
 })
 
-describe('collectMediaIds', () => {
+describe('collectMediaFilenames', () => {
   it('returns an empty array for null', () => {
-    expect(collectMediaIds(null)).toEqual([])
+    expect(collectMediaFilenames(null)).toEqual([])
   })
 
   it('returns an empty array for ADF with no media', () => {
@@ -204,29 +237,29 @@ describe('collectMediaIds', () => {
       type: 'doc',
       content: [{ type: 'paragraph', content: [{ type: 'text', text: 'hi' }] }],
     }
-    expect(collectMediaIds(adf)).toEqual([])
+    expect(collectMediaFilenames(adf)).toEqual([])
   })
 
-  it('collects ids from top-level and nested media nodes in document order', () => {
+  it('collects filenames from top-level and nested media nodes in document order', () => {
     const adf: AdfNode = {
       type: 'doc',
       content: [
-        { type: 'media', attrs: { id: 'a' } },
-        { type: 'paragraph', content: [{ type: 'media', attrs: { id: 'b' } }] },
-        { type: 'mediaGroup', content: [{ type: 'media', attrs: { id: 'c' } }] },
+        { type: 'media', attrs: { id: 'u-a', alt: 'a.png' } },
+        { type: 'paragraph', content: [{ type: 'media', attrs: { id: 'u-b', alt: 'b.png' } }] },
+        { type: 'mediaGroup', content: [{ type: 'media', attrs: { id: 'u-c', alt: 'c.png' } }] },
       ],
     }
-    expect(collectMediaIds(adf)).toEqual(['a', 'b', 'c'])
+    expect(collectMediaFilenames(adf)).toEqual(['a.png', 'b.png', 'c.png'])
   })
 
-  it('skips media nodes without an id attribute', () => {
+  it('skips media nodes without an alt attribute', () => {
     const adf: AdfNode = {
       type: 'doc',
       content: [
-        { type: 'media', attrs: { alt: 'no-id' } },
-        { type: 'media', attrs: { id: 'a' } },
+        { type: 'media', attrs: { id: 'u-x' } },
+        { type: 'media', attrs: { id: 'u-a', alt: 'a.png' } },
       ],
     }
-    expect(collectMediaIds(adf)).toEqual(['a'])
+    expect(collectMediaFilenames(adf)).toEqual(['a.png'])
   })
 })

@@ -145,17 +145,6 @@ export function buildHandlers(getWorld: () => World): HttpHandler[] {
       })
     }),
 
-    // Jira attachment metadata endpoint — per-id GET that returns a canned
-    // shape so the server-side `getMediaMetadata` resolves during a Detail-
-    // panel load. The e2e fixture seeds `attrs.url` directly, so the proxy
-    // flow is bypassed end-to-end; this handler exists for parity with the
-    // production wire shape and so any future spec exercising the proxy
-    // route has a predictable response.
-    http.get('*/rest/api/3/attachment/metadata/:id', ({ params }) => {
-      const id = String(params.id)
-      return HttpResponse.json({ id, mimeType: 'image/png' })
-    }),
-
     // Proxy URL injected into ADF media nodes after server-side enrichment.
     // The e2e fixture seeds `attrs.url = http://127.0.0.1:9999/api/jira-media/<id>`
     // so the browser's <img>/<video> fetch lands on this MSW handler instead

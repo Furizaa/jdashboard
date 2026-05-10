@@ -5,7 +5,7 @@ import type {
   DetailIssue,
   IssueLink,
   LinkedIssueRef,
-  MediaMetadata,
+  RawAttachment,
   RawComment,
   RawDetailedIssue,
   RawIssueLink,
@@ -14,7 +14,7 @@ import type {
   StatusCategoryKey,
 } from '../../../gateways/jira/types'
 import { DetailConfig } from '../config'
-import { collectMediaIds, enrichAdfWithMedia } from '../domain/enrich-adf-with-media'
+import { type AttachmentRef, enrichAdfWithMedia } from '../domain/enrich-adf-with-media'
 import type { LoadIssueError } from '../errors'
 
 export type LoadIssueOk = {
@@ -34,6 +34,7 @@ const DETAIL_ISSUE_FIELDS = [
   'parent',
   'issuelinks',
   'comment',
+  'attachment',
 ] as const
 
 const SUB_ISSUE_FIELDS = ['summary', 'status', 'issuetype'] as const
@@ -154,34 +155,32 @@ function shapeIssue(input: {
   }
 }
 
-function collectIssueMediaIds(issue: DetailIssue): readonly string[] {
-  const ids: string[] = []
-  for (const id of collectMediaIds(issue.description)) ids.push(id)
-  for (const comment of issue.comments) {
-    for (const id of collectMediaIds(comment.body)) ids.push(id)
+// Filename collisions inside one issue: first-wins. Subsequent attachments
+// with the same filename render as the placeholder. Documented Phase 1
+// limitation — collisions are rare; degrades gracefully.
+function buildAttachmentByFilename(
+  attachments: readonly RawAttachment[],
+): ReadonlyMap<string, AttachmentRef> {
+  const out = new Map<string, AttachmentRef>()
+  for (const a of attachments) {
+    if (!out.has(a.filename)) {
+      out.set(a.filename, { attachmentId: a.id, mimeType: a.mimeType })
+    }
   }
-  return ids
-}
-
-function dedupe(ids: readonly string[]): readonly string[] {
-  return Array.from(new Set(ids))
-}
-
-function buildMediaMap(metadata: readonly MediaMetadata[]): ReadonlyMap<string, MediaMetadata> {
-  return new Map(metadata.map((m) => [m.id, m]))
+  return out
 }
 
 function applyMediaEnrichment(
   issue: DetailIssue,
-  mediaUrlMap: ReadonlyMap<string, MediaMetadata>,
+  attachmentByFilename: ReadonlyMap<string, AttachmentRef>,
 ): DetailIssue {
-  if (mediaUrlMap.size === 0) return issue
+  if (attachmentByFilename.size === 0) return issue
   return {
     ...issue,
-    description: enrichAdfWithMedia(issue.description, mediaUrlMap),
+    description: enrichAdfWithMedia(issue.description, attachmentByFilename),
     comments: issue.comments.map((c) => ({
       ...c,
-      body: enrichAdfWithMedia(c.body, mediaUrlMap),
+      body: enrichAdfWithMedia(c.body, attachmentByFilename),
     })),
   }
 }
@@ -209,19 +208,7 @@ export const loadIssue = (
       { concurrency: 'unbounded' },
     )
     const issue = shapeIssue({ detailed, subSearch })
-    const ids = dedupe(collectIssueMediaIds(issue))
-    const metadata =
-      ids.length === 0
-        ? []
-        : yield* jira
-            .getMediaMetadata(ids)
-            .pipe(
-              Effect.catchAll((error) =>
-                Effect.logWarning(
-                  `[loadIssue] media metadata resolution failed for ${ids.length} id(s): ${error.message}`,
-                ).pipe(Effect.as([] as readonly MediaMetadata[])),
-              ),
-            )
-    const enriched = applyMediaEnrichment(issue, buildMediaMap(metadata))
+    const attachmentByFilename = buildAttachmentByFilename(detailed.fields.attachment ?? [])
+    const enriched = applyMediaEnrichment(issue, attachmentByFilename)
     return { baseUrl: config.baseUrl, issue: enriched }
   })

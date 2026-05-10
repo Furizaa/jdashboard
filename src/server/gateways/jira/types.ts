@@ -115,6 +115,12 @@ export type RawComment = {
   body?: unknown
 }
 
+export type RawAttachment = {
+  id: string
+  filename: string
+  mimeType: string
+}
+
 export type RawDetailedIssue = {
   id: string
   key: string
@@ -130,14 +136,8 @@ export type RawDetailedIssue = {
     parent?: RawLinkedRef | null
     issuelinks?: RawIssueLink[]
     comment?: { comments: RawComment[] }
+    attachment?: RawAttachment[]
   }
-}
-
-export type MediaMetadata = {
-  readonly id: string
-  readonly mimeType: string
-  readonly width?: number
-  readonly height?: number
 }
 
 export type MediaStream = {

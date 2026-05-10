@@ -1,13 +1,8 @@
 import { describe, expect, it } from '@effect/vitest'
 import { Effect, Layer } from 'effect'
-import { JiraNotFound, JiraUnauthorized, MediaResolutionError } from '../../../gateways/jira/errors'
+import { JiraNotFound, JiraUnauthorized } from '../../../gateways/jira/errors'
 import { JiraGateway } from '../../../gateways/jira/port'
-import type {
-  AdfNode,
-  MediaMetadata,
-  RawDetailedIssue,
-  RawSearchResponse,
-} from '../../../gateways/jira/types'
+import type { AdfNode, RawDetailedIssue, RawSearchResponse } from '../../../gateways/jira/types'
 import { DetailConfig, type DetailConfigShape } from '../config'
 import { fakeJiraGateway } from './__fixtures__/fake-jira-gateway'
 import { loadIssue } from './load-issue'
@@ -153,6 +148,22 @@ describe('loadIssue', () => {
     )
   })
 
+  it.effect('requests the attachment field on the main issue fetch', () => {
+    let capturedFields: readonly string[] = []
+    const jira = fakeJiraGateway({
+      getIssue: (_key, fields) => {
+        capturedFields = fields
+        return Effect.succeed(emptyDetailedIssue('HDR-1'))
+      },
+      searchIssues: () => Effect.succeed(emptySearchResponse()),
+    })
+    return provide(loadIssue('HDR-1'), jira).pipe(
+      Effect.tap(() => {
+        expect(capturedFields).toContain('attachment')
+      }),
+    )
+  })
+
   it.effect('exposes baseUrl from config on the result', () =>
     Effect.gen(function* () {
       const jira = fakeJiraGateway({
@@ -275,14 +286,14 @@ describe('loadIssue', () => {
   )
 
   it.effect(
-    'enriches description and comment-body media nodes whose ids resolve, leaves others alone',
+    'enriches description and comment-body media nodes whose alt filename matches an attachment, leaves others alone',
     () =>
       Effect.gen(function* () {
         const description: AdfNode = {
           type: 'doc',
           content: [
-            { type: 'media', attrs: { id: 'media-desc-known' } },
-            { type: 'media', attrs: { id: 'media-desc-unknown' } },
+            { type: 'media', attrs: { id: 'uuid-desc-known', alt: 'pic.png' } },
+            { type: 'media', attrs: { id: 'uuid-desc-unknown', alt: 'orphan.png' } },
           ],
         }
         const commentBody: AdfNode = {
@@ -290,11 +301,10 @@ describe('loadIssue', () => {
           content: [
             {
               type: 'paragraph',
-              content: [{ type: 'media', attrs: { id: 'media-comment-known' } }],
+              content: [{ type: 'media', attrs: { id: 'uuid-comment', alt: 'clip.mp4' } }],
             },
           ],
         }
-        let receivedIds: readonly string[] = []
         const jira = fakeJiraGateway({
           getIssue: () =>
             Effect.succeed<RawDetailedIssue>({
@@ -304,6 +314,10 @@ describe('loadIssue', () => {
                 summary: 'with-media',
                 status: { name: 'To Do' },
                 description,
+                attachment: [
+                  { id: '10001', filename: 'pic.png', mimeType: 'image/png' },
+                  { id: '10002', filename: 'clip.mp4', mimeType: 'video/mp4' },
+                ],
                 comment: {
                   comments: [
                     {
@@ -316,36 +330,23 @@ describe('loadIssue', () => {
               },
             }),
           searchIssues: () => Effect.succeed(emptySearchResponse()),
-          getMediaMetadata: (ids) => {
-            receivedIds = ids
-            const known: MediaMetadata[] = [
-              { id: 'media-desc-known', mimeType: 'image/png' },
-              { id: 'media-comment-known', mimeType: 'video/mp4' },
-            ]
-            return Effect.succeed(known)
-          },
         })
         const result = yield* provide(loadIssue('HDR-1'), jira)
-        expect(receivedIds).toEqual([
-          'media-desc-known',
-          'media-desc-unknown',
-          'media-comment-known',
-        ])
         const descContent = result.issue.description?.content
-        expect(descContent?.[0]?.attrs?.url).toBe('/api/jira-media/media-desc-known')
+        expect(descContent?.[0]?.attrs?.url).toBe('/api/jira-media/10001')
         expect(descContent?.[0]?.attrs?.mimeType).toBe('image/png')
         expect(descContent?.[1]?.attrs?.url).toBeUndefined()
         const commentMedia = result.issue.comments[0]?.body?.content?.[0]?.content?.[0]
-        expect(commentMedia?.attrs?.url).toBe('/api/jira-media/media-comment-known')
+        expect(commentMedia?.attrs?.url).toBe('/api/jira-media/10002')
         expect(commentMedia?.attrs?.mimeType).toBe('video/mp4')
       }),
   )
 
-  it.effect('still loads the issue (with no enrichment) when getMediaMetadata fails entirely', () =>
+  it.effect('still loads the issue (with no enrichment) when fields.attachment is absent', () =>
     Effect.gen(function* () {
       const description: AdfNode = {
         type: 'doc',
-        content: [{ type: 'media', attrs: { id: 'media-1' } }],
+        content: [{ type: 'media', attrs: { id: 'uuid-1', alt: 'pic.png' } }],
       }
       const jira = fakeJiraGateway({
         getIssue: () =>
@@ -359,29 +360,11 @@ describe('loadIssue', () => {
             },
           }),
         searchIssues: () => Effect.succeed(emptySearchResponse()),
-        getMediaMetadata: () =>
-          Effect.fail(new MediaResolutionError({ message: 'upstream down', status: 502 })),
       })
       const result = yield* provide(loadIssue('HDR-1'), jira)
       const m = result.issue.description?.content?.[0]
-      expect(m?.attrs?.id).toBe('media-1')
+      expect(m?.attrs?.alt).toBe('pic.png')
       expect(m?.attrs?.url).toBeUndefined()
-    }),
-  )
-
-  it.effect('does not call getMediaMetadata when the issue has no media nodes', () =>
-    Effect.gen(function* () {
-      let called = false
-      const jira = fakeJiraGateway({
-        getIssue: () => Effect.succeed(emptyDetailedIssue('HDR-1')),
-        searchIssues: () => Effect.succeed(emptySearchResponse()),
-        getMediaMetadata: () => {
-          called = true
-          return Effect.succeed([])
-        },
-      })
-      yield* provide(loadIssue('HDR-1'), jira)
-      expect(called).toBe(false)
     }),
   )
 })

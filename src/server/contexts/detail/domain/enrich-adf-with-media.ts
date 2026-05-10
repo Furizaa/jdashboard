@@ -1,35 +1,40 @@
-import type { AdfNode, MediaMetadata } from '../../../gateways/jira/types'
+import type { AdfNode } from '../../../gateways/jira/types'
 
 const PROXY_PATH_PREFIX = '/api/jira-media/'
 
+export type AttachmentRef = {
+  readonly attachmentId: string
+  readonly mimeType: string
+}
+
 export function enrichAdfWithMedia(
   adf: AdfNode | null,
-  mediaUrlMap: ReadonlyMap<string, MediaMetadata>,
+  attachmentByFilename: ReadonlyMap<string, AttachmentRef>,
 ): AdfNode | null {
   if (adf === null) return null
-  if (mediaUrlMap.size === 0) return adf
-  return walk(adf, mediaUrlMap)
+  if (attachmentByFilename.size === 0) return adf
+  return walk(adf, attachmentByFilename)
 }
 
-export function collectMediaIds(adf: AdfNode | null): readonly string[] {
+export function collectMediaFilenames(adf: AdfNode | null): readonly string[] {
   if (adf === null) return []
-  const ids: string[] = []
-  collect(adf, ids)
-  return ids
+  const filenames: string[] = []
+  collect(adf, filenames)
+  return filenames
 }
 
-function walk(node: AdfNode, mediaUrlMap: ReadonlyMap<string, MediaMetadata>): AdfNode {
+function walk(node: AdfNode, attachmentByFilename: ReadonlyMap<string, AttachmentRef>): AdfNode {
   if (node.type === 'media') {
-    const id = typeof node.attrs?.id === 'string' ? node.attrs.id : null
-    if (id !== null) {
-      const metadata = mediaUrlMap.get(id)
-      if (metadata !== undefined) {
+    const filename = typeof node.attrs?.alt === 'string' ? node.attrs.alt : null
+    if (filename !== null) {
+      const attachment = attachmentByFilename.get(filename)
+      if (attachment !== undefined) {
         return {
           ...node,
           attrs: {
             ...node.attrs,
-            url: `${PROXY_PATH_PREFIX}${id}`,
-            mimeType: metadata.mimeType,
+            url: `${PROXY_PATH_PREFIX}${attachment.attachmentId}`,
+            mimeType: attachment.mimeType,
           },
         }
       }
@@ -39,7 +44,7 @@ function walk(node: AdfNode, mediaUrlMap: ReadonlyMap<string, MediaMetadata>): A
   if (Array.isArray(node.content) && node.content.length > 0) {
     return {
       ...node,
-      content: node.content.map((child) => walk(child, mediaUrlMap)),
+      content: node.content.map((child) => walk(child, attachmentByFilename)),
     }
   }
   return node
@@ -47,8 +52,8 @@ function walk(node: AdfNode, mediaUrlMap: ReadonlyMap<string, MediaMetadata>): A
 
 function collect(node: AdfNode, into: string[]): void {
   if (node.type === 'media') {
-    const id = typeof node.attrs?.id === 'string' ? node.attrs.id : null
-    if (id !== null) into.push(id)
+    const filename = typeof node.attrs?.alt === 'string' ? node.attrs.alt : null
+    if (filename !== null) into.push(filename)
     return
   }
   if (Array.isArray(node.content)) {

@@ -13,7 +13,6 @@ export function fakeJiraGateway(overrides: Partial<JiraGatewayShape>): JiraGatew
     getTransitions: () => notImpl('getTransitions'),
     transitionIssue: () => notImpl('transitionIssue'),
     createIssue: () => notImpl('createIssue'),
-    getMediaMetadata: () => notImpl('getMediaMetadata'),
     streamMedia: () => notImpl('streamMedia'),
     ...overrides,
   } as JiraGatewayShape

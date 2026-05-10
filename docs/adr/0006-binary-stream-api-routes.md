@@ -82,36 +82,26 @@ class MediaNotFound extends Schema.TaggedError<MediaNotFound>()('MediaNotFound',
 
 These also flow into `loadIssue`'s enrichment path; the application service catches them per-id and treats unresolvable media as "skip enrichment, leave placeholder" — `loadIssue` does not fail because some media couldn't be resolved.
 
-## ADF media enrichment (the consumer of `getMediaMetadata`)
+## ADF media enrichment (the consumer of the issue's `attachment` field)
 
 The mirror-image of the proxy route is server-side ADF enrichment at `loadIssue` time. The application service `loadIssue`:
 
-1. Walks the loaded `DetailIssue.description` and every `comments[].body`, collecting all `media` node `id`s.
-2. Calls `JiraGateway.getMediaMetadata(ids)`, which fans out one `GET /rest/api/3/attachment/metadata/<id>` per id with `Effect.all({ concurrency: 5 })`-bounded concurrency. Per-id `404`s are dropped silently from the result; other failures (`401`/`403`/`5xx`/network) fail the whole call with `MediaResolutionError`.
-3. Applies a pure walker — `src/server/contexts/detail/domain/enrich-adf-with-media.ts` — that injects `url: '/api/jira-media/<id>'` and `mimeType: '<resolved>'` into each `media` node's `attrs` before returning.
+1. Requests `attachment` as part of the issue fields on the existing `JiraGateway.getIssue` call. The response carries the issue's attachment list inline — `fields.attachment[]` with `{ id, filename, mimeType, ... }`. ADF `media` nodes carry the **filename** in `attrs.alt` (Atlassian Media Services UUIDs in `attrs.id` are not directly resolvable via any documented Jira Cloud endpoint).
+2. Builds a filename-keyed map `{ filename → { attachmentId, mimeType } }` from `fields.attachment`. Filename collisions inside one issue: first-wins (rare in practice; degrades to the placeholder).
+3. Applies a pure walker — `src/server/contexts/detail/domain/enrich-adf-with-media.ts` — that for every `media` node looks up `attrs.alt` in the map and, on hit, injects `url: '/api/jira-media/<integerAttachmentId>'` and `mimeType: '<attachment.mimeType>'` into `attrs`. Misses (filename absent or non-matching) pass through unchanged so the client falls back to the existing placeholder.
 
-Per-id resolution failures degrade to "node renders as the existing 'Media hosted in Jira' placeholder" — partial success is the contract. The walker is `(adf, mediaUrlMap) => AdfNode`, pure, table-driven, unit-tested.
+The walker is `(adf, attachmentByFilename) => AdfNode`, pure, table-driven, unit-tested. Filename-match is the same correlation Jira's own UI uses (verified empirically — `expand=renderedFields` rewrites every ADF media node to `<img src=".../attachment/content/<integerId>">`, with the integer id resolved by filename match against the issue's attachment list).
 
-The proxy route's binary fetch is a single `GET /rest/api/3/attachment/content/<id>?redirect=false`. The `redirect=false` query parameter asks Jira to stream bytes directly rather than `303 See Other`-redirecting to a media-services CDN; this keeps the proxy a one-hop pipe.
+The proxy route's binary fetch is a single `GET /rest/api/3/attachment/content/<integerId>?redirect=false`. The `redirect=false` query parameter asks Jira to stream bytes directly rather than `303 See Other`-redirecting to a media-services CDN; this keeps the proxy a one-hop pipe.
 
-The two new `JiraGateway` methods:
+The new `JiraGateway` method:
 
 ```ts
 // src/server/gateways/jira/port.ts
-readonly getMediaMetadata: (
-  ids: readonly string[],
-) => Effect.Effect<readonly MediaMetadata[], MediaResolutionError>
-
 readonly streamMedia: (
   id: string,
 ) => Effect.Effect<MediaStream, MediaResolutionError | MediaNotFound>
 
-type MediaMetadata = {
-  readonly id: string
-  readonly mimeType: string
-  readonly width?: number
-  readonly height?: number
-}
 type MediaStream = {
   readonly stream: ReadableStream<Uint8Array>
   readonly mimeType: string
@@ -119,17 +109,11 @@ type MediaStream = {
 }
 ```
 
-The application service and the API route both consume these methods atomically.
+`streamMedia` is consumed atomically by the API route. `loadIssue`'s enrichment needs no separate gateway method — the metadata it requires (filename → integer id, mime type) rides along on the existing `getIssue` payload.
 
 ## Policy menu (caching)
 
-Per ADR-0005's menu-with-upgrade-path framing:
-
-| Policy         | Phase 1                                        | Upgrade path                                                                                                                                                                                                                                             |
-| -------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Metadata cache | **None** — every gateway call hits Jira fresh. | `Cache.make` Layer keyed on attachment id with TTL ≈ minutes. Adopted when Jira's per-tenant rate limit gets hit in practice — earlier than under a bulk-token flow, since the metadata fan-out is now N calls per `loadIssue` instead of one bulk call. |
-
-Math: `loadIssue` makes N concurrency-bounded `attachment/metadata/<id>` calls, where N is the number of `media` nodes across the description and all comments (no separate token call). The proxy route makes 1 `attachment/content/<id>?redirect=false` call per media open. A panel with M media nodes opened, one media clicked, panel closed: M + 1 Jira calls. The fan-out lifts the per-`loadIssue` ceiling compared to a bulk endpoint, which is the relevant change for the rate-limit upgrade path; in absolute terms this still sits comfortably under any reasonable rate limit for typical issues. Caching is a real upgrade lever, not a Phase 1 requirement.
+No dedicated media caching is needed at Phase 1. The attachment metadata (filename → integer id, mime type) is co-fetched as part of the existing `getIssue` call, so `loadIssue` makes **zero** dedicated media-metadata Jira calls. The proxy route makes 1 `attachment/content/<integerId>?redirect=false` call per media open. A panel with M media nodes opened, one media clicked, panel closed: 1 Jira call for the issue load (already counted) plus 1 per media open.
 
 ## Why this is a separate ADR (and not an addendum to ADR-0005)
 
@@ -143,15 +127,15 @@ Folding this into ADR-0005 would muddy the lesson ADR-0005 teaches: that the JSO
 
 ## Tests
 
-- **Gateway methods** (`getMediaMetadata`, `streamMedia`) — unit-tested with `it.effect` against a faked `HttpClient.HttpClient` returning canned media-services responses; per-status error mapping covered table-driven.
-- **`enrichAdfWithMedia` walker** — pure unit tests, table-driven over ADF inputs and `MediaMetadata` maps. Covers: media-with-resolved-id, media-with-unresolvable-id (placeholder fallback), nested media inside paragraphs, media inside comments.
-- **`loadIssue` application service** — `it.effect` with a faked `JiraGateway` Tag whose `getMediaMetadata` returns a known map. Asserts the returned `DetailIssue.description` and each comment body have `attrs.url` / `attrs.mimeType` populated.
+- **Gateway method** (`streamMedia`) — unit-tested with `it.effect` against a faked `HttpClient.HttpClient` returning canned attachment-content responses; per-status error mapping covered table-driven.
+- **`enrichAdfWithMedia` walker** — pure unit tests, table-driven over ADF inputs and filename-keyed attachment maps. Covers: media-with-matching-filename, media-with-unmatched-filename (placeholder fallback), media with missing/non-string `alt`, nested media inside paragraphs, media inside comments.
+- **`loadIssue` application service** — `it.effect` with a faked `JiraGateway` Tag whose `getIssue` returns a `RawDetailedIssue` with `fields.attachment` populated. Asserts the returned `DetailIssue.description` and each comment body have `attrs.url` / `attrs.mimeType` populated for matching filenames; non-matching media pass through.
 - **API route handler** — small unit test: given a faked `JiraGateway` returning a `MediaStream`, the handler returns a `Response` with status `200`, the right `Content-Type`, and the stream as body. Status-mapping cases tested per error tag.
 - **End-to-end** — one new spec `tests/e2e/ticket-detail/adf-media-lightbox.spec.ts` per ADR-0001 (MSW at HTTP boundary). Three cases: image opens modal, video opens modal and autoplays muted, error-state chip rendered when MSW returns `404`. The Jira media-services calls are added as new MSW handlers.
 
 ## Migration
 
-Single PR slice (Slice 3a in the Detail-rendering PRD): adds `JiraGateway.getMediaMetadata` + `streamMedia`, the new tagged errors, the `enrichAdfWithMedia` domain walker, the API route, the dependency-cruiser rules. After this slice, real images render inline against real Jira data with no client-rendering changes (existing `Media.tsx` already renders `<img>` for url-bearing media). The lightbox slice (3b) and e2e coverage (3c) follow.
+Single PR slice (Slice 3a in the Detail-rendering PRD): adds `JiraGateway.streamMedia`, the new tagged errors, the `enrichAdfWithMedia` domain walker, the API route, the dependency-cruiser rules. After this slice, real images render inline against real Jira data with no client-rendering changes (existing `Media.tsx` already renders `<img>` for url-bearing media). The lightbox slice (3b) and e2e coverage (3c) follow.
 
 ## References
 

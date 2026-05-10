@@ -4,6 +4,7 @@ import { ServerEnv } from '../../runtime/server-env'
 import {
   GitlabNotFound,
   GitlabRejected,
+  GitlabTransportError,
   GitlabUnauthorized,
   type GitlabGatewayError,
 } from './errors'
@@ -124,7 +125,7 @@ const decodeJsonBody = <T>(
   response: HttpClientResponse.HttpClientResponse,
 ): Effect.Effect<T, GitlabGatewayError> =>
   response.json.pipe(
-    Effect.mapError((error) => new GitlabRejected({ message: error.message })),
+    Effect.mapError((error) => new GitlabTransportError({ message: error.message })),
   ) as Effect.Effect<T, GitlabGatewayError>
 
 const readErrorBody = (response: HttpClientResponse.HttpClientResponse): Effect.Effect<string> =>
@@ -161,7 +162,8 @@ export const GitlabGatewayLive: Layer.Layer<
     ): Effect.Effect<T, GitlabGatewayError> =>
       client.execute(request).pipe(
         Effect.mapError(
-          (error) => new GitlabRejected({ message: `GitLab request failed: ${error.message}` }),
+          (error) =>
+            new GitlabTransportError({ message: `GitLab request failed: ${error.message}` }),
         ),
         Effect.flatMap((response) =>
           HttpClientResponse.matchStatus(response, {

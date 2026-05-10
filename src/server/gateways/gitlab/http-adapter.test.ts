@@ -1,4 +1,4 @@
-import { HttpClient, HttpClientResponse } from '@effect/platform'
+import { HttpClient, HttpClientError, HttpClientResponse } from '@effect/platform'
 import { describe, expect, it } from '@effect/vitest'
 import { Effect, Layer } from 'effect'
 import { ServerEnv, type ServerEnvShape } from '../../runtime/server-env'
@@ -155,6 +155,43 @@ describe('GitlabGatewayLive — error mapping', () => {
       if (result._tag === 'Rejected') {
         expect(result.message).toBe('not-json')
       }
+    })
+    return provideTestLayers(program, client)
+  })
+
+  it.effect('maps a network failure (HttpClient transport error) to TransportError', () => {
+    const client = HttpClient.make((request) =>
+      Effect.fail(
+        new HttpClientError.RequestError({
+          request,
+          reason: 'Transport',
+          description: 'connection refused',
+        }),
+      ),
+    )
+    const program = Effect.gen(function* () {
+      const gateway = yield* GitlabGateway
+      const result = yield* gateway.getCurrentUser().pipe(Effect.flip)
+      expect(result._tag).toBe('TransportError')
+      if (result._tag === 'TransportError') {
+        expect(result.message).toContain('connection refused')
+      }
+    })
+    return provideTestLayers(program, client)
+  })
+
+  it.effect('maps a malformed-JSON 2xx response to TransportError (decode failure)', () => {
+    const client = fakeHttpClient(
+      () =>
+        new Response('not-json', {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+    )
+    const program = Effect.gen(function* () {
+      const gateway = yield* GitlabGateway
+      const result = yield* gateway.getCurrentUser().pipe(Effect.flip)
+      expect(result._tag).toBe('TransportError')
     })
     return provideTestLayers(program, client)
   })

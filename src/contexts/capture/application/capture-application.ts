@@ -53,6 +53,11 @@ export function createCaptureApplicationService(
           .with({ ok: false, error: { _tag: 'Rejected' } }, ({ error }) =>
             errAsync<CaptureSubmitSnapshot, CaptureSubmitError>(new CaptureRejected(error.message)),
           )
+          .with({ ok: false, error: { _tag: 'TransportError' } }, ({ error }) =>
+            errAsync<CaptureSubmitSnapshot, CaptureSubmitError>(
+              new CaptureNetworkError(error.message),
+            ),
+          )
           .exhaustive(),
       ),
 

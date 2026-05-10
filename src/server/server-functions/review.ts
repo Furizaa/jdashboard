@@ -34,7 +34,7 @@ export const getReviewCards = createServerFn({ method: 'GET' }).handler(
 
 const getGitlabUserProgram = Effect.gen(function* () {
   const gitlab = yield* GitlabGateway
-  const me = yield* gitlab.getCurrentUser().pipe(dieOn('NotFound', 'Rejected'))
+  const me = yield* gitlab.getCurrentUser().pipe(dieOn('NotFound', 'Rejected', 'TransportError'))
   return { username: me.username, displayName: me.displayName }
 })
 

@@ -54,7 +54,9 @@ export const loadBoard: Effect.Effect<LoadBoardOk, JiraUnauthorized, JiraGateway
       label: config.labelFilter,
       doneWindowDays: config.doneWindowDays,
     })
-    const response = yield* jira.searchIssues(jql, BOARD_FIELDS).pipe(dieOn('NotFound', 'Rejected'))
+    const response = yield* jira
+      .searchIssues(jql, BOARD_FIELDS)
+      .pipe(dieOn('NotFound', 'Rejected', 'TransportError'))
     const hideSet = new Set(config.hideLabels.map((l) => l.toLowerCase()))
     const issues = response.issues.map((issue) => toBoardIssue(issue, hideSet))
     return { baseUrl: config.baseUrl, issues }

@@ -9,6 +9,8 @@ import { ServerEnv, ServerEnvLive } from './server-env'
 const RETRY_ATTEMPTS = 2
 const TIMEOUT_DURATION = '10 seconds'
 
+// `Schedule.compose` intersects the two schedules: keep the exponential
+// backoff cadence but stop after `RETRY_ATTEMPTS` retries.
 const retrySchedule = Schedule.exponential('100 millis').pipe(
   Schedule.compose(Schedule.recurs(RETRY_ATTEMPTS)),
 )

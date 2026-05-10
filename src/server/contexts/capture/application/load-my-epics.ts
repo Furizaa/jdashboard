@@ -35,7 +35,9 @@ export const loadMyEpics: Effect.Effect<
     projectKey: config.projectKey,
     statuses: config.epic.statuses,
   })
-  const response = yield* jira.searchIssues(jql, EPIC_FIELDS).pipe(dieOn('NotFound', 'Rejected'))
+  const response = yield* jira
+    .searchIssues(jql, EPIC_FIELDS)
+    .pipe(dieOn('NotFound', 'Rejected', 'TransportError'))
   const epics: EpicRef[] = response.issues.map((issue) => ({
     key: issue.key,
     summary: issue.fields.summary,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@effect/vitest'
 import { Effect, Layer } from 'effect'
-import { JiraUnauthorized } from '../../../gateways/jira/errors'
+import { JiraTransportError, JiraUnauthorized } from '../../../gateways/jira/errors'
 import { JiraGateway } from '../../../gateways/jira/port'
 import type { RawSearchResponse } from '../../../gateways/jira/types'
 import { BoardConfig, type BoardConfigShape } from '../config'
@@ -131,6 +131,21 @@ describe('loadBoard', () => {
       })
       const failure = yield* provide(loadBoard, jira).pipe(Effect.flip)
       expect(failure._tag).toBe('Unauthorized')
+    }),
+  )
+
+  it.effect('demotes TransportError to a defect (not a tagged failure)', () =>
+    Effect.gen(function* () {
+      const jira = fakeJiraGateway({
+        searchIssues: () => Effect.fail(new JiraTransportError({ message: 'connection refused' })),
+      })
+      const exit = yield* Effect.exit(provide(loadBoard, jira))
+      expect(exit._tag).toBe('Failure')
+      if (exit._tag === 'Failure') {
+        // dieOn promotes TransportError to a defect; the cause is a Die,
+        // not a Fail with a tagged error.
+        expect(JSON.stringify(exit.cause)).toContain('Die')
+      }
     }),
   )
 })

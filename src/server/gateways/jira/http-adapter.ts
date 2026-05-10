@@ -4,6 +4,7 @@ import { ServerEnv } from '../../runtime/server-env'
 import {
   JiraNotFound,
   JiraRejected,
+  JiraTransportError,
   JiraUnauthorized,
   MediaNotFound,
   MediaResolutionError,
@@ -48,7 +49,7 @@ const decodeJsonBody = <T>(
   response: HttpClientResponse.HttpClientResponse,
 ): Effect.Effect<T, JiraGatewayError> =>
   response.json.pipe(
-    Effect.mapError((error) => new JiraRejected({ message: error.message })),
+    Effect.mapError((error) => new JiraTransportError({ message: error.message })),
   ) as Effect.Effect<T, JiraGatewayError>
 
 const readErrorBody = (response: HttpClientResponse.HttpClientResponse): Effect.Effect<string> =>
@@ -144,12 +145,12 @@ export const JiraGatewayLive: Layer.Layer<JiraGateway, never, HttpClient.HttpCli
       const postJson = (
         path: string,
         body: unknown,
-      ): Effect.Effect<HttpClientRequest.HttpClientRequest, JiraRejected> =>
+      ): Effect.Effect<HttpClientRequest.HttpClientRequest, JiraTransportError> =>
         HttpClientRequest.post(`${baseUrl}${path}`).pipe(
           HttpClientRequest.setHeaders(baseHeaders),
           HttpClientRequest.bodyJson(body),
           Effect.mapError(
-            (err) => new JiraRejected({ message: `Encoding request body failed: ${err}` }),
+            (err) => new JiraTransportError({ message: `Encoding request body failed: ${err}` }),
           ),
         )
 
@@ -158,7 +159,7 @@ export const JiraGatewayLive: Layer.Layer<JiraGateway, never, HttpClient.HttpCli
       ): Effect.Effect<T, JiraGatewayError> =>
         client.execute(request).pipe(
           Effect.mapError(
-            (error) => new JiraRejected({ message: `Jira request failed: ${error.message}` }),
+            (error) => new JiraTransportError({ message: `Jira request failed: ${error.message}` }),
           ),
           Effect.flatMap((response) =>
             HttpClientResponse.matchStatus(response, {
@@ -175,7 +176,7 @@ export const JiraGatewayLive: Layer.Layer<JiraGateway, never, HttpClient.HttpCli
       ): Effect.Effect<void, JiraGatewayError> =>
         client.execute(request).pipe(
           Effect.mapError(
-            (error) => new JiraRejected({ message: `Jira request failed: ${error.message}` }),
+            (error) => new JiraTransportError({ message: `Jira request failed: ${error.message}` }),
           ),
           Effect.flatMap((response) =>
             HttpClientResponse.matchStatus(response, {

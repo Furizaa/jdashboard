@@ -25,7 +25,7 @@ export const loadMrStatuses: Effect.Effect<
   const gitlab = yield* GitlabGateway
   const config = yield* BoardConfig
 
-  const me = yield* gitlab.getCurrentUser().pipe(dieOn('NotFound', 'Rejected'))
+  const me = yield* gitlab.getCurrentUser().pipe(dieOn('NotFound', 'Rejected', 'TransportError'))
 
   const nowMs = yield* Clock.currentTimeMillis
   const updatedAfter = new Date(nowMs - config.doneWindowDays * MS_PER_DAY)
@@ -36,7 +36,7 @@ export const loadMrStatuses: Effect.Effect<
       authorUsername: me.username,
       updatedAfter,
     })
-    .pipe(dieOn('NotFound', 'Rejected'))
+    .pipe(dieOn('NotFound', 'Rejected', 'TransportError'))
 
   const matched = buildMrKeyMap(list, config.projectKey)
 

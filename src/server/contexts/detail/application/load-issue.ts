@@ -195,10 +195,10 @@ export const loadIssue = (
     const config = yield* DetailConfig
     const [detailed, subSearch] = yield* Effect.all(
       [
-        jira.getIssue(key, DETAIL_ISSUE_FIELDS).pipe(dieOn('Rejected')),
+        jira.getIssue(key, DETAIL_ISSUE_FIELDS).pipe(dieOn('Rejected', 'TransportError')),
         jira
           .searchIssues(`parent = ${quoteJqlString(key)}`, SUB_ISSUE_FIELDS)
-          .pipe(dieOn('NotFound', 'Rejected')),
+          .pipe(dieOn('NotFound', 'Rejected', 'TransportError')),
       ],
       { concurrency: 'unbounded' },
     )

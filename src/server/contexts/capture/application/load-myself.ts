@@ -11,7 +11,7 @@ export type LoadMyselfOk = {
 export const loadMyself: Effect.Effect<LoadMyselfOk, LoadMyselfError, JiraGateway> = Effect.gen(
   function* () {
     const jira = yield* JiraGateway
-    const user = yield* jira.getMyself().pipe(dieOn('NotFound', 'Rejected'))
+    const user = yield* jira.getMyself().pipe(dieOn('NotFound', 'Rejected', 'TransportError'))
     return { user }
   },
 )

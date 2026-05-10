@@ -125,6 +125,12 @@ export function createCoordinator(deps: CoordinatorDeps): Coordinator {
         toast.error(message)
         return err<void, ApplyTransitionError>(new TransitionUnauthorized(message))
       })
+      .with({ ok: false, error: { _tag: 'TransportError' } }, ({ error }) => {
+        rollbackBoard()
+        rollbackIssue()
+        toast.error(`Couldn't change status: ${error.message}`)
+        return err<void, ApplyTransitionError>(new TransitionNetworkError(error.message))
+      })
       .exhaustive()
   }
 
@@ -178,6 +184,12 @@ export function createCoordinator(deps: CoordinatorDeps): Coordinator {
           const message = 'Invalid Jira credentials'
           toast.error('Failed to create ticket', { description: message })
           return err<CreateIssueSnapshot, CreateIssueError>(new CreateIssueUnauthorized(message))
+        })
+        .with({ ok: false, error: { _tag: 'TransportError' } }, ({ error }) => {
+          toast.error('Failed to create ticket', { description: error.message })
+          return err<CreateIssueSnapshot, CreateIssueError>(
+            new CreateIssueNetworkError(error.message),
+          )
         })
         .exhaustive()
     } finally {

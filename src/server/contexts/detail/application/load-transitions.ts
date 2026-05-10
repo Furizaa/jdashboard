@@ -13,6 +13,6 @@ export const loadTransitions = (
 ): Effect.Effect<LoadTransitionsOk, LoadTransitionsError, JiraGateway> =>
   Effect.gen(function* () {
     const jira = yield* JiraGateway
-    const transitions = yield* jira.getTransitions(key).pipe(dieOn('Rejected'))
+    const transitions = yield* jira.getTransitions(key).pipe(dieOn('Rejected', 'TransportError'))
     return { transitions }
   })

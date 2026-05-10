@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@effect/vitest'
 import { Effect, Layer } from 'effect'
-import { JiraRejected, JiraUnauthorized } from '../../../gateways/jira/errors'
+import { JiraRejected, JiraTransportError, JiraUnauthorized } from '../../../gateways/jira/errors'
 import { JiraGateway } from '../../../gateways/jira/port'
 import type { CreateIssueBody } from '../../../gateways/jira/types'
 import { CaptureConfig, type CaptureConfigShape } from '../config'
@@ -127,6 +127,21 @@ describe('quickCreate', () => {
       expect(failure._tag).toBe('Rejected')
       if (failure._tag === 'Rejected') {
         expect(failure.message).toBe('service unavailable')
+      }
+    }),
+  )
+
+  it.effect('propagates TransportError as a tagged failure (not a defect)', () =>
+    Effect.gen(function* () {
+      const jira = fakeJiraGateway({
+        getMyself: () =>
+          Effect.succeed({ accountId: 'acc-1', displayName: 'A', avatarUrl: 'https://a' }),
+        createIssue: () => Effect.fail(new JiraTransportError({ message: 'connection refused' })),
+      })
+      const failure = yield* provide(quickCreate(SAMPLE_INPUT), jira).pipe(Effect.flip)
+      expect(failure._tag).toBe('TransportError')
+      if (failure._tag === 'TransportError') {
+        expect(failure.message).toBe('connection refused')
       }
     }),
   )

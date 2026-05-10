@@ -10,8 +10,10 @@ export type MrBundle = {
   readonly reviewers: readonly RawMrReviewerWithState[]
 }
 
-// NotFound / Rejected on a single MR drop that MR but keep the rest;
-// Unauthorized propagates so the whole call surfaces as 401.
+// NotFound / Rejected / TransportError on a single MR drop that MR but keep
+// the rest; Unauthorized propagates so the whole call surfaces as 401. The
+// outer concurrency budget (5 at the application-service level — see
+// CONTEXT-MAP.md) is the only one in flight; per-MR fan-out is sequential.
 export const fetchMrBundle = (
   gitlab: GitlabGateway['Type'],
   iid: number,
@@ -23,7 +25,7 @@ export const fetchMrBundle = (
       gitlab.getMrApprovals(iid),
       gitlab.getMrReviewers(iid),
     ],
-    { concurrency: 'unbounded' },
+    { concurrency: 1 },
   ).pipe(
     Effect.map(
       ([detail, discussions, approvals, reviewers]): MrBundle => ({
@@ -36,5 +38,6 @@ export const fetchMrBundle = (
     Effect.catchTags({
       NotFound: () => Effect.succeed(null),
       Rejected: () => Effect.succeed(null),
+      TransportError: () => Effect.succeed(null),
     }),
   )

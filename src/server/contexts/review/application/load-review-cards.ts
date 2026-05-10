@@ -162,7 +162,7 @@ const lookupBulkIssues = (
   if (uniqueKeys.length === 0) return Effect.succeed([])
   const hideSet = new Set(hideLabels.map((l) => l.toLowerCase()))
   return jira.searchIssues(buildBulkIssuesJql(uniqueKeys), BULK_FIELDS).pipe(
-    dieOn('NotFound', 'Rejected'),
+    dieOn('NotFound', 'Rejected', 'TransportError'),
     Effect.map((response) => response.issues.map((issue) => toBoardIssue(issue, hideSet))),
   )
 }
@@ -204,14 +204,14 @@ export const loadReviewCards: Effect.Effect<
   const jira = yield* JiraGateway
   const config = yield* ReviewConfig
 
-  const me = yield* gitlab.getCurrentUser().pipe(dieOn('NotFound', 'Rejected'))
+  const me = yield* gitlab.getCurrentUser().pipe(dieOn('NotFound', 'Rejected', 'TransportError'))
 
   const nowMs = yield* Clock.currentTimeMillis
   const updatedAfter = new Date(nowMs - config.lookbackDays * MS_PER_DAY)
 
   const list = yield* gitlab
     .listMrs({ states: ['opened', 'merged'], reviewerUsername: me.username, updatedAfter })
-    .pipe(dieOn('NotFound', 'Rejected'))
+    .pipe(dieOn('NotFound', 'Rejected', 'TransportError'))
 
   const candidates = list.filter((mr) => !mr.draft)
 

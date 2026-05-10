@@ -54,10 +54,13 @@ const WireMrDetailSchema = Schema.Struct({
 })
 type WireMrDetail = Schema.Schema.Type<typeof WireMrDetailSchema>
 
+// GitLab omits `resolved` on non-resolvable notes (system notes, plain
+// comments). The downstream consumer only reads it when `resolvable` is
+// true, so defaulting the missing case to `false` is safe.
 const WireNoteSchema = Schema.Struct({
   author: Schema.Struct({ username: Schema.String }),
   resolvable: Schema.Boolean,
-  resolved: Schema.Boolean,
+  resolved: Schema.optionalWith(Schema.Boolean, { default: () => false }),
   system: Schema.Boolean,
 })
 

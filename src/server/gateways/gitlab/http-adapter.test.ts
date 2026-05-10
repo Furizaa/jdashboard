@@ -271,6 +271,41 @@ describe('GitlabGatewayLive — wire shape normalisation', () => {
   })
 })
 
+describe('GitlabGatewayLive — getMrDiscussions tolerates missing `resolved`', () => {
+  // GitLab omits `resolved` on non-resolvable notes (system notes, plain
+  // comments). The schema must default the missing field to `false` so the
+  // whole MR fan-out doesn't drop on every real-world MR.
+  it.effect('decodes a system note without `resolved` field', () => {
+    const client = fakeHttpClient(() =>
+      jsonResponse([
+        {
+          id: 'd1',
+          notes: [
+            {
+              author: { username: 'system-bot' },
+              resolvable: false,
+              system: true,
+            },
+          ],
+        },
+      ]),
+    )
+    const program = Effect.gen(function* () {
+      const gateway = yield* GitlabGateway
+      const value = yield* gateway.getMrDiscussions(1)
+      expect(value).toEqual([
+        {
+          id: 'd1',
+          notes: [
+            { authorUsername: 'system-bot', resolvable: false, resolved: false, system: true },
+          ],
+        },
+      ])
+    })
+    return provideTestLayers(program, client)
+  })
+})
+
 describe('GitlabGatewayLive — schema decode failures route to TransportError', () => {
   it.effect('getCurrentUser: wrong-shape body decodes as TransportError', () => {
     const client = fakeHttpClient(() => jsonResponse({ wrong: 'shape' }))

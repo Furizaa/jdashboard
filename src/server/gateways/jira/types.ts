@@ -1,3 +1,5 @@
+import { Schema } from 'effect'
+
 type AdfMark = { type: string; attrs?: Record<string, string | number | boolean | null> }
 
 export type AdfNode = {
@@ -14,6 +16,14 @@ export type JiraUser = {
   displayName: string
   avatarUrl: string
 }
+
+// Wire shape returned by GET /rest/api/3/myself; the gateway maps this to the
+// public `JiraUser` after decoding (largest available avatar wins).
+export const JiraUserResponseSchema = Schema.Struct({
+  accountId: Schema.String,
+  displayName: Schema.String,
+  avatarUrls: Schema.Record({ key: Schema.String, value: Schema.String }),
+})
 
 export type GatewayCreatedIssue = { key: string }
 
@@ -74,71 +84,104 @@ export type DetailIssue = {
 
 export type EpicRef = { key: string; summary: string }
 
-export type RawLinkedRef = {
-  key: string
-  fields?: {
-    summary?: string
-    status?: { name: string; statusCategory?: { key: string; name: string } }
-    issuetype?: { name: string }
-  }
-}
+// `status.name` stays Schema.String — HDR statuses mix ALL-CAPS and Title Case
+// so a literal-union would reject valid values.
+const StatusFieldSchema = Schema.Struct({
+  name: Schema.String,
+  statusCategory: Schema.optional(Schema.Struct({ key: Schema.String, name: Schema.String })),
+})
 
-export type RawIssue = {
-  id: string
-  key: string
-  fields: {
-    summary: string
-    status: { name: string; statusCategory?: { key: string; name: string } }
-    labels?: string[]
-    issuetype?: { name: string }
-    parent?: RawLinkedRef | null
-  }
-}
+export const RawLinkedRefSchema = Schema.Struct({
+  key: Schema.String,
+  fields: Schema.optional(
+    Schema.Struct({
+      summary: Schema.optional(Schema.String),
+      status: Schema.optional(StatusFieldSchema),
+      issuetype: Schema.optional(Schema.Struct({ name: Schema.String })),
+    }),
+  ),
+})
+export type RawLinkedRef = Schema.Schema.Type<typeof RawLinkedRefSchema>
 
-export type RawSearchResponse = {
-  issues: RawIssue[]
-  nextPageToken?: string
-  isLast?: boolean
-}
+export const RawIssueSchema = Schema.Struct({
+  id: Schema.String,
+  key: Schema.String,
+  fields: Schema.Struct({
+    summary: Schema.String,
+    status: StatusFieldSchema,
+    labels: Schema.optional(Schema.Array(Schema.String)),
+    issuetype: Schema.optional(Schema.Struct({ name: Schema.String })),
+    parent: Schema.optional(Schema.NullOr(RawLinkedRefSchema)),
+  }),
+})
+export type RawIssue = Schema.Schema.Type<typeof RawIssueSchema>
 
-export type RawIssueLink = {
-  id: string
-  type: { name: string; inward: string; outward: string }
-  inwardIssue?: RawLinkedRef
-  outwardIssue?: RawLinkedRef
-}
+export const RawSearchResponseSchema = Schema.Struct({
+  issues: Schema.Array(RawIssueSchema),
+  nextPageToken: Schema.optional(Schema.String),
+  isLast: Schema.optional(Schema.Boolean),
+})
+export type RawSearchResponse = Schema.Schema.Type<typeof RawSearchResponseSchema>
 
-export type RawComment = {
-  id: string
-  author?: { displayName: string; avatarUrls?: Record<string, string> } | null
-  created: string
-  body?: unknown
-}
+export const RawIssueLinkSchema = Schema.Struct({
+  id: Schema.String,
+  type: Schema.Struct({
+    name: Schema.String,
+    inward: Schema.String,
+    outward: Schema.String,
+  }),
+  inwardIssue: Schema.optional(RawLinkedRefSchema),
+  outwardIssue: Schema.optional(RawLinkedRefSchema),
+})
+export type RawIssueLink = Schema.Schema.Type<typeof RawIssueLinkSchema>
 
-export type RawAttachment = {
-  id: string
-  filename: string
-  mimeType: string
-}
+// `body` carries ADF; ADF validation is a separate concern and the walker
+// tolerates malformed structures, so we leave it Schema.Unknown here.
+export const RawCommentSchema = Schema.Struct({
+  id: Schema.String,
+  author: Schema.optional(
+    Schema.NullOr(
+      Schema.Struct({
+        displayName: Schema.String,
+        avatarUrls: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.String })),
+      }),
+    ),
+  ),
+  created: Schema.String,
+  body: Schema.optional(Schema.Unknown),
+})
+export type RawComment = Schema.Schema.Type<typeof RawCommentSchema>
 
-export type RawDetailedIssue = {
-  id: string
-  key: string
-  fields: {
-    summary: string
-    status: { name: string }
-    issuetype?: { name: string }
-    labels?: string[]
-    priority?: { name: string } | null
-    assignee?: { displayName: string } | null
-    reporter?: { displayName: string } | null
-    description?: unknown
-    parent?: RawLinkedRef | null
-    issuelinks?: RawIssueLink[]
-    comment?: { comments: RawComment[] }
-    attachment?: RawAttachment[]
-  }
-}
+export const RawAttachmentSchema = Schema.Struct({
+  id: Schema.String,
+  filename: Schema.String,
+  mimeType: Schema.String,
+})
+export type RawAttachment = Schema.Schema.Type<typeof RawAttachmentSchema>
+
+// `priority.name` stays Schema.String — the 'Undefined' sentinel must not be
+// rejected here; loadIssue's pickPriorityName normalizes it to null later.
+// `description` carries ADF — kept Schema.Unknown for the same reason as
+// RawCommentSchema's body.
+export const RawDetailedIssueSchema = Schema.Struct({
+  id: Schema.String,
+  key: Schema.String,
+  fields: Schema.Struct({
+    summary: Schema.String,
+    status: StatusFieldSchema,
+    issuetype: Schema.optional(Schema.Struct({ name: Schema.String })),
+    labels: Schema.optional(Schema.Array(Schema.String)),
+    priority: Schema.optional(Schema.NullOr(Schema.Struct({ name: Schema.String }))),
+    assignee: Schema.optional(Schema.NullOr(Schema.Struct({ displayName: Schema.String }))),
+    reporter: Schema.optional(Schema.NullOr(Schema.Struct({ displayName: Schema.String }))),
+    description: Schema.optional(Schema.Unknown),
+    parent: Schema.optional(Schema.NullOr(RawLinkedRefSchema)),
+    issuelinks: Schema.optional(Schema.Array(RawIssueLinkSchema)),
+    comment: Schema.optional(Schema.Struct({ comments: Schema.Array(RawCommentSchema) })),
+    attachment: Schema.optional(Schema.Array(RawAttachmentSchema)),
+  }),
+})
+export type RawDetailedIssue = Schema.Schema.Type<typeof RawDetailedIssueSchema>
 
 export type MediaStream = {
   readonly stream: ReadableStream<Uint8Array>

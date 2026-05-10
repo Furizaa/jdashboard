@@ -165,13 +165,17 @@ export class World {
         `World.transitionIssue: no transition '${transitionId}' seeded for ${issueKey}`,
       )
     }
-    const issue = this.issues.find((i) => i.key === issueKey)
-    if (issue === undefined) {
+    const idx = this.issues.findIndex((i) => i.key === issueKey)
+    if (idx === -1) {
       throw new Error(`World.transitionIssue: no issue seeded with key ${issueKey}`)
     }
-    issue.fields.status = {
-      ...issue.fields.status,
-      name: transition.toStatusName,
+    const issue = this.issues[idx]!
+    this.issues[idx] = {
+      ...issue,
+      fields: {
+        ...issue.fields,
+        status: { ...issue.fields.status, name: transition.toStatusName },
+      },
     }
     return transition.toStatusName
   }

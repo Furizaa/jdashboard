@@ -132,7 +132,7 @@ function shapeMeta(f: RawDetailedIssue['fields']): {
 } {
   return {
     typeName: f.issuetype?.name ?? 'Task',
-    labels: f.labels ?? [],
+    labels: [...(f.labels ?? [])],
     priorityName: pickPriorityName(f.priority?.name),
   }
 }

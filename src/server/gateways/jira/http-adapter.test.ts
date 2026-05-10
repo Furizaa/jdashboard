@@ -296,3 +296,68 @@ describe('JiraGatewayLive — searchIssues', () => {
     )
   })
 })
+
+describe('JiraGatewayLive — schema decode failures route to TransportError', () => {
+  it.effect('getMyself: wrong-shape body decodes as TransportError', () => {
+    const client = fakeHttpClient(() => jsonResponse({ wrong: 'shape' }))
+    const program = Effect.gen(function* () {
+      const gateway = yield* JiraGateway
+      const failure = yield* gateway.getMyself().pipe(Effect.flip)
+      expect(failure._tag).toBe('TransportError')
+    })
+    return provideTestLayers(program, client)
+  })
+
+  it.effect('searchIssues: wrong-shape body decodes as TransportError', () => {
+    const client = fakeHttpClient(() => jsonResponse({ wrong: 'shape' }))
+    const program = Effect.gen(function* () {
+      const gateway = yield* JiraGateway
+      const failure = yield* gateway.searchIssues('project = HDR', ['summary']).pipe(Effect.flip)
+      expect(failure._tag).toBe('TransportError')
+    })
+    return provideTestLayers(program, client)
+  })
+
+  it.effect('getIssue: wrong-shape body decodes as TransportError', () => {
+    const client = fakeHttpClient(() => jsonResponse({ wrong: 'shape' }))
+    const program = Effect.gen(function* () {
+      const gateway = yield* JiraGateway
+      const failure = yield* gateway.getIssue('HDR-1', ['summary']).pipe(Effect.flip)
+      expect(failure._tag).toBe('TransportError')
+    })
+    return provideTestLayers(program, client)
+  })
+
+  it.effect('getTransitions: wrong-shape body decodes as TransportError', () => {
+    const client = fakeHttpClient(() => jsonResponse({ wrong: 'shape' }))
+    const program = Effect.gen(function* () {
+      const gateway = yield* JiraGateway
+      const failure = yield* gateway.getTransitions('HDR-1').pipe(Effect.flip)
+      expect(failure._tag).toBe('TransportError')
+    })
+    return provideTestLayers(program, client)
+  })
+
+  it.effect('createIssue: wrong-shape body decodes as TransportError', () => {
+    const client = fakeHttpClient(() => jsonResponse({ wrong: 'shape' }))
+    const program = Effect.gen(function* () {
+      const gateway = yield* JiraGateway
+      const failure = yield* gateway
+        .createIssue({
+          fields: {
+            project: { key: 'HDR' },
+            issuetype: { name: 'Bug' },
+            summary: 's',
+            description: { type: 'doc', version: 1, content: [] },
+            priority: { name: 'Lowest' },
+            labels: [],
+            parent: { key: 'HDR-1' },
+            assignee: { accountId: 'a' },
+          },
+        })
+        .pipe(Effect.flip)
+      expect(failure._tag).toBe('TransportError')
+    })
+    return provideTestLayers(program, client)
+  })
+})

@@ -1,5 +1,5 @@
 import { HttpClient, HttpClientRequest, HttpClientResponse } from '@effect/platform'
-import { Effect, Layer, Stream } from 'effect'
+import { Effect, Layer, Schema, Stream } from 'effect'
 import { ServerEnv } from '../../runtime/server-env'
 import {
   JiraNotFound,
@@ -11,15 +11,32 @@ import {
   type JiraGatewayError,
 } from './errors'
 import { JiraGateway } from './port'
-import type {
-  AllowedTransition,
-  CreateIssueBody,
-  GatewayCreatedIssue,
-  JiraUser,
-  MediaStream,
-  RawDetailedIssue,
-  RawSearchResponse,
+import {
+  JiraUserResponseSchema,
+  RawDetailedIssueSchema,
+  RawSearchResponseSchema,
+  type AllowedTransition,
+  type CreateIssueBody,
+  type GatewayCreatedIssue,
+  type JiraUser,
+  type MediaStream,
 } from './types'
+
+const GetTransitionsResponseSchema = Schema.Struct({
+  transitions: Schema.Array(
+    Schema.Struct({
+      id: Schema.String,
+      name: Schema.String,
+      to: Schema.Struct({ name: Schema.String }),
+    }),
+  ),
+})
+
+const CreatedIssueResponseSchema = Schema.Struct({
+  id: Schema.String,
+  key: Schema.String,
+  self: Schema.String,
+})
 
 function basicAuth(email: string, token: string): string {
   const encoded = Buffer.from(`${email}:${token}`, 'utf8').toString('base64')
@@ -45,12 +62,12 @@ function parseJiraErrorMessage(body: string): string {
   return body || 'Jira request was rejected'
 }
 
-const decodeJsonBody = <T>(
-  response: HttpClientResponse.HttpClientResponse,
-): Effect.Effect<T, JiraGatewayError> =>
-  response.json.pipe(
-    Effect.mapError((error) => new JiraTransportError({ message: error.message })),
-  ) as Effect.Effect<T, JiraGatewayError>
+const decodeJsonAs =
+  <A, I>(schema: Schema.Schema<A, I>) =>
+  (response: HttpClientResponse.HttpClientResponse): Effect.Effect<A, JiraGatewayError> =>
+    HttpClientResponse.schemaBodyJson(schema)(response).pipe(
+      Effect.mapError((error) => new JiraTransportError({ message: error.message })),
+    )
 
 const readErrorBody = (response: HttpClientResponse.HttpClientResponse): Effect.Effect<string> =>
   response.text.pipe(Effect.catchAll(() => Effect.succeed('')))
@@ -154,22 +171,23 @@ export const JiraGatewayLive: Layer.Layer<JiraGateway, never, HttpClient.HttpCli
           ),
         )
 
-      const executeJson = <T>(
-        request: HttpClientRequest.HttpClientRequest,
-      ): Effect.Effect<T, JiraGatewayError> =>
-        client.execute(request).pipe(
-          Effect.mapError(
-            (error) => new JiraTransportError({ message: `Jira request failed: ${error.message}` }),
-          ),
-          Effect.flatMap((response) =>
-            HttpClientResponse.matchStatus(response, {
-              '2xx': (ok) => decodeJsonBody<T>(ok),
-              401: (): Effect.Effect<T, JiraGatewayError> => Effect.fail(new JiraUnauthorized()),
-              404: (): Effect.Effect<T, JiraGatewayError> => Effect.fail(new JiraNotFound()),
-              orElse: (bad): Effect.Effect<T, JiraGatewayError> => failFromStatus(bad),
-            }),
-          ),
-        )
+      const executeJson =
+        <A, I>(schema: Schema.Schema<A, I>) =>
+        (request: HttpClientRequest.HttpClientRequest): Effect.Effect<A, JiraGatewayError> =>
+          client.execute(request).pipe(
+            Effect.mapError(
+              (error) =>
+                new JiraTransportError({ message: `Jira request failed: ${error.message}` }),
+            ),
+            Effect.flatMap((response) =>
+              HttpClientResponse.matchStatus(response, {
+                '2xx': (ok): Effect.Effect<A, JiraGatewayError> => decodeJsonAs(schema)(ok),
+                401: (): Effect.Effect<A, JiraGatewayError> => Effect.fail(new JiraUnauthorized()),
+                404: (): Effect.Effect<A, JiraGatewayError> => Effect.fail(new JiraNotFound()),
+                orElse: (bad): Effect.Effect<A, JiraGatewayError> => failFromStatus(bad),
+              }),
+            ),
+          )
 
       const executeNoBody = (
         request: HttpClientRequest.HttpClientRequest,
@@ -190,11 +208,7 @@ export const JiraGatewayLive: Layer.Layer<JiraGateway, never, HttpClient.HttpCli
 
       return JiraGateway.of({
         getMyself: () =>
-          executeJson<{
-            accountId: string
-            displayName: string
-            avatarUrls: Record<string, string>
-          }>(get('/rest/api/3/myself')).pipe(
+          executeJson(JiraUserResponseSchema)(get('/rest/api/3/myself')).pipe(
             Effect.map((me): JiraUser => {
               const avatarUrl =
                 me.avatarUrls['48x48'] ?? me.avatarUrls['32x32'] ?? me.avatarUrls['24x24'] ?? ''
@@ -204,20 +218,20 @@ export const JiraGatewayLive: Layer.Layer<JiraGateway, never, HttpClient.HttpCli
 
         searchIssues: (jql, fields) =>
           postJson('/rest/api/3/search/jql', { jql, fields, maxResults: 100 }).pipe(
-            Effect.flatMap((req) => executeJson<RawSearchResponse>(req)),
+            Effect.flatMap(executeJson(RawSearchResponseSchema)),
           ),
 
         getIssue: (key, fields) => {
           const params = new URLSearchParams({ fields: fields.join(',') })
-          return executeJson<RawDetailedIssue>(
+          return executeJson(RawDetailedIssueSchema)(
             get(`/rest/api/3/issue/${encodeURIComponent(key)}?${params.toString()}`),
           )
         },
 
         getTransitions: (key) =>
-          executeJson<{
-            transitions: Array<{ id: string; name: string; to: { name: string } }>
-          }>(get(`/rest/api/3/issue/${encodeURIComponent(key)}/transitions`)).pipe(
+          executeJson(GetTransitionsResponseSchema)(
+            get(`/rest/api/3/issue/${encodeURIComponent(key)}/transitions`),
+          ).pipe(
             Effect.map((resp): AllowedTransition[] =>
               resp.transitions.map((t) => ({ id: t.id, name: t.name, toStatusName: t.to.name })),
             ),
@@ -230,7 +244,7 @@ export const JiraGatewayLive: Layer.Layer<JiraGateway, never, HttpClient.HttpCli
 
         createIssue: (body: CreateIssueBody) =>
           postJson('/rest/api/3/issue', body).pipe(
-            Effect.flatMap((req) => executeJson<{ id: string; key: string; self: string }>(req)),
+            Effect.flatMap(executeJson(CreatedIssueResponseSchema)),
             Effect.map((created): GatewayCreatedIssue => ({ key: created.key })),
           ),
 

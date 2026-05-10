@@ -23,6 +23,7 @@ import {
 import { extractKeysFromTitle } from '../../../gateways/gitlab/mr-key-map'
 import { ReviewConfig } from '../config'
 import type { LoadReviewCardsError } from '../errors'
+import { quoteJqlString } from '../../../lib/jql'
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000
 
@@ -91,10 +92,6 @@ function buildReviewerVisuals(
 
 function isOpenedOrMerged(state: string): state is 'opened' | 'merged' {
   return state === 'opened' || state === 'merged'
-}
-
-function quoteJqlString(value: string): string {
-  return `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`
 }
 
 function buildBulkIssuesJql(keys: readonly string[]): string {

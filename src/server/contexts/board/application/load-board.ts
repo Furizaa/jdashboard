@@ -3,6 +3,7 @@ import { JiraGateway } from '../../../gateways/jira/port'
 import type { BoardIssue, RawIssue } from '../../../gateways/jira/types'
 import { BoardConfig } from '../config'
 import type { JiraUnauthorized } from '../../../gateways/jira/errors'
+import { quoteJqlString } from '../../../lib/jql'
 
 export type LoadBoardOk = {
   readonly baseUrl: string
@@ -10,10 +11,6 @@ export type LoadBoardOk = {
 }
 
 const BOARD_FIELDS = ['summary', 'status', 'labels', 'issuetype', 'parent'] as const
-
-function quoteJqlString(value: string): string {
-  return `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`
-}
 
 function buildBoardJql(input: {
   projectKey: string

@@ -10,6 +10,7 @@ import {
 import { loadIssue } from '../contexts/detail/application/load-issue'
 import { loadTransitions } from '../contexts/detail/application/load-transitions'
 import { performTransition } from '../contexts/detail/application/perform-transition'
+import { assertIssueKey } from '../lib/jql'
 import { appRuntime } from '../runtime/app-runtime'
 import { toWire, type WireResult } from '../wire/to-wire'
 
@@ -31,15 +32,19 @@ export type TransitionIssueResult =
   | { readonly ok: true }
   | { readonly ok: false; readonly error: PerformTransitionErrorWire }
 
-function requireKey(label: string, value: unknown): string {
+function requireIssueKey(label: string, value: unknown): string {
+  return assertIssueKey(typeof value === 'string' ? value : '', label)
+}
+
+function requireTransitionId(value: unknown): string {
   if (typeof value !== 'string' || value.trim() === '') {
-    throw new Error(`${label}: key is required`)
+    throw new Error('transitionIssue (transitionId): required')
   }
   return value.trim()
 }
 
 export const getIssue = createServerFn({ method: 'GET' })
-  .inputValidator((data: { key: string }) => ({ key: requireKey('getIssue', data?.key) }))
+  .inputValidator((data: { key: string }) => ({ key: requireIssueKey('getIssue', data?.key) }))
   .handler(async ({ data }): Promise<GetIssueResult> => {
     const program = loadIssue(data.key).pipe(Effect.provide(DetailConfigLive))
     const wire = await appRuntime.runPromise(toWire(program, LoadIssueError))
@@ -50,7 +55,9 @@ export const getIssue = createServerFn({ method: 'GET' })
   })
 
 export const getTransitions = createServerFn({ method: 'GET' })
-  .inputValidator((data: { key: string }) => ({ key: requireKey('getTransitions', data?.key) }))
+  .inputValidator((data: { key: string }) => ({
+    key: requireIssueKey('getTransitions', data?.key),
+  }))
   .handler(async ({ data }): Promise<GetTransitionsResult> => {
     const wire = await appRuntime.runPromise(
       toWire(loadTransitions(data.key), LoadTransitionsError),
@@ -63,8 +70,8 @@ export const getTransitions = createServerFn({ method: 'GET' })
 
 export const transitionIssue = createServerFn({ method: 'POST' })
   .inputValidator((data: { key: string; transitionId: string }) => ({
-    key: requireKey('transitionIssue', data?.key),
-    transitionId: requireKey('transitionIssue (transitionId)', data?.transitionId),
+    key: requireIssueKey('transitionIssue', data?.key),
+    transitionId: requireTransitionId(data?.transitionId),
   }))
   .handler(async ({ data }): Promise<TransitionIssueResult> => {
     const wire = await appRuntime.runPromise(

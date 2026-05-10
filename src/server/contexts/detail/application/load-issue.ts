@@ -16,6 +16,7 @@ import type {
 import { DetailConfig } from '../config'
 import { type AttachmentRef, enrichAdfWithMedia } from '../domain/enrich-adf-with-media'
 import type { LoadIssueError } from '../errors'
+import { quoteJqlString } from '../../../lib/jql'
 
 export type LoadIssueOk = {
   readonly baseUrl: string
@@ -198,7 +199,7 @@ export const loadIssue = (
             Rejected: (e) => Effect.die(e),
           }),
         ),
-        jira.searchIssues(`parent = "${key}"`, SUB_ISSUE_FIELDS).pipe(
+        jira.searchIssues(`parent = ${quoteJqlString(key)}`, SUB_ISSUE_FIELDS).pipe(
           Effect.catchTags({
             NotFound: (e) => Effect.die(e),
             Rejected: (e) => Effect.die(e),

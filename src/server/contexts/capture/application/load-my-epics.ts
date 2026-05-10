@@ -3,16 +3,13 @@ import { JiraGateway } from '../../../gateways/jira/port'
 import type { EpicRef } from '../../../gateways/jira/types'
 import { CaptureConfig } from '../config'
 import type { LoadMyEpicsError } from '../errors'
+import { quoteJqlString } from '../../../lib/jql'
 
 export type LoadMyEpicsOk = {
   readonly epics: readonly EpicRef[]
 }
 
 const EPIC_FIELDS = ['summary'] as const
-
-function quoteJqlString(value: string): string {
-  return `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`
-}
 
 function buildEpicJql(input: { projectKey: string; statuses: readonly string[] }): string {
   const statusClauses = input.statuses.map((s) => `status = ${quoteJqlString(s)}`)

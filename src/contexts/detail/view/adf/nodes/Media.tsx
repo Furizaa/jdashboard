@@ -1,17 +1,9 @@
-import { useState, type ReactNode } from 'react'
+import { useState } from 'react'
 import { Play } from 'lucide-react'
 import { MediaLightbox } from './MediaLightbox'
 import { MediaUnavailable } from './MediaUnavailable'
 
 type MediaAttrs = Record<string, string | number | boolean | null> | undefined
-
-export function MediaSingle({ children }: { children: ReactNode }) {
-  return <div className="my-2">{children}</div>
-}
-
-export function MediaGroup({ children }: { children: ReactNode }) {
-  return <div className="my-2 flex flex-wrap gap-2">{children}</div>
-}
 
 export function Media({ attrs, jiraBaseUrl }: { attrs: MediaAttrs; jiraBaseUrl?: string }) {
   const url = typeof attrs?.url === 'string' ? attrs.url : null
@@ -67,17 +59,22 @@ function MediaPreview({
         type="button"
         onClick={() => setOpen(true)}
         aria-label={ariaLabel}
-        className="border-border focus-visible:ring-ring relative inline-block max-w-full cursor-zoom-in overflow-hidden rounded-md border focus-visible:ring-2 focus-visible:outline-none"
+        className="border-border bg-muted/40 focus-visible:ring-ring relative block aspect-video w-full cursor-zoom-in overflow-hidden rounded-md border focus-visible:ring-2 focus-visible:outline-none"
       >
         {kind === 'image' ? (
-          <img src={url} alt={alt} className="block max-w-full" onError={() => setErrored(true)} />
+          <img
+            src={url}
+            alt={alt}
+            className="block h-full w-full object-contain"
+            onError={() => setErrored(true)}
+          />
         ) : (
           <>
             <video
               src={url}
               preload="metadata"
               muted
-              className="block max-w-full"
+              className="block h-full w-full object-contain"
               onError={() => setErrored(true)}
             >
               <track kind="captions" />

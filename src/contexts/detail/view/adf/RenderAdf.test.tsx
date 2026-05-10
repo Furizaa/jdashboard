@@ -380,7 +380,7 @@ describe('RenderAdf', () => {
           }),
         ),
       ).toMatchInlineSnapshot(
-        `"<div class="space-y-3"><div class="my-2"><button type="button" class="border-border focus-visible:ring-ring relative inline-block max-w-full cursor-zoom-in overflow-hidden rounded-md border focus-visible:ring-2 focus-visible:outline-none"><img alt="screenshot" class="block max-w-full" src="https://example.com/img.png"></button></div></div>"`,
+        `"<div class="space-y-3"><div class="my-2 grid grid-cols-3 gap-2"><button type="button" class="border-border bg-muted/40 focus-visible:ring-ring relative block aspect-video w-full cursor-zoom-in overflow-hidden rounded-md border focus-visible:ring-2 focus-visible:outline-none"><img alt="screenshot" class="block h-full w-full object-contain" src="https://example.com/img.png"></button></div></div>"`,
       )
     })
 
@@ -392,7 +392,7 @@ describe('RenderAdf', () => {
       expect(
         render(<RenderAdf doc={doc} jiraBaseUrl="https://j.example.com" />).container.innerHTML,
       ).toMatchInlineSnapshot(
-        `"<div class="space-y-3"><div class="my-2"><span class="border-border bg-muted/40 text-muted-foreground inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs"><span>Media hosted in Jira</span><a href="https://j.example.com" target="_blank" rel="noopener noreferrer" class="text-sky-400 hover:underline">Open in Jira</a></span></div></div>"`,
+        `"<div class="space-y-3"><div class="my-2 grid grid-cols-3 gap-2"><span class="border-border bg-muted/40 text-muted-foreground inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs"><span>Media hosted in Jira</span><a href="https://j.example.com" target="_blank" rel="noopener noreferrer" class="text-sky-400 hover:underline">Open in Jira</a></span></div></div>"`,
       )
     })
 
@@ -405,8 +405,32 @@ describe('RenderAdf', () => {
           }),
         ),
       ).toMatchInlineSnapshot(
-        `"<div class="space-y-3"><div class="my-2"><span class="border-border bg-muted/40 text-muted-foreground inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs"><span>Media hosted in Jira</span></span></div></div>"`,
+        `"<div class="space-y-3"><div class="my-2 grid grid-cols-3 gap-2"><span class="border-border bg-muted/40 text-muted-foreground inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs"><span>Media hosted in Jira</span></span></div></div>"`,
       )
+    })
+
+    it('packs consecutive mediaSingle siblings into a single 3-column row', () => {
+      const doc: AdfNode = {
+        type: 'doc',
+        content: [
+          {
+            type: 'mediaSingle',
+            content: [
+              { type: 'media', attrs: { type: 'file', id: 'a', url: 'https://example.com/a.png' } },
+            ],
+          },
+          {
+            type: 'mediaSingle',
+            content: [
+              { type: 'media', attrs: { type: 'file', id: 'b', url: 'https://example.com/b.png' } },
+            ],
+          },
+        ],
+      }
+      const container = render(<RenderAdf doc={doc} />).container
+      const rows = container.querySelectorAll('div.my-2.grid.grid-cols-3.gap-2')
+      expect(rows).toHaveLength(1)
+      expect(rows[0]?.querySelectorAll('button')).toHaveLength(2)
     })
 
     it('renders mediaGroup with multiple media children', () => {
@@ -427,7 +451,7 @@ describe('RenderAdf', () => {
           }),
         ),
       ).toMatchInlineSnapshot(
-        `"<div class="space-y-3"><div class="my-2 flex flex-wrap gap-2"><button type="button" aria-label="View media" class="border-border focus-visible:ring-ring relative inline-block max-w-full cursor-zoom-in overflow-hidden rounded-md border focus-visible:ring-2 focus-visible:outline-none"><img alt="" class="block max-w-full" src="https://example.com/a.png"></button><button type="button" aria-label="View media" class="border-border focus-visible:ring-ring relative inline-block max-w-full cursor-zoom-in overflow-hidden rounded-md border focus-visible:ring-2 focus-visible:outline-none"><img alt="" class="block max-w-full" src="https://example.com/b.png"></button></div></div>"`,
+        `"<div class="space-y-3"><div class="my-2 grid grid-cols-3 gap-2"><button type="button" aria-label="View media" class="border-border bg-muted/40 focus-visible:ring-ring relative block aspect-video w-full cursor-zoom-in overflow-hidden rounded-md border focus-visible:ring-2 focus-visible:outline-none"><img alt="" class="block h-full w-full object-contain" src="https://example.com/a.png"></button><button type="button" aria-label="View media" class="border-border bg-muted/40 focus-visible:ring-ring relative block aspect-video w-full cursor-zoom-in overflow-hidden rounded-md border focus-visible:ring-2 focus-visible:outline-none"><img alt="" class="block h-full w-full object-contain" src="https://example.com/b.png"></button></div></div>"`,
       )
     })
   })

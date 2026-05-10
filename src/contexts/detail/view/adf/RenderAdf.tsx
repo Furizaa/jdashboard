@@ -11,8 +11,6 @@ import {
   InlineCard,
   ListItem,
   Media,
-  MediaGroup,
-  MediaSingle,
   Mention,
   OrderedList,
   Panel,
@@ -84,12 +82,6 @@ function renderNode(node: AdfNode, key: number, jiraBaseUrl: string | undefined)
         {renderChildren(n, jiraBaseUrl)}
       </Panel>
     ))
-    .with({ type: 'mediaSingle' }, (n) => (
-      <MediaSingle key={key}>{renderChildren(n, jiraBaseUrl)}</MediaSingle>
-    ))
-    .with({ type: 'mediaGroup' }, (n) => (
-      <MediaGroup key={key}>{renderChildren(n, jiraBaseUrl)}</MediaGroup>
-    ))
     .with({ type: 'media' }, (n) => <Media key={key} attrs={n.attrs} jiraBaseUrl={jiraBaseUrl} />)
     .with({ type: 'inlineCard' }, (n) => (
       <InlineCard
@@ -102,7 +94,44 @@ function renderNode(node: AdfNode, key: number, jiraBaseUrl: string | undefined)
     .otherwise(() => <Unsupported key={key} type="unknown" />)
 }
 
+// `mediaSingle` / `mediaGroup` siblings are flattened into a single
+// 3-column grid so that consecutive attachments pack into rows of three
+// regardless of which wrapper Jira used for each one.
 function renderChildren(node: AdfNode, jiraBaseUrl: string | undefined): ReactNode {
   if (!Array.isArray(node.content)) return null
-  return node.content.map((child, i) => renderNode(child, i, jiraBaseUrl))
+
+  const out: ReactNode[] = []
+  let mediaRun: AdfNode[] = []
+  let runStart = 0
+
+  const flushMediaRun = () => {
+    if (mediaRun.length === 0) return
+    const tiles: ReactNode[] = []
+    for (const wrapper of mediaRun) {
+      if (!Array.isArray(wrapper.content)) continue
+      for (const child of wrapper.content) {
+        if (child.type !== 'media') continue
+        tiles.push(<Media key={tiles.length} attrs={child.attrs} jiraBaseUrl={jiraBaseUrl} />)
+      }
+    }
+    out.push(
+      <div key={`media-row-${runStart}`} className="my-2 grid grid-cols-3 gap-2">
+        {tiles}
+      </div>,
+    )
+    mediaRun = []
+  }
+
+  node.content.forEach((child, i) => {
+    if (child.type === 'mediaSingle' || child.type === 'mediaGroup') {
+      if (mediaRun.length === 0) runStart = i
+      mediaRun.push(child)
+      return
+    }
+    flushMediaRun()
+    out.push(renderNode(child, i, jiraBaseUrl))
+  })
+  flushMediaRun()
+
+  return out
 }

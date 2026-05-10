@@ -10,8 +10,8 @@ import {
   quickCreateSchema,
   type QuickCreateInput,
 } from '../contexts/capture/application/quick-create-schema'
-import { appRuntime } from '../runtime/app-runtime'
-import { toWire, type WireResult } from '../wire/to-wire'
+import { runWire } from './run-wire'
+import type { WireResult } from '../wire/to-wire'
 
 type LoadMyselfErrorWire = Schema.Schema.Encoded<typeof LoadMyselfError>
 type LoadMyEpicsErrorWire = Schema.Schema.Encoded<typeof LoadMyEpicsError>
@@ -30,13 +30,7 @@ export type CreateIssueResult = WireResult<
 >
 
 export const getMyself = createServerFn({ method: 'GET' }).handler(
-  async (): Promise<GetMyselfResult> => {
-    const wire = await appRuntime.runPromise(toWire(loadMyself, LoadMyselfError))
-    if (!wire.ok && wire.error._tag === 'InternalError') {
-      throw new Error('getMyself: internal error')
-    }
-    return wire as GetMyselfResult
-  },
+  async (): Promise<GetMyselfResult> => runWire(loadMyself, LoadMyselfError, 'getMyself'),
 )
 
 export const createIssue = createServerFn({ method: 'POST' })
@@ -49,20 +43,12 @@ export const createIssue = createServerFn({ method: 'POST' })
   })
   .handler(async ({ data }): Promise<CreateIssueResult> => {
     const program = quickCreateProgram(data).pipe(Effect.provide(CaptureConfigLive))
-    const wire = await appRuntime.runPromise(toWire(program, QuickCreateError))
-    if (!wire.ok && wire.error._tag === 'InternalError') {
-      throw new Error('createIssue: internal error')
-    }
-    return wire as CreateIssueResult
+    return runWire(program, QuickCreateError, 'createIssue')
   })
 
 export const getMyEpics = createServerFn({ method: 'GET' }).handler(
   async (): Promise<GetMyEpicsResult> => {
     const program = loadMyEpics.pipe(Effect.provide(CaptureConfigLive))
-    const wire = await appRuntime.runPromise(toWire(program, LoadMyEpicsError))
-    if (!wire.ok && wire.error._tag === 'InternalError') {
-      throw new Error('getMyEpics: internal error')
-    }
-    return wire as GetMyEpicsResult
+    return runWire(program, LoadMyEpicsError, 'getMyEpics')
   },
 )

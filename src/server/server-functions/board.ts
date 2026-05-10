@@ -6,8 +6,8 @@ import { BoardConfigLive } from '../contexts/board/config'
 import { LoadBoardError, LoadMrStatusesError } from '../contexts/board/errors'
 import { loadBoard } from '../contexts/board/application/load-board'
 import { loadMrStatuses } from '../contexts/board/application/load-mr-statuses'
-import { appRuntime } from '../runtime/app-runtime'
-import { toWire, type WireResult } from '../wire/to-wire'
+import { runWire } from './run-wire'
+import type { WireResult } from '../wire/to-wire'
 
 const boardProgram = loadBoard.pipe(Effect.provide(BoardConfigLive))
 const mrStatusesProgram = loadMrStatuses.pipe(Effect.provide(BoardConfigLive))
@@ -26,24 +26,10 @@ export type GetMrStatusesResult = WireResult<
 >
 
 export const searchIssues = createServerFn({ method: 'GET' }).handler(
-  async (): Promise<SearchIssuesResult> => {
-    const wire = await appRuntime.runPromise(toWire(boardProgram, LoadBoardError))
-    if (!wire.ok && wire.error._tag === 'InternalError') {
-      // Defects (unexpected errors like a Jira 5xx) become server-function
-      // failures so react-query's `isError` flag flips and the UI shows
-      // "Sync failed". Tagged failures (Unauthorized) stay in the wire shape.
-      throw new Error('searchIssues: internal error')
-    }
-    return wire as SearchIssuesResult
-  },
+  async (): Promise<SearchIssuesResult> => runWire(boardProgram, LoadBoardError, 'searchIssues'),
 )
 
 export const getMrStatuses = createServerFn({ method: 'GET' }).handler(
-  async (): Promise<GetMrStatusesResult> => {
-    const wire = await appRuntime.runPromise(toWire(mrStatusesProgram, LoadMrStatusesError))
-    if (!wire.ok && wire.error._tag === 'InternalError') {
-      throw new Error('getMrStatuses: internal error')
-    }
-    return wire as GetMrStatusesResult
-  },
+  async (): Promise<GetMrStatusesResult> =>
+    runWire(mrStatusesProgram, LoadMrStatusesError, 'getMrStatuses'),
 )

@@ -8,6 +8,7 @@ import { ReviewConfigLive } from '../contexts/review/config'
 import { LoadReviewCardsError } from '../contexts/review/errors'
 import { dieOn } from '../lib/die-on'
 import { appRuntime } from '../runtime/app-runtime'
+import { runWire } from './run-wire'
 import { toWire, type WireResult } from '../wire/to-wire'
 
 type LoadReviewCardsErrorWire = Schema.Schema.Encoded<typeof LoadReviewCardsError>
@@ -24,13 +25,8 @@ export type GetGitlabUserResult =
 const reviewCardsProgram = loadReviewCards.pipe(Effect.provide(ReviewConfigLive))
 
 export const getReviewCards = createServerFn({ method: 'GET' }).handler(
-  async (): Promise<GetReviewCardsResult> => {
-    const wire = await appRuntime.runPromise(toWire(reviewCardsProgram, LoadReviewCardsError))
-    if (!wire.ok && wire.error._tag === 'InternalError') {
-      throw new Error('getReviewCards: internal error')
-    }
-    return wire as GetReviewCardsResult
-  },
+  async (): Promise<GetReviewCardsResult> =>
+    runWire(reviewCardsProgram, LoadReviewCardsError, 'getReviewCards'),
 )
 
 const GitlabUserOnlyError = Schema.Union(GitlabUnauthorized)

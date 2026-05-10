@@ -298,10 +298,21 @@ Forbidden (codified as `dependency-cruiser` rules):
 | ------------------------ | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | Effect runtime           | `effect`                          | Single `ManagedRuntime` at process scope (`appRuntime`); handlers call `appRuntime.runPromise(toWire(...))`.                 |
 | HTTP                     | `@effect/platform`'s `HttpClient` | Schema-validated bodies, retry/timeout middleware as Layers, fake via `Layer.succeed(HttpClient.HttpClient, fake)` in tests. |
-| Schema (server-internal) | `effect/Schema`                   | HTTP response shapes, internal codecs, tagged-error encoders.                                                                |
+| Schema (server-internal) | `effect/Schema`                   | HTTP response shapes via `HttpClientResponse.schemaBodyJson`; internal codecs; tagged-error encoders.                        |
 | Schema (client-crossing) | `zod`                             | Any schema consumed on both sides (today: `quickCreateSchema`). One validator per side of the boundary, not per repo.        |
 | Tagged errors            | `Schema.TaggedError`              | Free `Effect.catchTag` ergonomics + free wire codec via `Schema.encodeUnknownSync`.                                          |
 | Tests                    | `@effect/vitest`                  | `it.effect("...", () => program)` from the start; hand-rolled fakes via `Layer.succeed`; no `vi.mock` of internal modules.   |
+
+### Wire error taxonomy
+
+Gateway adapters surface a fixed vocabulary of tagged failures; per-context error unions pick the subset they want to surface and demote the rest to defects via `dieOn`.
+
+- **`Unauthorized`** — credentials missing or rejected (401).
+- **`NotFound`** — the addressed resource does not exist (404).
+- **`Rejected`** — upstream returned a 4xx with a body (validation rejection, conflict, etc.); carries `message`.
+- **`TransportError`** — network failure, request encoding failure, or response decode failure; the request never produced a meaningful upstream answer. Distinct from `Rejected` so per-context error unions can choose to surface or demote it.
+
+Per-context error unions pick the subset that matters for that surface — e.g. `quickCreate` and `performTransition` surface `Unauthorized | Rejected | TransportError` (a transport blip during a write should reach the user as a tagged failure, not a generic `Sync failed`); read paths like `loadIssue` / `loadTransitions` retain `Unauthorized | NotFound` and demote `Rejected` / `TransportError` to defects (the JQL is server-built or the path is read-only, so a transport blip becomes an `InternalError` and the user sees react-query's `Sync failed`).
 
 ### Server-side policy menus (chosen point + upgrade path)
 

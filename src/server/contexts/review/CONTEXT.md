@@ -27,10 +27,10 @@ In the new layout, `loadReviewCards` lives in **Review's application layer** and
 
 ## Concurrency
 
-Per Q11.3 of the PRD, the per-MR fan-out caps concurrency at 5 (`Effect.all(..., { concurrency: 5 })`). Inside one MR, the four sub-calls (`getMr`, `getMrDiscussions`, `getMrApprovals`, `getMrReviewers`) run unbounded.
+Per Q11.3 of the PRD, the per-MR fan-out caps concurrency at 5 (`Effect.all(..., { concurrency: 5 })`) at the application-service level. Inside one MR, the four sub-calls (`getMr`, `getMrDiscussions`, `getMrApprovals`, `getMrReviewers`) run sequentially (`concurrency: 1`) so the documented "5 in flight" matches the runtime — see `gateways/gitlab/mr-fanout.ts`.
 
 ## Error policy
 
 - `Unauthorized` from any gateway propagates as a **tagged failure** on the wire.
-- `NotFound` / `Rejected` from a single MR's fan-out drop that MR but keep the rest (a single bad MR doesn't kill the whole list).
-- `NotFound` / `Rejected` from `getCurrentUser`, `listMrs`, and the bulk Jira lookup are unexpected and become **defects** (`Effect.die`) — they surface as `InternalError` at the wire boundary.
+- `NotFound` / `Rejected` / `TransportError` from a single MR's fan-out drop that MR but keep the rest (a single bad MR or a transient transport blip on one MR doesn't kill the whole list).
+- `NotFound` / `Rejected` / `TransportError` from `getCurrentUser`, `listMrs`, and the bulk Jira lookup are demoted to **defects** via `dieOn('NotFound', 'Rejected', 'TransportError')` — they surface as `InternalError` at the wire boundary so react-query shows "Sync failed". The bulk Jira lookup's JQL is server-built, so a 4xx is a contract bug; the GitLab user/list calls are read-only, so a transport blip is best left to the next poll rather than turned into a tagged failure.

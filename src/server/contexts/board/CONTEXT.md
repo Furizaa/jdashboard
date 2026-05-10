@@ -35,7 +35,7 @@ Each application service is a single Effect — not a factory. The dependency ch
 5. Lifts a `parent` whose `issuetype.name` is `Epic` into the issue's `epic` field; otherwise `epic = null`.
 6. Returns `{ baseUrl, issues }`.
 
-`JiraUnauthorized` propagates as a tagged failure (and serialises to wire `_tag: 'Unauthorized'`). `JiraRejected` and `JiraNotFound` from the gateway are demoted to defects via `Effect.catchTags` (the existing service throws on these too — preserved as defects so `toWire`'s `catchAllDefect` produces `InternalError`).
+`JiraUnauthorized` propagates as a tagged failure (and serialises to wire `_tag: 'Unauthorized'`). `JiraRejected`, `JiraNotFound`, and `JiraTransportError` from the gateway are demoted to defects via `dieOn('NotFound', 'Rejected', 'TransportError')` (the existing service throws on these too — preserved as defects so `toWire`'s `catchAllDefect` produces `InternalError`; the JQL is server-built, so a 4xx is a contract bug, and the read path's policy is to let react-query show "Sync failed" rather than introduce a new tagged failure).
 
 **`loadMrStatuses`** does:
 
@@ -45,7 +45,7 @@ Each application service is a single Effect — not a factory. The dependency ch
 4. Fans out per-MR (`concurrency: 5`) to fetch detail / discussions / approvals / reviewers via `fetchMrBundle`, then summarises each via `summarizeMr`.
 5. Returns `{ byKey }`.
 
-`GitlabUnauthorized` propagates as a tagged failure. `GitlabNotFound` / `GitlabRejected` from the user/list calls are demoted to defects (a 5xx during board polling surfaces as `InternalError`); per-MR fan-out failures drop the affected MR but keep the rest.
+`GitlabUnauthorized` propagates as a tagged failure. `GitlabNotFound` / `GitlabRejected` / `GitlabTransportError` from the user/list calls are demoted to defects via `dieOn('NotFound', 'Rejected', 'TransportError')` (a transport blip during board polling surfaces as `InternalError` so react-query shows "Sync failed"); per-MR fan-out failures (`NotFound`, `Rejected`, `TransportError` on a single MR's bundle) drop the affected MR but keep the rest. The outer fan-out is `concurrency: 5` at the application-service level; the inner per-MR sub-calls (`getMr`, `getMrDiscussions`, `getMrApprovals`, `getMrReviewers`) run sequentially (`concurrency: 1`) so the documented "5 in flight" matches the runtime.
 
 ## Gateway dependencies
 

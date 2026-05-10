@@ -25,11 +25,11 @@ Server-internal validation (HTTP response shape decoding, internal codecs) uses 
 
 `src/server/server-functions/capture.ts`:
 
-| Server function | Method | Returns                                                                                                |
-| --------------- | ------ | ------------------------------------------------------------------------------------------------------ |
-| `getMyself`     | GET    | `{ ok: true, user } \| { ok: false, error: { _tag: 'Unauthorized' } }`                                 |
-| `getMyEpics`    | GET    | `{ ok: true, epics } \| { ok: false, error: { _tag: 'Unauthorized' } }`                                |
-| `createIssue`   | POST   | `{ ok: true, key, baseUrl } \| { ok: false, error: { _tag: 'Unauthorized' \| 'Rejected', message? } }` |
+| Server function | Method | Returns                                                                                                                    |
+| --------------- | ------ | -------------------------------------------------------------------------------------------------------------------------- |
+| `getMyself`     | GET    | `{ ok: true, user } \| { ok: false, error: { _tag: 'Unauthorized' } }`                                                     |
+| `getMyEpics`    | GET    | `{ ok: true, epics } \| { ok: false, error: { _tag: 'Unauthorized' } }`                                                    |
+| `createIssue`   | POST   | `{ ok: true, key, baseUrl } \| { ok: false, error: { _tag: 'Unauthorized' \| 'Rejected' \| 'TransportError', message? } }` |
 
 The `InternalError` tag is added by `toWire` for any unhandled defect — clients see a tagged shape uniformly, but the handler converts it into a thrown exception so react-query's `isError` flag flips.
 
@@ -42,14 +42,14 @@ The `InternalError` tag is added by `toWire` for any unhandled defect — client
 ```ts
 loadMyself: Effect.Effect<LoadMyselfOk, JiraUnauthorized, JiraGateway>
 loadMyEpics: Effect.Effect<LoadMyEpicsOk, JiraUnauthorized, JiraGateway | CaptureConfig>
-quickCreate(input): Effect.Effect<QuickCreateOk, JiraUnauthorized | JiraRejected, JiraGateway | CaptureConfig>
+quickCreate(input): Effect.Effect<QuickCreateOk, JiraUnauthorized | JiraRejected | JiraTransportError, JiraGateway | CaptureConfig>
 ```
 
 What they do:
 
-- **`loadMyself`** calls `JiraGateway.getMyself()` and surfaces the user. `Rejected` and `NotFound` from the gateway become defects (the Jira `/myself` endpoint never legitimately returns those).
-- **`loadMyEpics`** builds an epic JQL from `CaptureConfig.epic.statuses` + `CaptureConfig.projectKey`, calls `JiraGateway.searchIssues`, and shapes the response into `EpicRef[]`. `Rejected` and `NotFound` become defects.
-- **`quickCreate`** runs `loadMyself` first (for `accountId`), assembles the `CreateIssueBody` via `domain/build-create-payload.ts`, then calls `JiraGateway.createIssue`. Both `Unauthorized` paths (from `loadMyself` and from `createIssue`) and `Rejected` from `createIssue` propagate as tagged failures; `Rejected` from `loadMyself` also propagates so a 5xx during user lookup surfaces consistently.
+- **`loadMyself`** calls `JiraGateway.getMyself()` and surfaces the user. `NotFound`, `Rejected`, and `TransportError` from the gateway become defects (the Jira `/myself` endpoint never legitimately returns the first two; a transport blip during user lookup is rare enough that surfacing it as `InternalError` and letting react-query show "Sync failed" is the right policy for this read path).
+- **`loadMyEpics`** builds an epic JQL from `CaptureConfig.epic.statuses` + `CaptureConfig.projectKey`, calls `JiraGateway.searchIssues`, and shapes the response into `EpicRef[]`. `NotFound`, `Rejected`, and `TransportError` become defects (server-built JQL won't legitimately produce a 4xx; transport failures demote to `InternalError` consistent with the other read paths).
+- **`quickCreate`** runs `loadMyself` first (for `accountId`), assembles the `CreateIssueBody` via `domain/build-create-payload.ts`, then calls `JiraGateway.createIssue`. Only `NotFound` is demoted (the `/myself` and create endpoints don't legitimately 404); `Unauthorized`, `Rejected`, and `TransportError` propagate as tagged failures because a transport blip during a write should reach the user as a tagged failure, not be silently relabeled.
 
 ## Gateway dependencies
 
@@ -59,7 +59,7 @@ What they do:
 
 - `LoadMyselfError = Schema.Union(JiraUnauthorized)`
 - `LoadMyEpicsError = Schema.Union(JiraUnauthorized)`
-- `QuickCreateError = Schema.Union(JiraUnauthorized, JiraRejected)`
+- `QuickCreateError = Schema.Union(JiraUnauthorized, JiraRejected, JiraTransportError)`
 
 Each handler hands its error union to `toWire`, which encodes the tagged failure on the wire and adds `InternalError` for any uncaught defect.
 
@@ -71,7 +71,7 @@ Each handler hands its error union to `toWire`, which encodes the tagged failure
 
 Each application module has a sibling `*.test.ts` using `@effect/vitest`'s `it.effect`. Gateway and config are faked via `Layer.succeed(JiraGateway, fake)` + `Layer.succeed(CaptureConfig, config)`. The hand-rolled fake gateway lives in `__fixtures__/fake-jira-gateway.ts` (per-context, even though its shape mirrors Board's and Detail's — the rule is per-context fakes).
 
-`quick-create.test.ts` covers both transitive `Unauthorized` paths (from `loadMyself` and from `createIssue`) and the `Rejected` path.
+`quick-create.test.ts` covers both transitive `Unauthorized` paths (from `loadMyself` and from `createIssue`), the `Rejected` path, and the `TransportError` path.
 
 ## Domain
 

@@ -2,7 +2,7 @@ import { Effect } from 'effect'
 import { JiraRejected } from '../../../../gateways/jira/errors'
 import type { JiraGatewayShape } from '../../../../gateways/jira/port'
 
-const notImpl = (label: string) =>
+const notImpl = <A, E>(label: string): Effect.Effect<A, E> =>
   Effect.die(new Error(`fake-jira-gateway: ${label} not implemented in this test`))
 
 export function fakeJiraGateway(overrides: Partial<JiraGatewayShape>): JiraGatewayShape {
@@ -15,7 +15,7 @@ export function fakeJiraGateway(overrides: Partial<JiraGatewayShape>): JiraGatew
     createIssue: () => notImpl('createIssue'),
     streamMedia: () => notImpl('streamMedia'),
     ...overrides,
-  } as JiraGatewayShape
+  }
 }
 
 export { JiraRejected }

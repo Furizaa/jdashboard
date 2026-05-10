@@ -2,7 +2,7 @@ import { Effect } from 'effect'
 import { GitlabRejected } from '../../../../gateways/gitlab/errors'
 import type { GitlabGatewayShape } from '../../../../gateways/gitlab/port'
 
-const notImpl = (label: string) =>
+const notImpl = <A, E>(label: string): Effect.Effect<A, E> =>
   Effect.die(new Error(`fake-gitlab-gateway: ${label} not implemented in this test`))
 
 export function fakeGitlabGateway(overrides: Partial<GitlabGatewayShape>): GitlabGatewayShape {
@@ -14,7 +14,7 @@ export function fakeGitlabGateway(overrides: Partial<GitlabGatewayShape>): Gitla
     getMrApprovals: () => notImpl('getMrApprovals'),
     getMrReviewers: () => notImpl('getMrReviewers'),
     ...overrides,
-  } as GitlabGatewayShape
+  }
 }
 
 export { GitlabRejected }

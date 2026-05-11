@@ -47,9 +47,19 @@ describe('countUnresolvedThreads', () => {
     expect(countUnresolvedThreads([d])).toBe(0)
   })
 
-  it('counts non-resolvable threads (general MR comments)', () => {
+  it('excludes non-resolvable threads (general MR comments are not "unresolved")', () => {
     const d = discussion([note({ authorUsername: 'alice', resolvable: false })])
-    expect(countUnresolvedThreads([d])).toBe(1)
+    expect(countUnresolvedThreads([d])).toBe(0)
+  })
+
+  it('excludes non-resolvable bot comments (e.g. coverage bot)', () => {
+    // Regression: HDR-18517 had a Coverage Δ Report bot note with
+    // resolvable=false, resolved=null, system=false. Counting it as
+    // unresolved made the card render "Approved (unresolved)" forever.
+    const d = discussion([
+      note({ authorUsername: 'project_bot', resolvable: false, system: false }),
+    ])
+    expect(countUnresolvedThreads([d])).toBe(0)
   })
 
   it('excludes system-note threads (assignments, approvals, draft toggles)', () => {
@@ -70,7 +80,7 @@ describe('countUnresolvedThreads', () => {
       discussion([note({ authorUsername: 'me' })]),
       discussion([note({ authorUsername: 'dave' })]),
     ]
-    expect(countUnresolvedThreads(ds)).toBe(4)
+    expect(countUnresolvedThreads(ds)).toBe(3)
   })
 
   it('skips empty-note discussions', () => {

@@ -38,9 +38,10 @@ test('unresolved-thread chip count follows the count rule', async ({ page, world
   world.seedMrPipeline(MR_IID, makePipeline({ status: 'success' }))
 
   // Discussions exercising every limb of the rule
-  // (`countUnresolvedThreads` in `~/kernel/mr/count-unresolved.ts`):
+  // (`countUnresolvedThreads` in `~/server/gateways/gitlab/mr/count-unresolved.ts`):
   //   - resolvable + !resolved + non-system → counted
-  //   - !resolvable + non-system → counted (general MR comments)
+  //   - !resolvable + non-system → excluded (general/bot comments aren't
+  //     "threads to resolve" — GitLab itself doesn't count them)
   //   - resolvable + resolved → excluded
   //   - system note (first note) → excluded
   // The current implementation does *not* exclude threads whose first note
@@ -52,9 +53,9 @@ test('unresolved-thread chip count follows the count rule', async ({ page, world
       id: 'd-counted-resolvable',
       notes: [{ authorUsername: 'alice', resolvable: true, resolved: false }],
     }),
-    // counted (2) — non-resolvable general comment.
+    // excluded — non-resolvable general comment (e.g. coverage bot).
     makeDiscussion({
-      id: 'd-counted-general',
+      id: 'd-excluded-general',
       notes: [{ authorUsername: 'alice', resolvable: false, resolved: false }],
     }),
     // excluded — resolved.
@@ -67,7 +68,7 @@ test('unresolved-thread chip count follows the count rule', async ({ page, world
       id: 'd-excluded-system',
       notes: [{ authorUsername: 'alice', resolvable: false, resolved: false, system: true }],
     }),
-    // counted (3) — first-note author is the current user. The author-mode
+    // counted (2) — first-note author is the current user. The author-mode
     // counter does not exclude self-authored threads, so this still counts.
     makeDiscussion({
       id: 'd-self',
@@ -80,6 +81,6 @@ test('unresolved-thread chip count follows the count rule', async ({ page, world
   const card = page.locator(`[data-issue-key="${ISSUE_KEY}"]`)
   const chip = card.getByTestId(testIds.unresolvedThreadChip)
   await expect(chip).toBeVisible()
-  await expect(chip).toHaveText('3')
-  await expect(chip).toHaveAttribute('title', '3 unresolved comment threads')
+  await expect(chip).toHaveText('2')
+  await expect(chip).toHaveAttribute('title', '2 unresolved comment threads')
 })

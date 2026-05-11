@@ -11,7 +11,6 @@ const baseConfig: CaptureConfigShape = {
   baseUrl: 'https://example.atlassian.net',
   projectKey: 'HDR',
   quickCreate: { summaryPrefix: '[FE]: ', labels: ['Frontend'], priority: 'Lowest' },
-  epic: { statuses: ['In Progress'] },
 }
 
 function provide<A, E>(
@@ -31,7 +30,7 @@ function emptySearchResponse(): RawSearchResponse {
 }
 
 describe('loadMyEpics', () => {
-  it.effect('builds JQL from config and forwards it to searchIssues (single status)', () => {
+  it.effect('builds JQL from config and forwards it to searchIssues', () => {
     let capturedJql: string | undefined
     const jira = fakeJiraGateway({
       searchIssues: (jql) => {
@@ -42,26 +41,8 @@ describe('loadMyEpics', () => {
     return provide(loadMyEpics, jira).pipe(
       Effect.tap(() => {
         expect(capturedJql).toBe(
-          'issuetype = Epic AND assignee = currentUser() AND status = "In Progress" AND project = "HDR"',
+          'issuetype = Epic AND assignee = currentUser() AND statusCategory != Done AND project = "HDR"',
         )
-      }),
-    )
-  })
-
-  it.effect('wraps multiple statuses in parentheses joined by OR', () => {
-    let capturedJql: string | undefined
-    const jira = fakeJiraGateway({
-      searchIssues: (jql) => {
-        capturedJql = jql
-        return Effect.succeed(emptySearchResponse())
-      },
-    })
-    return provide(loadMyEpics, jira, {
-      ...baseConfig,
-      epic: { statuses: ['In Progress', 'In Review'] },
-    }).pipe(
-      Effect.tap(() => {
-        expect(capturedJql).toContain('(status = "In Progress" OR status = "In Review")')
       }),
     )
   })

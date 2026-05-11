@@ -12,7 +12,6 @@ const baseConfig: CaptureConfigShape = {
   baseUrl: 'https://example.atlassian.net',
   projectKey: 'HDR',
   quickCreate: { summaryPrefix: '[FE]: ', labels: ['Frontend'], priority: 'Lowest' },
-  epic: { statuses: ['In Progress'] },
 }
 
 const SAMPLE_INPUT: QuickCreateInput = {

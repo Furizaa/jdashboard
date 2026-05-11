@@ -48,7 +48,7 @@ quickCreate(input): Effect.Effect<QuickCreateOk, JiraUnauthorized | JiraRejected
 What they do:
 
 - **`loadMyself`** calls `JiraGateway.getMyself()` and surfaces the user. `NotFound`, `Rejected`, and `TransportError` from the gateway become defects (the Jira `/myself` endpoint never legitimately returns the first two; a transport blip during user lookup is rare enough that surfacing it as `InternalError` and letting react-query show "Sync failed" is the right policy for this read path).
-- **`loadMyEpics`** builds an epic JQL from `CaptureConfig.epic.statuses` + `CaptureConfig.projectKey`, calls `JiraGateway.searchIssues`, and shapes the response into `EpicRef[]`. `NotFound`, `Rejected`, and `TransportError` become defects (server-built JQL won't legitimately produce a 4xx; transport failures demote to `InternalError` consistent with the other read paths).
+- **`loadMyEpics`** builds an epic JQL from `CaptureConfig.projectKey` (filtering on `statusCategory != Done` rather than enumerating status names — HDR's Epic workflow uses idiosyncratic, mixed-case statuses that don't reliably enumerate), calls `JiraGateway.searchIssues`, and shapes the response into `EpicRef[]`. `NotFound`, `Rejected`, and `TransportError` become defects (server-built JQL won't legitimately produce a 4xx; transport failures demote to `InternalError` consistent with the other read paths).
 - **`quickCreate`** runs `loadMyself` first (for `accountId`), assembles the `CreateIssueBody` via `domain/build-create-payload.ts`, then calls `JiraGateway.createIssue`. Only `NotFound` is demoted (the `/myself` and create endpoints don't legitimately 404); `Unauthorized`, `Rejected`, and `TransportError` propagate as tagged failures because a transport blip during a write should reach the user as a tagged failure, not be silently relabeled.
 
 ## Gateway dependencies
@@ -65,7 +65,7 @@ Each handler hands its error union to `toWire`, which encodes the tagged failure
 
 ## Config
 
-`CaptureConfig` (Tag) + `CaptureConfigLive` (Layer) — derived from `ServerEnv`. Holds `projectKey`, `quickCreate` (summary prefix, default labels, default priority), `epic` (statuses to filter by), and `baseUrl`. Lives in `src/server/contexts/capture/config.ts` together with the legacy `defaultQuickCreateConfig` and `defaultEpicConfig` constants. Provided per-handler via `Effect.provide(CaptureConfigLive)` so the runtime's pre-built dependency graph stays minimal.
+`CaptureConfig` (Tag) + `CaptureConfigLive` (Layer) — derived from `ServerEnv`. Holds `projectKey`, `quickCreate` (summary prefix, default labels, default priority), and `baseUrl`. Lives in `src/server/contexts/capture/config.ts` together with the `defaultQuickCreateConfig` constant. Provided per-handler via `Effect.provide(CaptureConfigLive)` so the runtime's pre-built dependency graph stays minimal.
 
 ## Tests
 

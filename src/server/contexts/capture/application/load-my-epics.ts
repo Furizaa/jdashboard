@@ -10,7 +10,9 @@ export type LoadMyEpicsOk = {
   readonly epics: readonly EpicRef[]
 }
 
-const EPIC_FIELDS = ['summary'] as const
+// `status` is unused downstream but required by the gateway's response schema
+// (`RawIssueSchema`); omit it and JSON decoding fails on any non-empty result.
+const EPIC_FIELDS = ['summary', 'status'] as const
 
 // statusCategory (not status name) because HDR's Epic workflow uses
 // idiosyncratic, mixed-case statuses (IN IMPLEMENTATION, IN CODE REVIEW, ...)

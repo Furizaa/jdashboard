@@ -16,7 +16,7 @@ export function AuthGate({ children }: { children: ReactNode }): ReactNode {
   if (query.isPending) {
     return (
       <div className="flex min-h-dvh items-center justify-center">
-        <p className="text-muted-foreground text-sm">Checking Jira credentials…</p>
+        <p className="text-ink-subtle text-sm">Checking Jira credentials…</p>
       </div>
     )
   }
@@ -54,7 +54,8 @@ function InvalidCredentials() {
             >
               id.atlassian.com/manage-profile/security/api-tokens
             </a>{' '}
-            and update <code className="bg-muted rounded px-1 py-0.5 text-xs">.env</code>.
+            and update{' '}
+            <code className="bg-surface-2 rounded px-1.5 py-0.5 font-mono text-xs">.env</code>.
           </p>
         </>
       }
@@ -73,16 +74,16 @@ function FullScreenMessage({
 }) {
   return (
     <div className="flex min-h-dvh items-center justify-center p-6">
-      <div className="border-border bg-card max-w-md rounded-xl border p-6 shadow-lg">
+      <div className="border-border bg-card max-w-md rounded-lg border p-8">
         <h1
           className={cn(
-            'text-xl font-semibold',
+            'text-xl font-semibold tracking-[-0.015em]',
             tone === 'destructive' ? 'text-destructive' : 'text-foreground',
           )}
         >
           {title}
         </h1>
-        <div className="text-muted-foreground mt-2 text-sm leading-relaxed">{body}</div>
+        <div className="text-ink-subtle mt-3 text-sm leading-relaxed">{body}</div>
       </div>
     </div>
   )

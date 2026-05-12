@@ -5,10 +5,10 @@ import { HARDCODED_PARENTS } from '../domain'
 import { useMyEpics } from '../presenter'
 
 const TRIGGER_CLASS =
-  'border-border bg-background text-foreground placeholder:text-muted-foreground focus-visible:ring-ring flex w-full items-center justify-between rounded border px-2 py-1.5 text-left text-xs focus-visible:ring-1 focus-visible:outline-none'
+  'border-border bg-surface-1 text-foreground placeholder:text-ink-tertiary hover:bg-surface-2 focus-visible:ring-ring focus:border-border-strong flex w-full items-center justify-between rounded-md border px-2.5 py-2 text-left text-[13px] transition-colors focus-visible:ring-2 focus-visible:outline-none'
 
 const SECTION_LABEL_CLASS =
-  'text-muted-foreground px-2.5 pt-1.5 pb-1 text-[10px] uppercase tracking-wide'
+  'text-ink-tertiary px-2.5 pt-2 pb-1 text-[10px] font-medium tracking-[0.06em] uppercase'
 
 function useDismissOnOutside(
   active: boolean,
@@ -68,10 +68,10 @@ function ParentTrigger({
       aria-expanded={popoverOpen}
       className={TRIGGER_CLASS}
     >
-      <span className={selected ? 'text-foreground' : 'text-muted-foreground'}>
+      <span className={selected ? 'text-foreground' : 'text-ink-tertiary'}>
         {selected ? `${selected.key} · ${selected.label}` : 'Select a parent…'}
       </span>
-      <ChevronDown size={14} className="text-muted-foreground ml-2 shrink-0" />
+      <ChevronDown size={14} className="text-ink-subtle ml-2 shrink-0" />
     </button>
   )
 }
@@ -140,7 +140,7 @@ function ParentPopover({
   return (
     <div
       role="listbox"
-      className="border-border bg-popover absolute top-full left-0 z-30 mt-1 w-full overflow-hidden rounded-md border py-1 text-xs shadow-lg"
+      className="border-border bg-popover absolute top-full left-0 z-30 mt-1.5 w-full overflow-hidden rounded-md border py-1 text-[13px] shadow-[0_8px_24px_-8px_rgba(0,0,0,0.6)]"
     >
       <div className={SECTION_LABEL_CLASS}>Pinned</div>
       <ul>
@@ -154,7 +154,7 @@ function ParentPopover({
           />
         ))}
       </ul>
-      <div className="border-border/50 my-1 border-t" />
+      <div className="border-border my-1 border-t" />
       <div className={SECTION_LABEL_CLASS}>My in-progress epics</div>
       <DynamicSection
         isLoading={isLoading}
@@ -186,10 +186,10 @@ function ParentRow({
         role="option"
         aria-selected={selected}
         onClick={() => onSelect(entryKey)}
-        className="hover:bg-muted/60 text-foreground flex w-full items-center gap-2 px-2.5 py-1.5 text-left"
+        className="hover:bg-surface-3 text-foreground aria-selected:bg-surface-3 flex w-full items-center gap-2 px-2.5 py-2 text-left transition-colors"
       >
-        <span className="text-muted-foreground font-mono">{entryKey}</span>
-        <span>·</span>
+        <span className="text-ink-subtle font-mono text-[11px]">{entryKey}</span>
+        <span className="text-ink-tertiary">·</span>
         <span className="flex-1 truncate">{label}</span>
       </button>
     </li>
@@ -220,12 +220,12 @@ function DynamicSection({
   }
   if (isError) {
     return (
-      <div className="text-muted-foreground px-2.5 py-1.5">
+      <div className="text-ink-subtle px-2.5 py-1.5">
         Failed to load epics —{' '}
         <button
           type="button"
           onClick={onRetry}
-          className="text-foreground focus-visible:ring-ring underline-offset-2 hover:underline focus-visible:ring-1 focus-visible:outline-none"
+          className="text-foreground focus-visible:ring-ring underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:outline-none"
         >
           retry
         </button>
@@ -233,9 +233,7 @@ function DynamicSection({
     )
   }
   if (epics.length === 0) {
-    return (
-      <div className="text-muted-foreground px-2.5 py-1.5">No active epics assigned to you</div>
-    )
+    return <div className="text-ink-subtle px-2.5 py-1.5">No active epics assigned to you</div>
   }
   return (
     <ul>

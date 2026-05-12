@@ -5,13 +5,15 @@ const SKELETON_CARDS_PER_COLUMN = 4
 
 export function BoardSkeleton() {
   return (
-    <div className="grid h-full grid-cols-4 gap-4 p-4" aria-hidden>
+    <div className="grid h-full grid-cols-4 gap-5 p-5" aria-hidden>
       {COLUMNS.map((column) => (
         <section key={column} className="flex min-h-0 flex-col">
-          <header className="mb-2 flex items-baseline gap-2 px-1">
-            <h2 className="text-foreground text-sm font-semibold tracking-wide">{column}</h2>
+          <header className="mb-3 flex items-center gap-2 px-0.5">
+            <h2 className="text-ink-subtle text-[11px] font-medium tracking-[0.04em] uppercase">
+              {column}
+            </h2>
           </header>
-          <div className="flex flex-1 flex-col gap-2 overflow-hidden pr-1">
+          <div className="flex flex-1 flex-col gap-2.5 overflow-hidden pr-0.5">
             {Array.from({ length: SKELETON_CARDS_PER_COLUMN }).map((_, i) => (
               <SkeletonCard key={i} />
             ))}
@@ -24,13 +26,13 @@ export function BoardSkeleton() {
 
 function SkeletonCard() {
   return (
-    <div className="border-border bg-card rounded-md border px-3 py-2.5 shadow-sm">
+    <div className="border-border bg-card rounded-lg border px-3.5 py-3">
       <div className="flex items-center gap-2">
         <Skeleton className="h-3.5 w-3.5 shrink-0 rounded-sm" />
         <Skeleton className="h-3 w-16 rounded" />
         <Skeleton className="ml-auto h-5 w-20 rounded-full" />
       </div>
-      <div className="mt-1.5 space-y-1.5">
+      <div className="mt-2 space-y-1.5">
         <Skeleton className="h-3 w-full rounded" />
         <Skeleton className="h-3 w-3/4 rounded" />
       </div>

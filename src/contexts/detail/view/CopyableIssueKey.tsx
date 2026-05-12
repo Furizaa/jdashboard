@@ -35,7 +35,7 @@ export function CopyableIssueKey({
       type="button"
       onClick={handleClick}
       aria-label={`Copy Jira URL for ${issueKey}`}
-      className="text-foreground decoration-muted-foreground/60 focus-visible:ring-ring rounded underline decoration-dotted underline-offset-[3px] transition-colors hover:decoration-solid focus-visible:ring-1 focus-visible:outline-none"
+      className="text-foreground decoration-ink-tertiary focus-visible:ring-ring rounded underline decoration-dotted underline-offset-[3px] transition-colors hover:decoration-solid focus-visible:ring-2 focus-visible:outline-none"
     >
       {copied ? 'Copied' : issueKey}
     </button>

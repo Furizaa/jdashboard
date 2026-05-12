@@ -14,14 +14,14 @@ const DEFAULT_VALUES: QuickCreateInput = {
   description: '',
 }
 
-const REQUIRED_LABEL_CLASS = 'text-foreground mb-1 block text-xs font-medium'
+const REQUIRED_LABEL_CLASS = 'text-ink-subtle mb-1.5 block text-[11px] font-medium tracking-wide'
 const REQUIRED_ASTERISK = (
   <span aria-hidden="true" className="text-destructive ml-0.5">
     *
   </span>
 )
 const INPUT_CLASS =
-  'border-border bg-background text-foreground placeholder:text-muted-foreground focus-visible:ring-ring w-full rounded border px-2 py-1.5 text-xs focus-visible:ring-1 focus-visible:outline-none'
+  'border-border bg-surface-1 text-foreground placeholder:text-ink-tertiary focus-visible:ring-ring focus:border-border-strong w-full rounded-md border px-2.5 py-2 text-[13px] transition-colors focus-visible:ring-2 focus-visible:outline-none'
 
 export function QuickCreateForm({
   summaryRef,
@@ -57,7 +57,7 @@ export function QuickCreateForm({
         e.stopPropagation()
         form.handleSubmit()
       }}
-      className="flex flex-col gap-3"
+      className="flex flex-col gap-4"
     >
       <form.Field name="type">
         {(field) => (
@@ -111,7 +111,7 @@ export function QuickCreateForm({
               value={field.state.value}
               onChange={(e) => field.handleChange(e.target.value)}
               onBlur={field.handleBlur}
-              className={`${INPUT_CLASS} resize-y`}
+              className={`${INPUT_CLASS} resize-y leading-[1.5]`}
             />
           </div>
         )}
@@ -122,7 +122,7 @@ export function QuickCreateForm({
           type="button"
           onClick={onCancel}
           disabled={isPending}
-          className="border-border text-foreground hover:bg-muted/60 focus-visible:ring-ring rounded border px-3 py-1.5 text-xs transition-colors focus-visible:ring-1 focus-visible:outline-none disabled:cursor-default disabled:opacity-50"
+          className="border-border bg-surface-1 text-foreground hover:bg-surface-2 focus-visible:ring-ring rounded-md border px-3.5 py-2 text-[13px] font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-default disabled:opacity-50"
         >
           Cancel
         </button>
@@ -131,7 +131,7 @@ export function QuickCreateForm({
             <button
               type="submit"
               disabled={!canSubmit || isSubmitting || isPending}
-              className="bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-ring rounded px-3 py-1.5 text-xs font-medium transition-colors focus-visible:ring-1 focus-visible:outline-none disabled:cursor-default disabled:opacity-50"
+              className="bg-primary text-primary-foreground hover:bg-primary-hover focus-visible:ring-ring rounded-md px-3.5 py-2 text-[13px] font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-default disabled:opacity-50"
             >
               Create
             </button>

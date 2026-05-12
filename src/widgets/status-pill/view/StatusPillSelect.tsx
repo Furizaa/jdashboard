@@ -54,7 +54,7 @@ function ClickableStatusPill({
         aria-haspopup="menu"
         aria-expanded={display.open}
         aria-label={`Change status from ${status}`}
-        className="hover:bg-muted/40 focus-visible:ring-ring -mx-0.5 rounded-full transition-colors focus-visible:ring-1 focus-visible:outline-none"
+        className="focus-visible:ring-ring rounded-full transition hover:brightness-125 focus-visible:ring-2 focus-visible:outline-none"
       >
         <StatusPill status={status} />
       </button>
@@ -62,7 +62,7 @@ function ClickableStatusPill({
         <div
           role="menu"
           className={cn(
-            'border-border bg-popover absolute top-full z-30 mt-1 min-w-45 overflow-hidden rounded-md border py-1 text-xs shadow-lg',
+            'border-border bg-popover absolute top-full z-30 mt-1.5 min-w-48 overflow-hidden rounded-md border py-1 text-[13px] shadow-[0_8px_24px_-8px_rgba(0,0,0,0.6)]',
             align === 'end' ? 'right-0' : 'left-0',
           )}
         >
@@ -117,16 +117,16 @@ function TransitionRow({
         onClick={() => {
           if (!item.isCurrent) onSelect(item.id, item.toStatusName)
         }}
-        className="hover:bg-muted/60 flex w-full items-center gap-2 px-2.5 py-1.5 text-left disabled:cursor-default disabled:opacity-50 disabled:hover:bg-transparent"
+        className="hover:bg-surface-3 flex w-full items-center gap-2 px-2.5 py-2 text-left transition-colors disabled:cursor-default disabled:opacity-50 disabled:hover:bg-transparent"
       >
         <StatusIcon shape={item.style.shape} color={item.style.color} />
         <span className="text-foreground flex-1 truncate">{item.displayName}</span>
-        {item.isCurrent && <Check size={12} className="text-muted-foreground" />}
+        {item.isCurrent && <Check size={12} className="text-ink-subtle" />}
       </button>
     </li>
   )
 }
 
 function DropdownMessage({ children }: { children: React.ReactNode }) {
-  return <div className="text-muted-foreground px-2.5 py-1.5">{children}</div>
+  return <div className="text-ink-subtle px-2.5 py-1.5">{children}</div>
 }

@@ -15,13 +15,17 @@ export function BoardColumn({
   const liveCount = items.filter((item) => item.state !== 'leaving').length
   return (
     <section className="flex min-h-0 flex-col">
-      <header className="mb-2 flex items-baseline gap-2 px-1">
-        <h2 className="text-foreground text-sm font-semibold tracking-wide">{column}</h2>
-        <span className="text-muted-foreground text-xs tabular-nums">{liveCount}</span>
+      <header className="mb-3 flex items-center gap-2 px-0.5">
+        <h2 className="text-ink-subtle text-[11px] font-medium tracking-[0.04em] uppercase">
+          {column}
+        </h2>
+        <span className="text-ink-tertiary bg-surface-2 inline-flex h-4 min-w-[18px] items-center justify-center rounded-full px-1.5 text-[10px] font-medium tabular-nums">
+          {liveCount}
+        </span>
       </header>
-      <div className="flex flex-1 flex-col gap-2 overflow-y-auto pr-1">
+      <div className="flex flex-1 flex-col gap-2.5 overflow-y-auto pr-0.5">
         {items.length === 0 ? (
-          <p className="text-muted-foreground px-2 py-1 text-xs">No tickets</p>
+          <p className="text-ink-tertiary px-0.5 py-1 text-xs">No tickets</p>
         ) : (
           items.map(({ card, id, state }) => (
             <TicketCard

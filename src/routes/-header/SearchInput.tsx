@@ -38,10 +38,10 @@ export function SearchInput({
   }, [])
 
   return (
-    <div className="relative w-60">
+    <div className="relative w-64">
       <Search
-        size={14}
-        className="text-muted-foreground pointer-events-none absolute top-1/2 left-2 -translate-y-1/2"
+        size={13}
+        className="text-ink-tertiary pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2"
       />
       <input
         ref={inputRef}
@@ -56,8 +56,14 @@ export function SearchInput({
             inputRef.current?.blur()
           }
         }}
-        className="border-border bg-background text-foreground placeholder:text-muted-foreground focus-visible:ring-ring h-7 w-full rounded border pr-2 pl-7 text-xs focus-visible:ring-1 focus-visible:outline-none"
+        className="border-border bg-surface-1 text-foreground placeholder:text-ink-tertiary focus:bg-surface-2 focus-visible:ring-ring focus:border-border-strong h-8 w-full rounded-md border pr-8 pl-7 text-xs transition-colors focus-visible:ring-2 focus-visible:outline-none"
       />
+      <kbd
+        aria-hidden="true"
+        className="text-ink-tertiary bg-surface-2 border-border absolute top-1/2 right-1.5 hidden -translate-y-1/2 items-center justify-center rounded border px-1 font-mono text-[10px] leading-[14px] sm:inline-flex"
+      >
+        ⌘K
+      </kbd>
     </div>
   )
 }

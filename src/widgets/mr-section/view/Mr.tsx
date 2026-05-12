@@ -57,18 +57,20 @@ function shouldHideReady(
   summary: MrSummary | null,
   column: Column | null,
 ): boolean {
-  if (layout === 'stack') {
-    if (summary === null) return true
-    return column === 'Done' && summary.kind === 'merged'
+  if (summary === null) {
+    if (layout === 'stack') return true
+    return column !== 'In Code Review'
   }
-  return summary === null && column !== 'In Code Review'
+  // Done + merged renders no warning and no review row — every child returns
+  // null, leaving only the divider. Hide the shell entirely in both layouts.
+  return column === 'Done' && summary.kind === 'merged'
 }
 
 function LoadingSkeleton({ layout }: { layout: Layout }) {
   if (layout !== 'row') return null
   return (
-    <div className="border-border/50 -mx-3 mt-2 -mb-2.5 border-t" aria-hidden>
-      <div className="px-3 py-1.5">
+    <div className="border-border -mx-3.5 mt-2.5 -mb-3 border-t" aria-hidden>
+      <div className="px-3.5 py-2">
         <Skeleton className="h-5 w-24 rounded-full" />
       </div>
     </div>
@@ -112,13 +114,13 @@ function Root({
 
 function CardShell({ summary, children }: { summary: MrSummary | null; children: ReactNode }) {
   return (
-    <div data-testid={testIds.mrSection} className="border-border/50 -mx-3 mt-2 -mb-2.5 border-t">
+    <div data-testid={testIds.mrSection} className="border-border -mx-3.5 mt-2.5 -mb-3 border-t">
       {summary !== null && summary.kind === 'review' ? (
         <div
           className={cn(
-            'flex items-center gap-2 px-3 py-1.5',
+            'flex items-center gap-2 px-3.5 py-2',
             summary.allApprovedAndClean &&
-              'rounded-b-md border-l-2 border-green-500/40 bg-green-500/10',
+              'rounded-b-lg border-l-2 border-[oklch(0.68_0.18_145/_0.5)] bg-[oklch(0.68_0.18_145/_0.08)]',
           )}
         >
           {children}
@@ -133,9 +135,9 @@ function CardShell({ summary, children }: { summary: MrSummary | null; children:
 function PanelShell({ summary, children }: { summary: MrSummary | null; children: ReactNode }) {
   const ciState = summary !== null && summary.kind === 'review' ? summary.ciState : null
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-muted-foreground text-[10px] tracking-wide uppercase">
+        <span className="text-ink-tertiary text-[10px] font-medium tracking-[0.06em] uppercase">
           Merge Request
         </span>
         {ciState !== null && <MrCiIndicator state={ciState} />}
@@ -161,7 +163,7 @@ function ReviewerRow() {
         />
       ))}
       {overflow > 0 && (
-        <span className="border-border/60 text-muted-foreground rounded-full border px-1.5 py-0.5 text-[10px] leading-none">
+        <span className="border-border text-ink-subtle rounded-full border px-1.5 py-0.5 text-[10px] leading-none">
           +{overflow}
         </span>
       )}
@@ -175,12 +177,12 @@ function ReviewerStack() {
   return (
     <div
       className={cn(
-        'flex flex-col gap-1.5 rounded-md',
+        'flex flex-col gap-2 rounded-md',
         summary.allApprovedAndClean &&
-          '-ml-2 border-l-2 border-green-500/40 bg-green-500/10 py-1.5 pr-1.5 pl-2',
+          '-ml-2 border-l-2 border-[oklch(0.68_0.18_145/_0.5)] bg-[oklch(0.68_0.18_145/_0.08)] py-2 pr-2 pl-2.5',
       )}
     >
-      <ul className="flex flex-col gap-1.5">
+      <ul className="flex flex-col gap-2">
         {summary.reviewers.map((reviewer) => (
           <ReviewerStackRow key={reviewer.username} reviewer={reviewer} />
         ))}
@@ -188,7 +190,7 @@ function ReviewerStack() {
       {summary.unresolvedCount > 0 && (
         <div
           title={unresolvedTitle(summary.unresolvedCount)}
-          className="text-muted-foreground inline-flex items-center gap-1 text-[11px] tabular-nums"
+          className="text-ink-subtle inline-flex items-center gap-1 text-[11px] tabular-nums"
         >
           <MessageSquare className="h-3 w-3" aria-hidden />
           {summary.unresolvedCount}
@@ -207,8 +209,8 @@ function ReviewerStackRow({ reviewer }: { reviewer: ReviewSummary['reviewers'][n
         visualState={reviewer.visualState}
       />
       <div className="min-w-0 flex-1 leading-tight">
-        <div className="text-foreground truncate text-[11px]">{reviewer.displayName}</div>
-        <div className="text-muted-foreground truncate text-[10px]">
+        <div className="text-foreground truncate text-[12px]">{reviewer.displayName}</div>
+        <div className="text-ink-tertiary truncate text-[10px]">
           {REVIEWER_BADGE_LABEL[reviewer.visualState]}
         </div>
       </div>
@@ -231,7 +233,7 @@ function UnresolvedChip() {
       data-testid={testIds.unresolvedThreadChip}
       title={unresolvedTitle(count)}
       className={cn(
-        'text-muted-foreground inline-flex items-center gap-1 text-[11px] tabular-nums',
+        'text-ink-subtle inline-flex items-center gap-1 text-[11px] tabular-nums',
         summary.ciState === 'none' && 'ml-auto',
       )}
     >
@@ -300,7 +302,7 @@ function pickWarning(ctx: CtxValue, triggerMerge: TriggerMerge): WarningInfo | n
 }
 
 const CARD_WARNING_ROW_CLASS =
-  'flex items-center gap-2 bg-amber-500/10 border-l-2 border-amber-500/40 rounded-b-md px-3 py-1.5 text-[11px]'
+  'flex items-center gap-2 bg-amber-500/10 border-l-2 border-amber-500/50 rounded-b-lg px-3.5 py-2 text-[11px]'
 
 function WarningRow() {
   const ctx = useMrCtx()
@@ -316,7 +318,7 @@ function StackWarning({ warning }: { warning: WarningInfo }) {
     <div
       data-testid={testIds.mrWarningRow}
       data-kind={warning.kind}
-      className="flex items-start gap-2 rounded-md border-l-2 border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-[11px]"
+      className="flex items-start gap-2 rounded-md border-l-2 border-amber-500/50 bg-amber-500/10 px-2.5 py-2 text-[11px]"
     >
       <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-amber-500" aria-hidden />
       <span className="text-foreground/90 leading-tight">{warning.text}</span>
@@ -334,7 +336,7 @@ function CardWarning({ warning }: { warning: WarningInfo }) {
         target="_blank"
         rel="noreferrer"
         onClick={(e) => e.stopPropagation()}
-        className="text-muted-foreground hover:text-foreground ml-auto text-[11px] hover:underline"
+        className="text-ink-subtle hover:text-foreground ml-auto text-[11px] hover:underline"
       >
         View MR ↗
       </a>

@@ -64,11 +64,11 @@ function Panel({ panel }: { panel: OpenPanel }) {
       aria-modal="true"
       aria-label={panelLabel(panel)}
     >
-      <div className="bg-background/40 absolute inset-0 backdrop-blur-[1px]" aria-hidden />
+      <div className="absolute inset-0 bg-black/65 backdrop-blur-[2px]" aria-hidden />
       {/* inner panel stops backdrop clicks from closing the dialog; not itself actionable */}
       {/* oxlint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events */}
       <div
-        className="border-border bg-card relative my-4 mr-4 flex h-[calc(100dvh-2rem)] w-[760px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-xl border shadow-2xl"
+        className="border-border bg-card relative my-4 mr-4 flex h-[calc(100dvh-2rem)] w-[760px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-xl border"
         onClick={(e) => e.stopPropagation()}
       >
         {showFixasap && <FixasapRibbon size="panel" />}

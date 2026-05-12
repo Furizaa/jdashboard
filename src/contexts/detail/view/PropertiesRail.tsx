@@ -7,7 +7,7 @@ import { Field } from './Field'
 
 export function PropertiesRail({ issue }: { issue: DetailIssue }) {
   return (
-    <aside className="flex flex-col gap-4 text-xs">
+    <aside className="flex flex-col gap-5 text-xs">
       <Field label="Status">
         <StatusPillSelect issueKey={issue.key} status={issue.statusName} />
       </Field>
@@ -28,9 +28,9 @@ export function PropertiesRail({ issue }: { issue: DetailIssue }) {
       </Field>
       <Field label="Labels">
         {issue.labels.length === 0 ? (
-          <span className="text-muted-foreground">—</span>
+          <span className="text-ink-tertiary">—</span>
         ) : (
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1.5">
             {issue.labels.map((label) => (
               <span key={label} className="inline-flex items-center gap-1.5">
                 <span

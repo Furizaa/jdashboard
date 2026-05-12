@@ -58,7 +58,7 @@ export function CardKey({
       type="button"
       onClick={handleClick}
       aria-label={ariaLabel}
-      className="text-muted-foreground hover:text-foreground decoration-muted-foreground/50 focus-visible:ring-ring rounded font-mono text-xs underline decoration-dotted underline-offset-[3px] transition-colors hover:decoration-solid focus-visible:ring-1 focus-visible:outline-none"
+      className="text-ink-subtle hover:text-foreground decoration-ink-tertiary/60 focus-visible:ring-ring rounded font-mono text-[11px] underline decoration-dotted underline-offset-[3px] transition-colors hover:decoration-solid focus-visible:ring-2 focus-visible:outline-none"
     >
       {copied ? 'Copied' : keyDisplay}
     </button>

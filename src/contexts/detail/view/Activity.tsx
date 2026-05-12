@@ -13,11 +13,13 @@ export function Activity({ comments, jiraBaseUrl }: { comments: Comment[]; jiraB
   )
 
   return (
-    <section className="mt-8">
-      <h2 className="text-muted-foreground text-[10px] tracking-wide uppercase">Activity</h2>
+    <section className="mt-10">
+      <h2 className="text-ink-tertiary text-[10px] font-medium tracking-[0.06em] uppercase">
+        Activity
+      </h2>
       <div className="mt-3">
         {ordered.length === 0 ? (
-          <span className="text-muted-foreground text-sm">No activity</span>
+          <span className="text-ink-subtle text-sm">No activity</span>
         ) : (
           <ul className="flex flex-col gap-5">
             {ordered.map((comment) => (
@@ -43,7 +45,7 @@ function CommentRow({ comment, jiraBaseUrl }: { comment: Comment; jiraBaseUrl: s
           <span className="text-foreground font-medium">{name}</span>
           <RelativeTime iso={comment.created} />
         </div>
-        <div className="mt-1.5 text-sm">
+        <div className="mt-1.5 text-[13px]">
           <RenderAdf doc={comment.body} jiraBaseUrl={jiraBaseUrl} />
         </div>
       </div>
@@ -66,7 +68,7 @@ function Avatar({ src, name, initial }: { src: string | null; name: string; init
   return (
     <span
       aria-hidden
-      className="bg-muted text-muted-foreground inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-medium"
+      className="bg-surface-2 text-ink-subtle inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-medium"
     >
       {initial}
     </span>
@@ -80,7 +82,7 @@ function RelativeTime({ iso }: { iso: string }) {
     return `${formatDistanceToNow(d)} ago`
   }, [iso])
   return (
-    <time dateTime={iso} title={iso} className="text-muted-foreground">
+    <time dateTime={iso} title={iso} className="text-ink-tertiary">
       {label}
     </time>
   )

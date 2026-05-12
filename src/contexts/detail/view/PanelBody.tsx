@@ -18,10 +18,12 @@ export function PanelBody({
   const hasDescription = extractPlainText(issue.description).length > 0
 
   return (
-    <div className="grid grid-cols-[1fr_180px] gap-6 p-6">
+    <div className="grid grid-cols-[1fr_200px] gap-8 p-7">
       <div className="min-w-0">
-        <h1 className="text-foreground text-xl leading-tight font-semibold">{issue.summary}</h1>
-        <div className="mt-5">
+        <h1 className="text-foreground text-[22px] leading-[1.25] font-semibold tracking-[-0.018em]">
+          {issue.summary}
+        </h1>
+        <div className="mt-6">
           {hasDescription ? (
             <RenderAdf doc={issue.description} jiraBaseUrl={jiraBaseUrl} />
           ) : (

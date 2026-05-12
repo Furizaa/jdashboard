@@ -24,7 +24,7 @@ export function Board({ searchQuery }: { searchQuery: string }) {
         {ready.showErrorBanner && (
           <ErrorBanner errorMessage={ready.errorMessage} onRetry={ready.retry} />
         )}
-        <div className="grid min-h-0 flex-1 grid-cols-4 gap-4 p-4">
+        <div className="grid min-h-0 flex-1 grid-cols-4 gap-5 p-5">
           {COLUMNS.map((column) => (
             <BoardColumn
               key={column}

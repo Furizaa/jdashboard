@@ -29,15 +29,15 @@ function render(state: Exclude<CiVisualState, 'none'>) {
     }))
     .with('failed', () => ({
       label: 'CI failed',
-      icon: <XCircle className={`${ICON_CLASS} text-red-500`} aria-hidden />,
+      icon: <XCircle className={`${ICON_CLASS} text-[oklch(0.65_0.22_25)]`} aria-hidden />,
     }))
     .with('running', () => ({
       label: 'CI running',
-      icon: <Loader2 className={`${ICON_CLASS} text-muted-foreground animate-spin`} aria-hidden />,
+      icon: <Loader2 className={`${ICON_CLASS} text-ink-subtle animate-spin`} aria-hidden />,
     }))
     .with('passed', () => ({
       label: 'CI passed',
-      icon: <CheckCircle className={`${ICON_CLASS} text-green-500`} aria-hidden />,
+      icon: <CheckCircle className={`${ICON_CLASS} text-[oklch(0.68_0.18_145)]`} aria-hidden />,
     }))
     .exhaustive()
 }

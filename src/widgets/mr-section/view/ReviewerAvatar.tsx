@@ -3,11 +3,11 @@ import { testIds } from '~/lib/testids'
 import { REVIEWER_STATE_LABEL, type ReviewerVisualState } from '~/kernel'
 
 const RING_STYLES: Record<ReviewerVisualState, { color: string; style: 'solid' | 'dashed' }> = {
-  'gray-dashed': { color: 'var(--color-muted-foreground)', style: 'dashed' },
-  'blue-dashed': { color: 'oklch(0.65 0.18 245)', style: 'dashed' },
+  'gray-dashed': { color: '#62666d', style: 'dashed' },
+  'blue-dashed': { color: '#5e6ad2', style: 'dashed' },
   'red-solid': { color: 'oklch(0.65 0.22 25)', style: 'solid' },
-  'green-solid': { color: 'oklch(0.65 0.18 145)', style: 'solid' },
-  'green-dashed': { color: 'oklch(0.65 0.18 145)', style: 'dashed' },
+  'green-solid': { color: 'oklch(0.68 0.18 145)', style: 'solid' },
+  'green-dashed': { color: 'oklch(0.68 0.18 145)', style: 'dashed' },
 }
 
 export function ReviewerAvatar({
@@ -22,7 +22,7 @@ export function ReviewerAvatar({
   const ring = RING_STYLES[visualState]
   const style: CSSProperties = {
     outline: `2px ${ring.style} ${ring.color}`,
-    outlineOffset: '1px',
+    outlineOffset: '1.5px',
   }
   const initial = displayName.trim().charAt(0).toUpperCase() || '?'
   return (
@@ -30,7 +30,7 @@ export function ReviewerAvatar({
       data-testid={testIds.reviewerAvatar}
       data-visual-state={visualState}
       title={`${displayName} — ${REVIEWER_STATE_LABEL[visualState]}`}
-      className="bg-muted text-muted-foreground inline-flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-full text-[10px] leading-none font-medium"
+      className="bg-surface-3 text-ink-subtle inline-flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-full text-[10px] leading-none font-medium"
       style={style}
     >
       {avatarUrl !== null ? (

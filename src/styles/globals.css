@@ -11,6 +11,7 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -20,37 +21,81 @@
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Inter', sans-serif;
-  --font-mono: ui-monospace, 'JetBrains Mono', 'Fira Code', Menlo, monospace;
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-surface-4: var(--surface-4);
+  --color-ink-subtle: var(--ink-subtle);
+  --color-ink-tertiary: var(--ink-tertiary);
+  --radius-sm: calc(var(--radius) * 0.75);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) * 1.5);
+  --radius-xl: calc(var(--radius) * 2);
+  --font-sans:
+    'Inter', ui-sans-serif, -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto,
+    system-ui, sans-serif;
+  --font-mono: ui-monospace, 'JetBrains Mono', 'Geist Mono', 'SF Mono', Menlo, Consolas, monospace;
+  --tracking-display-xl: -0.03em;
+  --tracking-display-lg: -0.025em;
+  --tracking-display: -0.02em;
+  --tracking-headline: -0.015em;
+  --tracking-tight: -0.01em;
+  --tracking-eyebrow: 0.04em;
 }
 
+/* Linear-derived palette. Surface ladder is canvas → 1 → 2 → 3 → 4.
+   Lavender (#5e6ad2) is the single chromatic accent and is reserved for the
+   brand mark, primary CTAs, focus rings, and link emphasis. */
 :root {
   --radius: 0.5rem;
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+
+  /* Surface ladder */
+  --canvas: #010102;
+  --surface-1: #0f1011;
+  --surface-2: #141516;
+  --surface-3: #18191a;
+  --surface-4: #191a1b;
+
+  /* Hairlines */
+  --hairline: #23252a;
+  --hairline-strong: #34343a;
+
+  /* Ink */
+  --ink: #f7f8f8;
+  --ink-muted: #d0d6e0;
+  --ink-subtle: #8a8f98;
+  --ink-tertiary: #62666d;
+
+  /* Brand */
+  --lavender: #5e6ad2;
+  --lavender-hover: #828fff;
+  --lavender-focus: #5e69d1;
+
+  /* shadcn-mapped tokens (consumed by Tailwind utility classes) */
+  --background: var(--canvas);
+  --foreground: var(--ink);
+  --card: var(--surface-1);
+  --card-foreground: var(--ink);
+  --popover: var(--surface-2);
+  --popover-foreground: var(--ink);
+  --primary: var(--lavender);
+  --primary-foreground: #ffffff;
+  --primary-hover: var(--lavender-hover);
+  --secondary: var(--surface-2);
+  --secondary-foreground: var(--ink);
+  --muted: var(--surface-2);
+  --muted-foreground: var(--ink-subtle);
+  --accent: var(--surface-3);
+  --accent-foreground: var(--ink);
   --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --destructive-foreground: #ffffff;
+  --border: var(--hairline);
+  --border-strong: var(--hairline-strong);
+  --input: var(--hairline-strong);
+  --ring: var(--lavender-focus);
 }
 
 @layer base {
@@ -62,18 +107,30 @@
     background-color: var(--background);
     color: var(--foreground);
     font-family: var(--font-sans);
+    font-feature-settings:
+      'cv11' 1,
+      'ss01' 1,
+      'ss03' 1;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
   button:not(:disabled),
   [role='button']:not([aria-disabled='true']) {
     cursor: pointer;
   }
 
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: oklch(1 0 0 / 18%) transparent;
+  /* Selection: lavender-tinted */
+  ::selection {
+    background-color: color-mix(in oklab, var(--lavender) 35%, transparent);
+    color: var(--ink);
   }
 
+  /* Scrollbars: hairline-thin, surface-1 thumb */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--hairline-strong) transparent;
+  }
   ::-webkit-scrollbar {
     width: 10px;
     height: 10px;
@@ -82,13 +139,13 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background-color: oklch(1 0 0 / 18%);
+    background-color: var(--hairline-strong);
     border-radius: 9999px;
     border: 2px solid transparent;
     background-clip: padding-box;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background-color: oklch(1 0 0 / 32%);
+    background-color: var(--ink-tertiary);
   }
   ::-webkit-scrollbar-corner {
     background: transparent;
@@ -119,13 +176,13 @@
 
 @keyframes ticket-card-pulse {
   0% {
-    box-shadow: 0 0 0 0 oklch(1 0 0 / 0);
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--lavender) 0%, transparent);
   }
   35% {
-    box-shadow: 0 0 0 3px oklch(1 0 0 / 0.45);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--lavender) 45%, transparent);
   }
   100% {
-    box-shadow: 0 0 0 0 oklch(1 0 0 / 0);
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--lavender) 0%, transparent);
   }
 }
 
@@ -158,11 +215,11 @@
 }
 
 .skeleton-shimmer {
-  background-color: var(--muted);
+  background-color: var(--surface-2);
   background-image: linear-gradient(
     90deg,
     transparent 0%,
-    oklch(1 0 0 / 0.06) 50%,
+    color-mix(in oklab, var(--ink) 6%, transparent) 50%,
     transparent 100%
   );
   background-size: 200px 100%;

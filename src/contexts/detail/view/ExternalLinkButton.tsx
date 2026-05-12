@@ -7,7 +7,7 @@ export function ExternalLinkButton({ href, children }: { href: string; children:
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="text-muted-foreground hover:text-foreground hover:bg-muted focus-visible:ring-ring inline-flex h-7 items-center gap-1.5 rounded px-2 text-xs transition-colors focus-visible:ring-1 focus-visible:outline-none"
+      className="text-ink-subtle hover:text-foreground hover:bg-surface-2 focus-visible:ring-ring inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-xs transition-colors focus-visible:ring-2 focus-visible:outline-none"
     >
       <span>{children}</span>
       <ExternalLink size={12} />

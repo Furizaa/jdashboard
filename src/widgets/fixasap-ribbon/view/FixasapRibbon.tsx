@@ -7,7 +7,7 @@ export function FixasapRibbon({ size }: { size: 'card' | 'panel' }) {
       aria-label="Urgent (FIXASAP)"
       className={cn(
         'pointer-events-none absolute top-0 right-0 overflow-hidden',
-        size === 'card' ? 'h-3.5 w-3.5 rounded-tr-md' : 'h-[22px] w-[22px] rounded-tr-xl',
+        size === 'card' ? 'h-4 w-4 rounded-tr-lg' : 'h-[22px] w-[22px] rounded-tr-xl',
       )}
     >
       <div

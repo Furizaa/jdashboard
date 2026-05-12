@@ -29,12 +29,12 @@ function readyExtras(panel: OpenPanel): ReadyExtras {
 export function PanelHeader({ panel }: { panel: OpenPanel }) {
   const { jiraUrl, copyJiraLink, prevKey, nextKey } = readyExtras(panel)
   return (
-    <header className="border-border flex items-center gap-2 border-b px-4 py-2.5">
-      <nav aria-label="Breadcrumb" className="text-muted-foreground font-mono text-xs">
+    <header className="border-border bg-surface-1 flex items-center gap-2 border-b px-4 py-3">
+      <nav aria-label="Breadcrumb" className="text-ink-subtle flex items-center font-mono text-xs">
         {panel.projectKey !== null && (
           <>
             <span>{panel.projectKey}</span>
-            <span className="px-1.5">·</span>
+            <span className="text-ink-tertiary px-1.5">/</span>
           </>
         )}
         <CopyableIssueKey issueKey={panel.issueKey} onCopy={copyJiraLink} />
@@ -54,6 +54,7 @@ export function PanelHeader({ panel }: { panel: OpenPanel }) {
         >
           <ChevronDown size={14} />
         </IconButton>
+        <span className="bg-border mx-0.5 h-4 w-px" aria-hidden />
         <OpenMrLink issueKey={panel.issueKey} />
         {jiraUrl !== null && <ExternalLinkButton href={jiraUrl}>Open in Jira</ExternalLinkButton>}
         <IconButton aria-label="Close panel" onClick={panel.close}>

@@ -58,15 +58,15 @@ export function TicketCard({
       data-animation={animationState === 'idle' ? undefined : animationState}
       aria-hidden={isLeaving || undefined}
       className={cn(
-        'ticket-card border-border bg-card hover:border-foreground/30 focus-visible:ring-ring group relative cursor-pointer rounded-md border px-3 py-2.5 text-left shadow-sm transition-colors focus-visible:ring-1 focus-visible:outline-none',
-        view.deemphasized && 'opacity-60',
+        'ticket-card border-border bg-card hover:bg-surface-2 hover:border-border-strong focus-visible:ring-ring group relative cursor-pointer rounded-lg border px-3.5 py-3 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none',
+        view.deemphasized && 'opacity-55',
       )}
     >
       {view.fixasap && <FixasapRibbon size="card" />}
       <CardHeader view={view} />
 
       <div
-        className="text-foreground mt-1.5 overflow-hidden text-sm leading-snug"
+        className="text-foreground mt-1.5 overflow-hidden text-[13px] leading-snug tracking-[-0.005em]"
         style={{
           display: '-webkit-box',
           WebkitLineClamp: 2,

@@ -27,14 +27,17 @@ export function Header({
   }, [])
 
   return (
-    <header className="border-border flex h-12 shrink-0 items-center gap-3 border-b px-4">
-      <span className="flex items-center gap-2">
+    <header className="bg-background border-border flex h-14 shrink-0 items-center gap-3 border-b px-5">
+      <span className="flex items-center gap-2.5">
         <Logo />
-        <span className="text-foreground text-sm font-semibold tracking-tight">clashboard</span>
+        <span className="text-foreground text-[15px] font-semibold tracking-[-0.015em]">
+          clashboard
+        </span>
       </span>
+      <span className="bg-border mx-1 h-4 w-px" aria-hidden />
       <QuickCreateButton />
       <SearchInput value={searchQuery} onChange={onSearchChange} />
-      <div className="ml-auto flex items-center gap-1">
+      <div className="ml-auto flex items-center gap-2">
         <GitlabIndicator />
         <SyncIndicator query={query} onRefresh={refresh} />
         <button
@@ -42,7 +45,7 @@ export function Header({
           onClick={refresh}
           aria-label="Refresh"
           data-testid={testIds.refreshButton}
-          className="text-muted-foreground hover:text-foreground hover:bg-muted focus-visible:ring-ring inline-flex h-7 w-7 items-center justify-center rounded transition-colors focus-visible:ring-1 focus-visible:outline-none"
+          className="text-ink-subtle hover:text-foreground hover:bg-surface-2 focus-visible:ring-ring inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors focus-visible:ring-2 focus-visible:outline-none"
         >
           <RefreshCw size={14} className={query.isFetching ? 'animate-spin' : undefined} />
         </button>
@@ -66,7 +69,7 @@ function SyncIndicator({
         onClick={onRefresh}
         title={errorMessage}
         data-testid={testIds.syncIndicator}
-        className="text-destructive hover:text-destructive/80 focus-visible:ring-ring rounded px-2 py-1 text-xs transition-colors focus-visible:ring-1 focus-visible:outline-none"
+        className="text-destructive hover:text-destructive/80 focus-visible:ring-ring rounded-md px-2 py-1 text-xs transition-colors focus-visible:ring-2 focus-visible:outline-none"
       >
         Sync failed · Retry
       </button>
@@ -77,7 +80,7 @@ function SyncIndicator({
       type="button"
       onClick={onRefresh}
       data-testid={testIds.syncIndicator}
-      className="text-muted-foreground hover:text-foreground focus-visible:ring-ring rounded px-2 py-1 text-xs transition-colors focus-visible:ring-1 focus-visible:outline-none"
+      className="text-ink-subtle hover:text-foreground focus-visible:ring-ring rounded-md px-2 py-1 text-xs transition-colors focus-visible:ring-2 focus-visible:outline-none"
     >
       {syncedLabel(query.dataUpdatedAt, query.isFetching)}
     </button>

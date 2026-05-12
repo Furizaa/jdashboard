@@ -72,7 +72,7 @@ export function TypeSegmented({
             tabIndex={selected ? 0 : -1}
             onClick={() => onChange(entry.value)}
             onKeyDown={(event) => handleKeyDown(event, i)}
-            className="focus-visible:ring-ring inline-flex flex-1 items-center justify-center gap-1.5 rounded border px-2 py-1.5 text-xs font-medium transition-colors focus-visible:ring-1 focus-visible:outline-none"
+            className="focus-visible:ring-ring inline-flex flex-1 items-center justify-center gap-1.5 rounded-md border px-2.5 py-2 text-[13px] font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
             style={
               selected
                 ? {

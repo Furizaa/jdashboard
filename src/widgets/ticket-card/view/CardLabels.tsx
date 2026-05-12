@@ -17,7 +17,7 @@ export function CardLabels({ view }: { view: TicketCardViewModel }) {
   return (
     // div wraps interactive children only to stop propagation to the card; not itself actionable
     // oxlint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
-    <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1" onClick={stopPropagation}>
+    <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1" onClick={stopPropagation}>
       {view.epic !== null && <EpicChip epic={view.epic} />}
       {visible.map((label) => (
         <span
@@ -31,13 +31,13 @@ export function CardLabels({ view }: { view: TicketCardViewModel }) {
             className="h-1.5 w-1.5 shrink-0 rounded-full"
             style={{ backgroundColor: colorForLabel(label) }}
           />
-          <span className="text-muted-foreground text-[11px] leading-none">{label}</span>
+          <span className="text-ink-subtle text-[11px] leading-none">{label}</span>
         </span>
       ))}
       {overflow > 0 && (
         <span
           data-testid={testIds.labelOverflowChip}
-          className="border-border/60 text-muted-foreground rounded-full border px-1.5 py-0.5 text-[10px] leading-none"
+          className="border-border text-ink-subtle rounded-full border px-1.5 py-0.5 text-[10px] leading-none"
         >
           +{overflow}
         </span>

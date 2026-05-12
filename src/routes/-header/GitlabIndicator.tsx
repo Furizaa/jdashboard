@@ -13,20 +13,24 @@ export function GitlabIndicator() {
 
   const wire = query.data
   if (wire.ok === false) {
-    // The only failure tag in GitlabUserOnlyError is 'Unauthorized'.
     return (
       <span
-        className="text-muted-foreground/60 rounded px-2 py-1 text-xs"
+        className="text-ink-tertiary border-border bg-surface-1 inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px]"
         title="GitLab token rejected (HTTP 401)"
       >
-        GitLab ✗
+        <span aria-hidden className="size-1.5 rounded-full bg-[oklch(0.65_0.22_25)]" />
+        GitLab
       </span>
     )
   }
 
   return (
-    <span className="text-muted-foreground rounded px-2 py-1 text-xs" title={wire.displayName}>
-      GitLab ✓ {wire.username}
+    <span
+      className="text-ink-subtle border-border bg-surface-1 inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px]"
+      title={wire.displayName}
+    >
+      <span aria-hidden className="size-1.5 rounded-full bg-[oklch(0.68_0.18_145)]" />
+      <span className="font-mono text-[10px]">{wire.username}</span>
     </span>
   )
 }

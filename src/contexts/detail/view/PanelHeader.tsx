@@ -4,6 +4,7 @@ import { CopyableIssueKey } from './CopyableIssueKey'
 import { ExternalLinkButton } from './ExternalLinkButton'
 import { IconButton } from './IconButton'
 import { OpenMrLink } from './OpenMrLink'
+import { ReviewMrButton } from './ReviewMrButton'
 
 type OpenPanel = Exclude<IssuePanelState, { phase: 'closed' }>
 
@@ -56,6 +57,7 @@ export function PanelHeader({ panel }: { panel: OpenPanel }) {
         </IconButton>
         <span className="bg-border mx-0.5 h-4 w-px" aria-hidden />
         <OpenMrLink issueKey={panel.issueKey} />
+        <ReviewMrButton issueKey={panel.issueKey} />
         {jiraUrl !== null && <ExternalLinkButton href={jiraUrl}>Open in Jira</ExternalLinkButton>}
         <IconButton aria-label="Close panel" onClick={panel.close}>
           <X size={14} />

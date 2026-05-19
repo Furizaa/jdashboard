@@ -200,6 +200,109 @@ describe('RenderAdf', () => {
     ).toMatchSnapshot()
   })
 
+  describe('taskList', () => {
+    it('renders a TODO task as an unchecked read-only checkbox', () => {
+      expect(
+        html(
+          wrap({
+            type: 'taskList',
+            attrs: { localId: 'list-1' },
+            content: [
+              {
+                type: 'taskItem',
+                attrs: { localId: 't1', state: 'TODO' },
+                content: [{ type: 'text', text: 'ship it' }],
+              },
+            ],
+          }),
+        ),
+      ).toMatchSnapshot()
+    })
+
+    it('renders a DONE task as a checked checkbox with strikethrough text', () => {
+      expect(
+        html(
+          wrap({
+            type: 'taskList',
+            attrs: { localId: 'list-1' },
+            content: [
+              {
+                type: 'taskItem',
+                attrs: { localId: 't1', state: 'DONE' },
+                content: [{ type: 'text', text: 'wrote tests' }],
+              },
+            ],
+          }),
+        ),
+      ).toMatchSnapshot()
+    })
+
+    it('renders a mixed list of TODO and DONE items', () => {
+      expect(
+        html(
+          wrap({
+            type: 'taskList',
+            attrs: { localId: 'list-1' },
+            content: [
+              {
+                type: 'taskItem',
+                attrs: { localId: 't1', state: 'DONE' },
+                content: [{ type: 'text', text: 'first' }],
+              },
+              {
+                type: 'taskItem',
+                attrs: { localId: 't2', state: 'TODO' },
+                content: [{ type: 'text', text: 'second' }],
+              },
+            ],
+          }),
+        ),
+      ).toMatchSnapshot()
+    })
+
+    it('renders inline marks (link, strong) inside task items', () => {
+      expect(
+        html(
+          wrap({
+            type: 'taskList',
+            attrs: { localId: 'list-1' },
+            content: [
+              {
+                type: 'taskItem',
+                attrs: { localId: 't1', state: 'TODO' },
+                content: [
+                  { type: 'text', text: 'review the ' },
+                  {
+                    type: 'text',
+                    text: 'spec',
+                    marks: [{ type: 'link', attrs: { href: 'https://example.com' } }],
+                  },
+                ],
+              },
+            ],
+          }),
+        ),
+      ).toMatchSnapshot()
+    })
+
+    it('defaults to TODO when state attribute is missing', () => {
+      expect(
+        html(
+          wrap({
+            type: 'taskList',
+            content: [
+              {
+                type: 'taskItem',
+                attrs: { localId: 't1' },
+                content: [{ type: 'text', text: 'no state' }],
+              },
+            ],
+          }),
+        ),
+      ).toMatchSnapshot()
+    })
+  })
+
   describe('codeBlock', () => {
     it('renders without language attribute as a plain block (no Shiki dependency loaded)', () => {
       expect(

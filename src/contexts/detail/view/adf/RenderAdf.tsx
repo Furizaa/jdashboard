@@ -17,6 +17,8 @@ import {
   Paragraph,
   Rule,
   Status,
+  TaskItem,
+  TaskList,
   Text,
   Unsupported,
 } from './nodes'
@@ -46,6 +48,14 @@ function renderNode(node: AdfNode, key: number, jiraBaseUrl: string | undefined)
     ))
     .with({ type: 'listItem' }, (n) => (
       <ListItem key={key}>{renderChildren(n, jiraBaseUrl)}</ListItem>
+    ))
+    .with({ type: 'taskList' }, (n) => (
+      <TaskList key={key}>{renderChildren(n, jiraBaseUrl)}</TaskList>
+    ))
+    .with({ type: 'taskItem' }, (n) => (
+      <TaskItem key={key} done={n.attrs?.state === 'DONE'}>
+        {renderChildren(n, jiraBaseUrl)}
+      </TaskItem>
     ))
     .with({ type: 'codeBlock' }, (n) => (
       <CodeBlock key={key} node={n}>

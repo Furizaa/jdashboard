@@ -41,10 +41,10 @@ export function ReviewMrButton({ issueKey }: { issueKey: string }) {
       onClick={handleClick}
       disabled={pending}
       aria-label="Review MR in terminal"
-      className="text-ink-subtle hover:text-foreground hover:bg-surface-2 focus-visible:ring-ring inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-xs transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
+      className="border-border bg-surface-1 text-foreground hover:bg-surface-2 focus-visible:ring-ring inline-flex h-7 w-full items-center justify-center gap-1.5 rounded-md border px-2 text-xs transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
     >
-      <span>Review MR</span>
       <Terminal size={12} />
+      <span>Review MR</span>
     </button>
   )
 }

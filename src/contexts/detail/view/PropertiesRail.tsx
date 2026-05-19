@@ -4,10 +4,22 @@ import { Mr, rootStateFromPhase } from '~/widgets/mr-section'
 import { useBoardData, useMrFor } from '~/coordinator'
 import { columnForStatus, type DetailIssue } from '~/kernel'
 import { Field } from './Field'
+import { OpenInWorkspaceButton } from './OpenInWorkspaceButton'
+import { ReviewMrButton } from './ReviewMrButton'
 
 export function PropertiesRail({ issue }: { issue: DetailIssue }) {
   return (
     <aside className="flex flex-col gap-5 text-xs">
+      <Field label="Actions">
+        <div className="flex flex-col gap-1.5">
+          <OpenInWorkspaceButton
+            issueKey={issue.key}
+            typeName={issue.typeName}
+            title={issue.summary}
+          />
+          <ReviewMrButton issueKey={issue.key} />
+        </div>
+      </Field>
       <Field label="Status">
         <StatusPillSelect issueKey={issue.key} status={issue.statusName} />
       </Field>

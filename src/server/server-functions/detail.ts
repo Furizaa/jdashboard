@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -14,6 +15,8 @@ import { loadIssue } from '../contexts/detail/application/load-issue'
 import { loadTransitions } from '../contexts/detail/application/load-transitions'
 import { performTransition } from '../contexts/detail/application/perform-transition'
 import { assertIssueKey } from '../lib/jql'
+import { runCheckWorktree, runOpenInWorkspace } from '../lib/open-workspace'
+import type { CheckWorktreeResult, OpenInWorkspaceResult } from '../lib/open-workspace'
 import { runWire } from './run-wire'
 import type { WireResult } from '../wire/to-wire'
 
@@ -101,3 +104,29 @@ export const reviewMr = createServerFn({ method: 'POST' })
     }
     return { ok: true }
   })
+
+export const checkWorktree = createServerFn({ method: 'POST' })
+  .inputValidator((data: { issueKey: string }) => ({
+    issueKey: requireIssueKey('checkWorktree', data?.issueKey),
+  }))
+  .handler(
+    async ({ data }): Promise<CheckWorktreeResult> =>
+      runCheckWorktree(data.issueKey, { homeDir: homedir(), exists: existsSync }),
+  )
+
+export const openInWorkspace = createServerFn({ method: 'POST' })
+  .inputValidator((data: { issueKey: string; branchName?: string }) => ({
+    issueKey: requireIssueKey('openInWorkspace', data?.issueKey),
+    branchName:
+      typeof data?.branchName === 'string' && data.branchName.trim() !== ''
+        ? data.branchName.trim()
+        : undefined,
+  }))
+  .handler(
+    async ({ data }): Promise<OpenInWorkspaceResult> =>
+      runOpenInWorkspace(data.issueKey, data.branchName, {
+        homeDir: homedir(),
+        exists: existsSync,
+        spawn: (command, args) => spawnSync(command, [...args], { encoding: 'utf8' }),
+      }),
+  )

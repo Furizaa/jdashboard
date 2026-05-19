@@ -1,3 +1,4 @@
+export { branchSlug } from './branch-slug'
 export { extractPlainText } from './extract-plain-text'
 export { findSiblings } from './find-siblings'
 export { normalizeCodeLanguage } from './normalize-code-language'

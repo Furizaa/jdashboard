@@ -93,12 +93,12 @@ describe('findWorkspaceRefByName', () => {
 describe('openInWorkspace — worktree missing', () => {
   const baseDeps = { homeDir: HOME, exists: () => false }
 
-  it('runs git fetch then git worktree add, then cmux list + new-workspace', () => {
-    const { spawn, calls } = recorder([ok(), ok(), ok('  workspace:1  Other\n'), ok()])
+  it('runs git fetch, worktree add, upstream config, then cmux list + new-workspace', () => {
+    const { spawn, calls } = recorder([ok(), ok(), ok(), ok(), ok('  workspace:1  Other\n'), ok()])
     const result = runOpenInWorkspace('HDR-7', 'feat/HDR-7-thing', { ...baseDeps, spawn })
 
     expect(result).toEqual({ ok: true })
-    expect(calls).toHaveLength(4)
+    expect(calls).toHaveLength(6)
     expect(calls[0]).toEqual({
       command: 'git',
       args: ['-C', `${HOME}/projects/dr-web`, 'fetch', 'origin', 'develop'],
@@ -116,12 +116,26 @@ describe('openInWorkspace — worktree missing', () => {
         'origin/develop',
       ],
     })
-    expect(calls[2]).toEqual({ command: 'cmux', args: ['list-workspaces'] })
-    expect(calls[3]?.command).toBe('cmux')
-    expect(calls[3]?.args.slice(0, 2)).toEqual(['new-workspace', '--name'])
-    expect(calls[3]?.args).toContain('GeoCloud HDR-7')
-    expect(calls[3]?.args).toContain(`${HOME}/projects/worktrees/dr-web/HDR-7`)
-    expect(calls[3]?.args).toContain(buildLayoutJson())
+    expect(calls[2]).toEqual({
+      command: 'git',
+      args: ['-C', `${HOME}/projects/dr-web`, 'config', 'branch.feat/HDR-7-thing.remote', 'origin'],
+    })
+    expect(calls[3]).toEqual({
+      command: 'git',
+      args: [
+        '-C',
+        `${HOME}/projects/dr-web`,
+        'config',
+        'branch.feat/HDR-7-thing.merge',
+        'refs/heads/feat/HDR-7-thing',
+      ],
+    })
+    expect(calls[4]).toEqual({ command: 'cmux', args: ['list-workspaces'] })
+    expect(calls[5]?.command).toBe('cmux')
+    expect(calls[5]?.args.slice(0, 2)).toEqual(['new-workspace', '--name'])
+    expect(calls[5]?.args).toContain('GeoCloud HDR-7')
+    expect(calls[5]?.args).toContain(`${HOME}/projects/worktrees/dr-web/HDR-7`)
+    expect(calls[5]?.args).toContain(buildLayoutJson())
   })
 
   it('returns ok:false with stderr when git fetch fails', () => {
@@ -143,6 +157,13 @@ describe('openInWorkspace — worktree missing', () => {
     const result = runOpenInWorkspace('HDR-7', 'feat/HDR-7-thing', { ...baseDeps, spawn })
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.error.message).toBe('already exists')
+  })
+
+  it('returns ok:false when configuring upstream fails', () => {
+    const { spawn } = recorder([ok(), ok(), fail('config locked')])
+    const result = runOpenInWorkspace('HDR-7', 'feat/HDR-7-thing', { ...baseDeps, spawn })
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error.message).toBe('config locked')
   })
 })
 

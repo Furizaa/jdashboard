@@ -118,11 +118,28 @@ function ensureWorktree(
     'git fetch',
   )
   if (fetchErr !== null) return fetchErr
-  return runStep(
+  const addErr = runStep(
     deps.spawn,
     'git',
     ['-C', repo, 'worktree', 'add', worktreePath, '-b', branchName, 'origin/develop'],
     'git worktree add',
+  )
+  if (addErr !== null) return addErr
+  // Configure upstream so `git push` (no flags) creates and pushes to
+  // origin/<branchName> on first push. Equivalent to `git push --set-upstream`
+  // without the upfront network call.
+  const remoteErr = runStep(
+    deps.spawn,
+    'git',
+    ['-C', repo, 'config', `branch.${branchName}.remote`, 'origin'],
+    'git config branch.remote',
+  )
+  if (remoteErr !== null) return remoteErr
+  return runStep(
+    deps.spawn,
+    'git',
+    ['-C', repo, 'config', `branch.${branchName}.merge`, `refs/heads/${branchName}`],
+    'git config branch.merge',
   )
 }
 

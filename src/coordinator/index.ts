@@ -33,5 +33,6 @@ export {
   useDetachTag,
   useInvalidateTags,
   useTagDefinitions,
+  useTagsState,
   useTicketTags,
 } from '~/contexts/tags'

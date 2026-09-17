@@ -5,3 +5,6 @@ export {
   type WatchlistModalApi,
   type WatchlistResultsView,
 } from './use-watchlist-modal'
+export { useWatchlistBoard } from './use-watchlist-board'
+export { useWatchlistLanes, useSetWatchlistLanes } from './use-watchlist-lanes'
+export { useCollapsedLanes } from './use-collapsed-lanes'

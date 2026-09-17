@@ -4,5 +4,6 @@ export {
   useDetachTag,
   useInvalidateTags,
   useTagDefinitions,
+  useTagsState,
   useTicketTags,
 } from './presenter'

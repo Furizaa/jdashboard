@@ -59,6 +59,21 @@ export const testIds = Object.freeze({
   bulkRefineProgressRow: 'bulk-refine-progress-row',
   collapseColumnButton: 'collapse-column-button',
   collapsedColumn: 'collapsed-column',
+  navRail: 'nav-rail',
+  navBoard: 'nav-board',
+  navWatchlist: 'nav-watchlist',
+  watchlistBoard: 'watchlist-board',
+  watchlistLane: 'watchlist-lane',
+  watchlistLaneCollapse: 'watchlist-lane-collapse',
+  watchlistLaneCollapsed: 'watchlist-lane-collapsed',
+  laneConfigButton: 'lane-config-button',
+  laneConfigModal: 'lane-config-modal',
+  laneConfigLaneRow: 'lane-config-lane-row',
+  laneConfigAddLane: 'lane-config-add-lane',
+  laneConfigDeleteLane: 'lane-config-delete-lane',
+  laneConfigTagToggle: 'lane-config-tag-toggle',
+  laneConfigMoveUp: 'lane-config-move-up',
+  laneConfigMoveDown: 'lane-config-move-down',
 } as const)
 
 /** `data-card-kind` discriminator on `ticketCard`. */

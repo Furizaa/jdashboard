@@ -94,7 +94,9 @@ export function useIssuePanel(issueKey: string | null, notesOpen: boolean): Issu
   const navigate = useMemo(
     () => (key: string | null) =>
       navigateFn({
-        to: '/',
+        // `to: '.'` keeps whichever board the panel was opened from (main or
+        // watchlist) rather than snapping back to the main board route.
+        to: '.',
         search: key === null ? {} : { issue: key, ...(notesOpen ? { notes: true } : {}) },
       }),
     [navigateFn, notesOpen],
@@ -103,7 +105,7 @@ export function useIssuePanel(issueKey: string | null, notesOpen: boolean): Issu
   const setNotesOpen = useMemo(
     () => (open: boolean) => {
       if (issueKey === null) return
-      navigateFn({ to: '/', search: { issue: issueKey, ...(open ? { notes: true } : {}) } })
+      navigateFn({ to: '.', search: { issue: issueKey, ...(open ? { notes: true } : {}) } })
     },
     [navigateFn, issueKey],
   )

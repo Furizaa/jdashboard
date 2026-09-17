@@ -204,14 +204,26 @@ module.exports = {
       },
     },
     {
+      name: 'watchlist-domain-only-imports-kernel',
+      comment:
+        "watchlist's domain layer is pure: it may only import from ~/kernel and its own peers.",
+      severity: 'error',
+      from: { path: '^src/contexts/watchlist/domain/' },
+      to: {
+        path: '^src/',
+        pathNot: '^(src/contexts/watchlist/domain/|src/kernel/)',
+      },
+    },
+    {
       name: 'watchlist-view-model-only-imports-kernel-and-domain',
       comment:
-        "watchlist's view-model is framework-free; it may only import ~/kernel and its own peers",
+        "watchlist's view-model is framework-free; it may only import ~/kernel, its own domain, and its own peers",
       severity: 'error',
       from: { path: '^src/contexts/watchlist/view-model/' },
       to: {
         path: '^src/',
-        pathNot: '^(src/contexts/watchlist/view-model/|src/kernel/)',
+        pathNot:
+          '^(src/contexts/watchlist/view-model/|src/contexts/watchlist/domain/|src/kernel/)',
       },
     },
     {

@@ -16,6 +16,7 @@ const KEY_MR = ['mr-statuses'] as const
 const KEY_REVIEW_CARDS = ['review-cards'] as const
 const KEY_WORKSPACES = ['workspaces'] as const
 const KEY_WATCHLIST = ['watchlist'] as const
+const KEY_WATCHLIST_LANES = ['watchlist-lanes'] as const
 const KEY_TAGS = ['tags'] as const
 const KEY_NOTE = (k: string) => ['notes', k] as const
 // Distinct from KEY_NOTE (not `['notes']`) so invalidating the has-note set does
@@ -32,6 +33,7 @@ export const DASHBOARD_QUERY_KEYS = {
   reviewCards: KEY_REVIEW_CARDS,
   workspaces: KEY_WORKSPACES,
   watchlist: KEY_WATCHLIST,
+  watchlistLanes: KEY_WATCHLIST_LANES,
   tags: KEY_TAGS,
   note: KEY_NOTE,
   noteKeys: KEY_NOTE_KEYS,
@@ -46,6 +48,7 @@ export const DASHBOARD_STALE_TIMES = {
   reviewCards: 30_000,
   workspaces: 15_000,
   watchlist: 30_000,
+  watchlistLanes: 30_000,
   tags: 30_000,
   note: 30_000,
   noteKeys: 30_000,

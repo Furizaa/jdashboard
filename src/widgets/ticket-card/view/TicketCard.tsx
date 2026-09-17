@@ -43,7 +43,9 @@ export function TicketCard({
     if (isLeaving) return
     match(view.bodyClick)
       .with({ kind: 'open-panel' }, ({ issueKey }) => {
-        navigate({ to: '/', search: { issue: issueKey } })
+        // `to: '.'` keeps the current board (main or watchlist) so the detail
+        // panel opens in place rather than jumping to the main board route.
+        navigate({ to: '.', search: { issue: issueKey } })
       })
       .with({ kind: 'open-mr' }, ({ url }) => {
         window.open(url, '_blank', 'noopener,noreferrer')
@@ -54,7 +56,7 @@ export function TicketCard({
   // The note badge deep-links into the panel with the notes pane already open.
   const openNotes = () => {
     if (cardIssueKey === '') return
-    navigate({ to: '/', search: { issue: cardIssueKey, notes: true } })
+    navigate({ to: '.', search: { issue: cardIssueKey, notes: true } })
   }
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {

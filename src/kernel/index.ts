@@ -39,6 +39,12 @@ export {
   reviewSearchHaystack,
 } from './review'
 export { WATCHLIST_CARD_ID_PREFIX, watchlistCardId } from './watchlist'
+export type {
+  GetWatchlistLanesResult,
+  SetWatchlistLanesResult,
+  WatchlistLaneConfig,
+  WatchlistLanesState,
+} from './watchlist-lanes'
 export type { GetNoteResult, ListNotesKeysResult, NoteMutationResult } from './notes'
 export type { RefineNoteResult, GetChangelogResult, ChangelogEntry } from './notes'
 export type { RouteTranscriptResult, RouteMatch } from './bulk-refine'

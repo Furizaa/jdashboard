@@ -3,28 +3,34 @@ import { formatDistanceToNow } from 'date-fns'
 import { RefreshCw, TerminalSquare } from 'lucide-react'
 import { useBoardData, useRefreshAll } from '~/coordinator'
 import { QuickCreateButton } from '~/contexts/capture'
-import { WatchlistButton } from '~/contexts/watchlist'
+import { WatchlistButton, LaneConfigButton } from '~/contexts/watchlist'
 import { TagManagerButton } from '~/contexts/tags'
 import { BulkRefineButton } from '~/contexts/bulk-refine'
 import { cn } from '~/lib/cn'
 import { testIds } from '~/lib/testids'
+import type { BoardVariant } from '../-app-shell'
 import { GitlabIndicator } from './GitlabIndicator'
-import { Logo } from './Logo'
 import { SearchInput } from './SearchInput'
 
 const TICK_INTERVAL_MS = 5_000
 
 export function Header({
+  variant,
   searchQuery,
   onSearchChange,
   onlyWorkspace,
   onToggleOnlyWorkspace,
 }: {
+  variant: BoardVariant
   searchQuery: string
   onSearchChange: (value: string) => void
   onlyWorkspace: boolean
   onToggleOnlyWorkspace: () => void
 }) {
+  // The watchlist board drops "New" (you don't create tickets you only advise on)
+  // and "Only Workspace" (workspace focus is a main-board concern), and adds the
+  // lane-config control instead.
+  const isWatchlist = variant === 'watchlist'
   const refresh = useRefreshAll()
   const query = useBoardData()
 
@@ -36,35 +42,35 @@ export function Header({
 
   return (
     <header className="bg-background border-border flex h-14 shrink-0 items-center gap-3 border-b px-5">
-      <span className="flex items-center gap-2.5">
-        <Logo />
-        <span className="text-foreground text-[15px] font-semibold tracking-[-0.015em]">
-          clashboard
-        </span>
+      <span className="text-foreground text-[15px] font-semibold tracking-[-0.015em]">
+        clashboard
       </span>
       <span className="bg-border mx-1 h-4 w-px" aria-hidden />
-      <QuickCreateButton />
+      {!isWatchlist && <QuickCreateButton />}
       <WatchlistButton />
+      {isWatchlist && <LaneConfigButton />}
       <TagManagerButton />
       <BulkRefineButton />
       <SearchInput value={searchQuery} onChange={onSearchChange} />
-      <button
-        type="button"
-        onClick={onToggleOnlyWorkspace}
-        aria-pressed={onlyWorkspace}
-        aria-label="Only show tickets with an open workspace"
-        title="Only show tickets with an open workspace"
-        data-testid={testIds.onlyWorkspaceToggle}
-        className={cn(
-          'focus-visible:ring-ring inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none',
-          onlyWorkspace
-            ? 'border-blue-500/40 bg-blue-500/15 text-blue-400'
-            : 'border-border text-ink-subtle hover:text-foreground hover:bg-surface-2',
-        )}
-      >
-        <TerminalSquare size={14} />
-        <span>Only Workspace</span>
-      </button>
+      {!isWatchlist && (
+        <button
+          type="button"
+          onClick={onToggleOnlyWorkspace}
+          aria-pressed={onlyWorkspace}
+          aria-label="Only show tickets with an open workspace"
+          title="Only show tickets with an open workspace"
+          data-testid={testIds.onlyWorkspaceToggle}
+          className={cn(
+            'focus-visible:ring-ring inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none',
+            onlyWorkspace
+              ? 'border-blue-500/40 bg-blue-500/15 text-blue-400'
+              : 'border-border text-ink-subtle hover:text-foreground hover:bg-surface-2',
+          )}
+        >
+          <TerminalSquare size={14} />
+          <span>Only Workspace</span>
+        </button>
+      )}
       <div className="ml-auto flex items-center gap-2">
         <GitlabIndicator />
         <SyncIndicator query={query} onRefresh={refresh} />

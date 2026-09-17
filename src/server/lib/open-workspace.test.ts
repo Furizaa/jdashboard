@@ -2,8 +2,14 @@ import type { SpawnSyncReturns } from 'node:child_process'
 import { describe, expect, it } from 'vitest'
 import {
   buildLayoutJson,
+  findWorkspaceRefByIssueKey,
   findWorkspaceRefByName,
+  issueKeysInName,
+  listOpenIssueKeys,
   runCheckWorktree,
+  runDiscardWorkspace,
+  runFocusWorkspace,
+  runListWorkspaces,
   runOpenInWorkspace,
   worktreePathFor,
 } from './open-workspace'
@@ -138,6 +144,35 @@ describe('openInWorkspace — worktree missing', () => {
     expect(calls[5]?.args).toContain(buildLayoutJson())
   })
 
+  it('fetches and bases the worktree on the existing remote branch when fromExistingBranch is set', () => {
+    const { spawn, calls } = recorder([ok(), ok(), ok(), ok(), ok('  workspace:1  Other\n'), ok()])
+    const result = runOpenInWorkspace(
+      'HDR-7',
+      'feat/HDR-7-existing',
+      { ...baseDeps, spawn },
+      { fromExistingBranch: true },
+    )
+
+    expect(result).toEqual({ ok: true })
+    expect(calls[0]).toEqual({
+      command: 'git',
+      args: ['-C', `${HOME}/projects/dr-web`, 'fetch', 'origin', 'feat/HDR-7-existing'],
+    })
+    expect(calls[1]).toEqual({
+      command: 'git',
+      args: [
+        '-C',
+        `${HOME}/projects/dr-web`,
+        'worktree',
+        'add',
+        `${HOME}/projects/worktrees/dr-web/HDR-7`,
+        '-b',
+        'feat/HDR-7-existing',
+        'origin/feat/HDR-7-existing',
+      ],
+    })
+  })
+
   it('returns ok:false with stderr when git fetch fails', () => {
     const { spawn } = recorder([fail('network down')])
     const result = runOpenInWorkspace('HDR-7', 'feat/HDR-7-thing', { ...baseDeps, spawn })
@@ -212,6 +247,215 @@ describe('openInWorkspace — worktree exists', () => {
     const result = runOpenInWorkspace('HDR-7', undefined, { ...baseDeps, spawn })
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.error.message).toBe('no such workspace')
+  })
+})
+
+describe('issueKeysInName', () => {
+  it('extracts a key embedded in a workspace name', () => {
+    expect(issueKeysInName('GeoCloud Invite HDR-20142')).toEqual(['HDR-20142'])
+  })
+
+  it('extracts multiple keys and ignores non-key tokens', () => {
+    expect(issueKeysInName('R GeoCloud HDR-19257 + HDR-17646')).toEqual(['HDR-19257', 'HDR-17646'])
+  })
+
+  it('returns nothing for a name with no key', () => {
+    expect(issueKeysInName('GeoCloud ROOT')).toEqual([])
+  })
+})
+
+describe('listOpenIssueKeys', () => {
+  const listing = [
+    '  workspace:1  Root',
+    '* workspace:2  Clashboard  [selected]',
+    '  workspace:3  GeoCloud ROOT',
+    '  workspace:9  GeoCloud Traj Minimap HDR-19529',
+    '  workspace:4  GeoCloud Invite HDR-20142',
+  ].join('\n')
+
+  it('collects distinct keys across all workspace names', () => {
+    expect(listOpenIssueKeys(listing).sort()).toEqual(['HDR-19529', 'HDR-20142'])
+  })
+
+  it('returns an empty list when no workspace carries a key', () => {
+    expect(listOpenIssueKeys('  workspace:1  Root\n  workspace:2  GeoCloud ROOT')).toEqual([])
+  })
+})
+
+describe('findWorkspaceRefByIssueKey', () => {
+  const listing = [
+    '  workspace:4  GeoCloud Invite HDR-20142',
+    '  workspace:9  GeoCloud Traj HDR-19529',
+  ].join('\n')
+
+  it('returns the ref of the workspace whose name carries the key', () => {
+    expect(findWorkspaceRefByIssueKey(listing, 'HDR-19529')).toBe('workspace:9')
+  })
+
+  it('returns null when no workspace carries the key', () => {
+    expect(findWorkspaceRefByIssueKey(listing, 'HDR-1')).toBeNull()
+  })
+})
+
+describe('runListWorkspaces', () => {
+  it('returns the open issue keys parsed from cmux output', () => {
+    const { spawn } = recorder([ok('  workspace:4  GeoCloud Invite HDR-20142\n')])
+    expect(runListWorkspaces({ spawn })).toEqual({ openIssueKeys: ['HDR-20142'] })
+  })
+
+  it('degrades to an empty list when cmux fails', () => {
+    const { spawn } = recorder([fail('socket error')])
+    expect(runListWorkspaces({ spawn })).toEqual({ openIssueKeys: [] })
+  })
+})
+
+describe('runFocusWorkspace', () => {
+  it('selects the workspace whose name carries the key', () => {
+    const { spawn, calls } = recorder([ok('  workspace:9  GeoCloud HDR-7\n'), ok()])
+    const result = runFocusWorkspace('HDR-7', { spawn })
+    expect(result).toEqual({ ok: true })
+    expect(calls).toEqual([
+      { command: 'cmux', args: ['list-workspaces'] },
+      { command: 'cmux', args: ['select-workspace', '--workspace', 'workspace:9'] },
+    ])
+  })
+
+  it('returns ok:false when no workspace carries the key', () => {
+    const { spawn } = recorder([ok('  workspace:1  Other\n')])
+    const result = runFocusWorkspace('HDR-7', { spawn })
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error.message).toContain('HDR-7')
+  })
+})
+
+describe('runDiscardWorkspace', () => {
+  function bgRecorder() {
+    const removals: Array<{ repoPath: string; worktreePath: string }> = []
+    return {
+      removals,
+      removeWorktreeInBackground: (repoPath: string, worktreePath: string) => {
+        removals.push({ repoPath, worktreePath })
+      },
+    }
+  }
+
+  it('closes the workspace (sync) and fires the worktree removal in the background', () => {
+    const { spawn, calls } = recorder([ok('  workspace:9  GeoCloud HDR-7\n'), ok()])
+    const bg = bgRecorder()
+    const result = runDiscardWorkspace('HDR-7', {
+      homeDir: HOME,
+      exists: () => true,
+      spawn,
+      removeWorktreeInBackground: bg.removeWorktreeInBackground,
+    })
+    expect(result).toEqual({ ok: true })
+    // No synchronous git call — only list + close go through spawn.
+    expect(calls).toEqual([
+      { command: 'cmux', args: ['list-workspaces'] },
+      { command: 'cmux', args: ['close-workspace', '--workspace', 'workspace:9'] },
+    ])
+    expect(bg.removals).toEqual([
+      {
+        repoPath: `${HOME}/projects/dr-web`,
+        worktreePath: `${HOME}/projects/worktrees/dr-web/HDR-7`,
+      },
+    ])
+  })
+
+  it('removes the worktree even when no cmux workspace is open', () => {
+    const { spawn, calls } = recorder([ok('  workspace:1  Other\n')])
+    const bg = bgRecorder()
+    const result = runDiscardWorkspace('HDR-7', {
+      homeDir: HOME,
+      exists: () => true,
+      spawn,
+      removeWorktreeInBackground: bg.removeWorktreeInBackground,
+    })
+    expect(result).toEqual({ ok: true })
+    expect(calls).toEqual([{ command: 'cmux', args: ['list-workspaces'] }])
+    expect(bg.removals).toHaveLength(1)
+  })
+
+  it('errors when neither a workspace nor a worktree exists, without a background removal', () => {
+    const { spawn } = recorder([ok('  workspace:1  Other\n')])
+    const bg = bgRecorder()
+    const result = runDiscardWorkspace('HDR-7', {
+      homeDir: HOME,
+      exists: () => false,
+      spawn,
+      removeWorktreeInBackground: bg.removeWorktreeInBackground,
+    })
+    expect(result.ok).toBe(false)
+    expect(bg.removals).toHaveLength(0)
+  })
+
+  it('returns ok:false and skips the removal when close-workspace fails', () => {
+    const { spawn } = recorder([ok('  workspace:9  GeoCloud HDR-7\n'), fail('busy')])
+    const bg = bgRecorder()
+    const result = runDiscardWorkspace('HDR-7', {
+      homeDir: HOME,
+      exists: () => true,
+      spawn,
+      removeWorktreeInBackground: bg.removeWorktreeInBackground,
+    })
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error.message).toBe('busy')
+    expect(bg.removals).toHaveLength(0)
+  })
+})
+
+describe('openInWorkspace — custom name and color', () => {
+  const baseDeps = { homeDir: HOME, exists: () => true }
+
+  it('creates the workspace with the given name and sets its color best-effort', () => {
+    const { spawn, calls } = recorder([
+      ok('  workspace:1  Other\n'),
+      ok(),
+      ok('  workspace:5  GeoCloud Invite HDR-7\n'),
+      ok(),
+    ])
+    const result = runOpenInWorkspace(
+      'HDR-7',
+      undefined,
+      { ...baseDeps, spawn },
+      {
+        workspaceName: 'GeoCloud Invite HDR-7',
+        color: 'Blue',
+      },
+    )
+    expect(result).toEqual({ ok: true })
+    expect(calls[1]?.args).toContain('GeoCloud Invite HDR-7')
+    expect(calls[3]).toEqual({
+      command: 'cmux',
+      args: [
+        'workspace-action',
+        '--action',
+        'set-color',
+        '--color',
+        'Blue',
+        '--workspace',
+        'workspace:5',
+      ],
+    })
+  })
+
+  it('still succeeds when the color-set step fails', () => {
+    const { spawn } = recorder([
+      ok('  workspace:1  Other\n'),
+      ok(),
+      ok('  workspace:5  GeoCloud Invite HDR-7\n'),
+      fail('unknown color'),
+    ])
+    const result = runOpenInWorkspace(
+      'HDR-7',
+      undefined,
+      { ...baseDeps, spawn },
+      {
+        workspaceName: 'GeoCloud Invite HDR-7',
+        color: 'Blue',
+      },
+    )
+    expect(result).toEqual({ ok: true })
   })
 })
 

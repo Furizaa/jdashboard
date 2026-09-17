@@ -15,10 +15,14 @@ export type {
   GetIssueResult,
   GetMyEpicsResult,
   GetTransitionsResult,
+  GetWatchlistCardsResult,
   IssueLink,
   LinkedIssueRef,
   QuickCreateInput,
   SearchIssuesResult,
+  SearchWatchlistCandidatesResult,
+  WatchlistCandidate,
+  WatchlistMutationResult,
 } from './jira'
 export { quickCreateSchema } from './jira'
 export type {
@@ -34,3 +38,18 @@ export {
   reviewCardId,
   reviewSearchHaystack,
 } from './review'
+export { WATCHLIST_CARD_ID_PREFIX, watchlistCardId } from './watchlist'
+export type { GetNoteResult, ListNotesKeysResult, NoteMutationResult } from './notes'
+export type { RefineNoteResult, GetChangelogResult, ChangelogEntry } from './notes'
+export type { RouteTranscriptResult, RouteMatch } from './bulk-refine'
+export {
+  DEFAULT_TAG_COLOR_ID,
+  TAG_COLORS,
+  resolveTagColor,
+  resolveTicketTags,
+  type GetTagsStateResult,
+  type TagColor,
+  type TagDefinition,
+  type TagMutationResult,
+  type TagsState,
+} from './tags'

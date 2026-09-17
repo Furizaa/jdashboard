@@ -21,6 +21,7 @@ export type RawReviewer = {
 }
 
 export type RawMrDetail = RawMrSummary & {
+  sourceBranch: string
   reviewers: RawReviewer[]
   headPipelineStatus: string | null
   hasConflicts: boolean

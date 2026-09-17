@@ -55,6 +55,8 @@ function makeInput(overrides: Partial<DeriveInput> = {}): DeriveInput {
     navigate: vi.fn(),
     openInBrowser: vi.fn(),
     copyJiraLinkAndToast: vi.fn(),
+    notesOpen: false,
+    setNotesOpen: vi.fn(),
     ...overrides,
   }
 }
@@ -216,5 +218,22 @@ describe('derive — bound action callbacks', () => {
     state.open('NEW-1')
     expect(navigate).toHaveBeenNthCalledWith(1, null)
     expect(navigate).toHaveBeenNthCalledWith(2, 'NEW-1')
+  })
+})
+
+describe('derive — notes pane', () => {
+  it('surfaces notesOpen and setNotesOpen on every open phase', () => {
+    const setNotesOpen = vi.fn()
+    const state = derive(makeInput({ notesOpen: true, setNotesOpen }))
+    if (state.phase === 'closed') throw new Error('expected open')
+    expect(state.notesOpen).toBe(true)
+    state.setNotesOpen(false)
+    expect(setNotesOpen).toHaveBeenCalledWith(false)
+  })
+
+  it('defaults notesOpen to false', () => {
+    const state = derive(makeInput())
+    if (state.phase === 'closed') throw new Error('expected open')
+    expect(state.notesOpen).toBe(false)
   })
 })

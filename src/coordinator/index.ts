@@ -5,11 +5,33 @@ export {
   useTransitions,
   useMrStatuses,
   useMrFor,
+  useWorkspaceOpen,
+  useOpenWorkspaceKeys,
+  useInvalidateWorkspaces,
   useTransitionAction,
   useCreateAction,
   useMrMergedAction,
   useRefreshAll,
+  useNote,
+  useSaveNote,
+  useHasNote,
+  useChangelog,
+  useRefineNote,
+  useRouteTranscript,
 } from './hooks'
 export type { CreateIssueSnapshot } from './coordinator'
 export { CreateIssueRejected, CreateIssueTimeout, type CreateIssueError } from './errors'
 export { useReviewCards } from '~/contexts/review'
+export {
+  useInvalidateWatchlist,
+  useRemoveFromWatchlist,
+  useWatchlistCards,
+  useWatchlistMembership,
+} from '~/contexts/watchlist'
+export {
+  useAttachTag,
+  useDetachTag,
+  useInvalidateTags,
+  useTagDefinitions,
+  useTicketTags,
+} from '~/contexts/tags'

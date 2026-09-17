@@ -48,6 +48,7 @@ const WireReviewerSchema = Schema.Struct({
 // handles unknown pipeline statuses gracefully.
 const WireMrDetailSchema = Schema.Struct({
   ...WireMrSummarySchema.fields,
+  source_branch: Schema.String,
   reviewers: Schema.Array(WireReviewerSchema),
   head_pipeline: Schema.NullOr(Schema.Struct({ status: Schema.String })),
   has_conflicts: Schema.Boolean,
@@ -107,6 +108,7 @@ function toRawMrSummary(wire: WireMrSummary): RawMrSummary {
 function toRawMrDetail(wire: WireMrDetail): RawMrDetail {
   return {
     ...toRawMrSummary(wire),
+    sourceBranch: wire.source_branch,
     reviewers: wire.reviewers.map((r) => ({
       username: r.username,
       displayName: r.name,
@@ -199,6 +201,15 @@ export const GitlabGatewayLive: Layer.Layer<
               orElse: (bad): Effect.Effect<A, GitlabGatewayError> => failFromStatus(bad),
             }),
           ),
+          // Surface every GitLab API failure in the server logs — without this
+          // an auth failure only ever showed as a client toast, with nothing to
+          // diagnose. The request line gives method + path context at a glance.
+          Effect.tapError((error) => {
+            const detail = 'message' in error && error.message ? ` — ${error.message}` : ''
+            return Effect.logError(
+              `[gitlab] ${request.method} ${request.url} failed: ${error._tag}${detail}`,
+            )
+          }),
         )
 
     return GitlabGateway.of({

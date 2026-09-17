@@ -1,7 +1,7 @@
 import { match } from 'ts-pattern'
 import { type KeyboardEvent } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { useMrFor } from '~/coordinator'
+import { useHasNote, useMrFor, useWorkspaceOpen } from '~/coordinator'
 import { Mr, rootStateFromPhase } from '~/widgets/mr-section'
 import { FixasapRibbon } from '~/widgets/fixasap-ribbon'
 import { cn } from '~/lib/cn'
@@ -10,6 +10,7 @@ import type { Column, MrSummary } from '~/kernel'
 import type { TicketCardViewModel } from '../view-model/build-card-view'
 import { CardHeader } from './CardHeader'
 import { CardLabels } from './CardLabels'
+import { CardTags } from './CardTags'
 
 export type TicketCardAnimationState = 'idle' | 'entering' | 'changed' | 'leaving'
 
@@ -23,6 +24,21 @@ export function TicketCard({
   const navigate = useNavigate()
   const isLeaving = animationState === 'leaving'
 
+  // Both jira and review-real cards carry a ticket key here (review-fake opens
+  // an MR and has none) — the same key that drives the "Only Workspace" filter.
+  const cardIssueKey = view.bodyClick.kind === 'open-panel' ? view.bodyClick.issueKey : ''
+  const workspaceOpen = useWorkspaceOpen(cardIssueKey)
+  const hasNote = useHasNote(cardIssueKey)
+
+  // Watchlist purple takes precedence over the workspace blue: a card only ever
+  // carries one tint, and "on my watchlist" is its defining trait here.
+  const tintClass =
+    view.tint === 'watchlist'
+      ? 'border-purple-500/40 bg-purple-500/10 hover:border-purple-500/60 hover:bg-purple-500/15'
+      : workspaceOpen
+        ? 'border-blue-500/40 bg-blue-500/10 hover:border-blue-500/60 hover:bg-blue-500/15'
+        : 'border-border bg-card hover:bg-surface-2 hover:border-border-strong'
+
   const handleBodyClick = () => {
     if (isLeaving) return
     match(view.bodyClick)
@@ -33,6 +49,12 @@ export function TicketCard({
         window.open(url, '_blank', 'noopener,noreferrer')
       })
       .exhaustive()
+  }
+
+  // The note badge deep-links into the panel with the notes pane already open.
+  const openNotes = () => {
+    if (cardIssueKey === '') return
+    navigate({ to: '/', search: { issue: cardIssueKey, notes: true } })
   }
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -58,12 +80,18 @@ export function TicketCard({
       data-animation={animationState === 'idle' ? undefined : animationState}
       aria-hidden={isLeaving || undefined}
       className={cn(
-        'ticket-card border-border bg-card hover:bg-surface-2 hover:border-border-strong focus-visible:ring-ring group relative cursor-pointer rounded-lg border px-3.5 py-3 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none',
+        'ticket-card focus-visible:ring-ring group relative cursor-pointer rounded-lg border px-3.5 py-3 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none',
+        tintClass,
         view.deemphasized && 'opacity-55',
       )}
     >
       {view.fixasap && <FixasapRibbon size="card" />}
-      <CardHeader view={view} />
+      <CardHeader
+        view={view}
+        workspaceOpen={workspaceOpen}
+        hasNote={hasNote}
+        onOpenNotes={openNotes}
+      />
 
       <div
         className="text-foreground mt-1.5 overflow-hidden text-[13px] leading-snug tracking-[-0.005em]"
@@ -78,6 +106,8 @@ export function TicketCard({
       </div>
 
       <CardLabels view={view} />
+
+      <CardTags issueKey={cardIssueKey} />
 
       <CardMrSection mrSection={view.mrSection} />
     </article>

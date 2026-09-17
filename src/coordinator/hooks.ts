@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useMutation, useQuery, type UseQueryResult } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query'
 import type { Result } from 'neverthrow'
 import {
   getMrStatuses,
@@ -10,9 +10,24 @@ import {
 import {
   getIssue,
   getTransitions,
+  listWorkspaces,
   type GetIssueResult,
   type GetTransitionsResult,
 } from '~/server/server-functions/detail'
+import {
+  getNote,
+  listNotesKeys,
+  saveNote,
+  type GetNoteResult,
+  type NoteMutationResult,
+} from '~/server/server-functions/notes'
+import {
+  getChangelog,
+  refineNote,
+  type GetChangelogResult,
+  type RefineNoteResult,
+} from '~/server/server-functions/refine'
+import { routeTranscript, type RouteTranscriptResult } from '~/server/server-functions/bulk-refine'
 import type { QuickCreateInput } from '~/server/contexts/capture/application/quick-create-schema'
 import type { MrSummary } from '~/server/gateways/gitlab/types'
 import { usePolling } from '~/lib/use-polling'
@@ -118,6 +133,47 @@ export function useMrFor(jiraKey: string): MrStatusResult {
   return { state: 'ready', summary: query.data.summary }
 }
 
+// Polled so that renaming a workspace outside the app (adding/removing a ticket
+// ref) reflects on the board within a few seconds, no reload.
+const WORKSPACES_POLL_INTERVAL_MS = 5_000
+const EMPTY_KEYS: readonly string[] = []
+
+// One shared query feeds every card, the detail panel, and the board filter
+// (react-query dedupes by key; `select` narrows per consumer).
+const WORKSPACES_QUERY = {
+  queryKey: DASHBOARD_QUERY_KEYS.workspaces,
+  queryFn: () => listWorkspaces(),
+  retry: false,
+  staleTime: DASHBOARD_STALE_TIMES.workspaces,
+  refetchInterval: WORKSPACES_POLL_INTERVAL_MS,
+  refetchOnWindowFocus: true,
+} as const
+
+// Whether a cmux workspace is open for this ticket. The heuristic is the
+// ticket key appearing in a workspace name (see `listOpenIssueKeys`). Loading
+// reads as "not open" so the "Open in Workspace" affordance is the default.
+export function useWorkspaceOpen(issueKey: string): boolean {
+  const query = useQuery({
+    ...WORKSPACES_QUERY,
+    select: (data) => data.openIssueKeys.includes(issueKey),
+  })
+  return query.data ?? false
+}
+
+// The full set of ticket keys with an open workspace — for the board's
+// "Only Workspace" filter.
+export function useOpenWorkspaceKeys(): readonly string[] {
+  const query = useQuery({ ...WORKSPACES_QUERY, select: (data) => data.openIssueKeys })
+  return query.data ?? EMPTY_KEYS
+}
+
+export function useInvalidateWorkspaces(): () => void {
+  const queryClient = useQueryClient()
+  return () => {
+    queryClient.invalidateQueries({ queryKey: DASHBOARD_QUERY_KEYS.workspaces })
+  }
+}
+
 export type TransitionVars = { key: string; transitionId: string; toStatusName: string }
 
 export function useTransitionAction(): {
@@ -156,4 +212,121 @@ export function useMrMergedAction(): (input: {
 export function useRefreshAll(): () => void {
   const coord = useCoordinator()
   return () => coord.refreshAll()
+}
+
+// One private markdown note per ticket, keyed by issue key. Notes are purely
+// local disk state (like tags/watchlist), so there is no gating on the Jira load
+// and the read never surfaces an error envelope.
+export function useNote(key: string): UseQueryResult<GetNoteResult> {
+  return useQuery({
+    queryKey: DASHBOARD_QUERY_KEYS.note(key),
+    queryFn: () => getNote({ data: { key } }),
+    retry: false,
+    staleTime: DASHBOARD_STALE_TIMES.note,
+  })
+}
+
+// Save invalidates the one ticket's note query plus the has-note set (so a card's
+// note badge appears/disappears as a note is first written or blanked). There is
+// no optimistic patch/rollback (local file I/O is fast and never partially
+// applies), mirroring how the tag and watchlist mutations invalidate rather than
+// patch.
+export function useSaveNote(): {
+  save: (key: string, content: string) => Promise<NoteMutationResult>
+  isPending: boolean
+} {
+  const queryClient = useQueryClient()
+  const mutation = useMutation<NoteMutationResult, Error, { key: string; content: string }>({
+    mutationFn: (data) => saveNote({ data }),
+    onSuccess: (_result, { key }) => {
+      queryClient.invalidateQueries({ queryKey: DASHBOARD_QUERY_KEYS.note(key) })
+      queryClient.invalidateQueries({ queryKey: DASHBOARD_QUERY_KEYS.noteKeys })
+    },
+  })
+  return {
+    save: (key, content) => mutation.mutateAsync({ key, content }),
+    isPending: mutation.isPending,
+  }
+}
+
+// The automated changelog beside a ticket's note — one entry per Refine run.
+// Read-only local disk state, like the note itself.
+export function useChangelog(key: string): UseQueryResult<GetChangelogResult> {
+  return useQuery({
+    queryKey: DASHBOARD_QUERY_KEYS.changelog(key),
+    queryFn: () => getChangelog({ data: { key } }),
+    retry: false,
+    staleTime: DASHBOARD_STALE_TIMES.changelog,
+  })
+}
+
+// Refine rewrites the note with a headless agent, then records what changed in
+// the changelog. On success invalidate the note (rewritten), the changelog (new
+// entry), and the has-note set (a first refine can create the note), so all three
+// refetch — mirroring `useSaveNote`, with no optimistic patch.
+export function useRefineNote(): {
+  refine: (key: string, refineText: string) => Promise<RefineNoteResult>
+  isPending: boolean
+} {
+  const queryClient = useQueryClient()
+  const mutation = useMutation<RefineNoteResult, Error, { key: string; refineText: string }>({
+    mutationFn: (data) => refineNote({ data }),
+    onSuccess: (result, { key }) => {
+      if (!result.ok) return
+      queryClient.invalidateQueries({ queryKey: DASHBOARD_QUERY_KEYS.note(key) })
+      queryClient.invalidateQueries({ queryKey: DASHBOARD_QUERY_KEYS.changelog(key) })
+      queryClient.invalidateQueries({ queryKey: DASHBOARD_QUERY_KEYS.noteKeys })
+    },
+  })
+  return {
+    refine: (key, refineText) => mutation.mutateAsync({ key, refineText }),
+    isPending: mutation.isPending,
+  }
+}
+
+// Bulk Refine, stage 1: route a pasted meeting transcript to the board tickets it
+// discusses, returning a per-ticket brief for each. This is a pure read (it
+// writes nothing — stage 2's per-ticket `refineNote` does the writes and its own
+// invalidation), so there is no `onSuccess` cache work here.
+// Structurally the server `RouteTicket` (declared locally to avoid an extra
+// import edge from this already-dependency-dense module).
+type BulkRefineTicket = {
+  key: string
+  summary: string
+  epic: string | null
+  labels: readonly string[]
+}
+
+export function useRouteTranscript(): {
+  route: (
+    transcript: string,
+    tickets: readonly BulkRefineTicket[],
+  ) => Promise<RouteTranscriptResult>
+  isPending: boolean
+} {
+  const mutation = useMutation<
+    RouteTranscriptResult,
+    Error,
+    { transcript: string; tickets: readonly BulkRefineTicket[] }
+  >({
+    mutationFn: (data) => routeTranscript({ data }),
+  })
+  return {
+    route: (transcript, tickets) => mutation.mutateAsync({ transcript, tickets }),
+    isPending: mutation.isPending,
+  }
+}
+
+// Whether a ticket has a note. One shared query lists the keys with a note file;
+// each card selects its own membership (react-query dedupes by key), so the board
+// costs one request, not one per card — the watchlist/workspace-badge pattern.
+export function useHasNote(issueKey: string): boolean {
+  const query = useQuery({
+    queryKey: DASHBOARD_QUERY_KEYS.noteKeys,
+    queryFn: () => listNotesKeys(),
+    retry: false,
+    staleTime: DASHBOARD_STALE_TIMES.noteKeys,
+    select: (data) => (issueKey === '' ? false : data.keys.includes(issueKey)),
+  })
+  return query.data ?? false
 }

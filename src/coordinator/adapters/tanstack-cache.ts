@@ -14,6 +14,15 @@ const KEY_ISSUE_PREFIX = ['jira', 'issue'] as const
 const KEY_TRANSITIONS = (k: string) => ['jira', 'transitions', k] as const
 const KEY_MR = ['mr-statuses'] as const
 const KEY_REVIEW_CARDS = ['review-cards'] as const
+const KEY_WORKSPACES = ['workspaces'] as const
+const KEY_WATCHLIST = ['watchlist'] as const
+const KEY_TAGS = ['tags'] as const
+const KEY_NOTE = (k: string) => ['notes', k] as const
+// Distinct from KEY_NOTE (not `['notes']`) so invalidating the has-note set does
+// not prefix-match and blow away every open note's query.
+const KEY_NOTE_KEYS = ['note-keys'] as const
+// The automated changelog beside a note; own prefix, not under `['notes']`.
+const KEY_CHANGELOG = (k: string) => ['note-changelog', k] as const
 
 export const DASHBOARD_QUERY_KEYS = {
   board: KEY_BOARD,
@@ -21,6 +30,12 @@ export const DASHBOARD_QUERY_KEYS = {
   transitions: KEY_TRANSITIONS,
   mrStatuses: KEY_MR,
   reviewCards: KEY_REVIEW_CARDS,
+  workspaces: KEY_WORKSPACES,
+  watchlist: KEY_WATCHLIST,
+  tags: KEY_TAGS,
+  note: KEY_NOTE,
+  noteKeys: KEY_NOTE_KEYS,
+  changelog: KEY_CHANGELOG,
 } as const
 
 export const DASHBOARD_STALE_TIMES = {
@@ -29,6 +44,12 @@ export const DASHBOARD_STALE_TIMES = {
   transitions: 0,
   mrStatuses: 30_000,
   reviewCards: 30_000,
+  workspaces: 15_000,
+  watchlist: 30_000,
+  tags: 30_000,
+  note: 30_000,
+  noteKeys: 30_000,
+  changelog: 30_000,
   myself: 60_000,
 } as const
 

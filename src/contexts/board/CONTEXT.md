@@ -11,7 +11,7 @@ The projection of live Jira issues + review cards onto the four-column grid. Own
 One of the four canonical placements: `TO DO`, `In Implementation`, `In Code Review`, `Done`. Kernel type — shared with Detail (sibling navigation), Review (review-card placement), and the status pill widget.
 
 **ColumnItem**:
-A renderable card on the board: a Jira issue or a review card, with an animation state and a stable id (`<jira-key>` or `review:<iid>`).
+A renderable card on the board: a Jira issue, a review card, or a watchlist card, with an animation state, a stable id (`<jira-key>`, `review:<iid>`, or `watchlist:<jira-key>`), and a `section` (`'main' | 'watchlist'`). Watchlist cards (from the Watchlist context, via `~/coordinator`) are always placed in the In Implementation lane's `'watchlist'` sub-section regardless of their real status, deduped against board jira keys; `BoardColumn` renders them under a divider. They carry no animation track — `state` is always `'idle'`.
 
 **ChangeVisual**:
 The view-model's stored animation state for one track (jira or review): which keys are currently entering, changed, or leaving. Distinct from `ChangeDiff`, which is the per-tick diff input.
@@ -21,6 +21,9 @@ The pure-domain output of `diffChange(prev, current, options, leaving)` — the 
 
 **Snapshot**:
 The board data the application service exposes on success — `{ baseUrl, issues }`. Stripped of the `{ ok, reason }` envelope so the consumer sees a clean Result.
+
+**Collapsed Done rail**:
+The Done column can be collapsed to a thin, clickable vertical strip (`CollapsedColumn`) so the three active lanes take the full width; clicking it expands back. This is a per-viewer UI preference, persisted in `localStorage` via the `useCollapsedDone` presenter hook — deliberately client-side, not the server's `~/.clashboard`. No domain/view-model involvement; the rail still shows the live item count.
 
 _Avoid_: "BoardState" (overloaded with the view-model's internal `State`), "phase" by itself for the display-state union (it's a _field_; the union is `DisplayState`).
 

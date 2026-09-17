@@ -1,6 +1,12 @@
 import { match, P } from 'ts-pattern'
 import type { BoardIssue, Column, ReviewCard, SearchIssuesResult } from '~/kernel'
-import { assembleColumns, EMPTY_VISUAL, type ChangeVisual, type ColumnItem } from '../domain'
+import {
+  assembleColumns,
+  EMPTY_VISUAL,
+  type ChangeVisual,
+  type ColumnItem,
+  type WorkspaceFilter,
+} from '../domain'
 
 export type State = {
   jira: ChangeVisual<BoardIssue>
@@ -161,10 +167,13 @@ export function derive(input: {
   state: State
   queryData: QueryData
   reviewCards: readonly ReviewCard[] | undefined
+  watchlistCards?: readonly BoardIssue[] | undefined
   searchQuery: string
+  workspaceFilter?: WorkspaceFilter
   retry: () => void
 }): DisplayState {
-  const { state, queryData, reviewCards, searchQuery, retry } = input
+  const { state, queryData, reviewCards, watchlistCards, searchQuery, workspaceFilter, retry } =
+    input
 
   if (queryData.isPending) return { phase: 'loading' }
   if (queryData.isError && queryData.data === undefined) {
@@ -183,7 +192,9 @@ export function derive(input: {
         jiraChange: state.jira,
         reviewCards,
         reviewChange: state.review,
+        watchlistCards,
         searchQuery,
+        workspaceFilter,
       }),
       showErrorBanner: queryData.isError,
       errorMessage: queryData.error?.message,

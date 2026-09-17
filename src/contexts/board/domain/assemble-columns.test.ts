@@ -309,3 +309,150 @@ describe('assembleColumns', () => {
     expect(reviewItem?.state).toBe('idle')
   })
 })
+
+describe('assembleColumns — Only Workspace filter', () => {
+  const openKeys = new Set(['A-1'])
+  const allIds = (result: Record<string, ColumnItem[]>) =>
+    Object.values(result)
+      .flat()
+      .map((item) => item.id)
+
+  it('keeps only jira issues whose key has an open workspace', () => {
+    const result = assembleColumns({
+      liveIssues: [issue('A-1'), issue('A-2')],
+      jiraChange: NO_JIRA_CHANGE,
+      searchQuery: '',
+      workspaceFilter: { onlyWorkspace: true, openKeys },
+    })
+    expect(allIds(result)).toEqual(['A-1'])
+  })
+
+  it('does not filter when onlyWorkspace is false', () => {
+    const result = assembleColumns({
+      liveIssues: [issue('A-1'), issue('A-2')],
+      jiraChange: NO_JIRA_CHANGE,
+      searchQuery: '',
+      workspaceFilter: { onlyWorkspace: false, openKeys },
+    })
+    expect(allIds(result).toSorted()).toEqual(['A-1', 'A-2'])
+  })
+
+  it('keeps a review-real card whose jira key has a workspace but always drops review-fake', () => {
+    const fake: ReviewCard = {
+      kind: 'review-fake',
+      iid: 99,
+      webUrl: 'https://gitlab/x',
+      title: 'orphan MR',
+      bucket: 'needs-review',
+      mrState: 'opened',
+      reviewers: [],
+      unresolvedCount: 0,
+      ciState: 'none',
+      // 'A-1' is in openKeys, yet the fake is still dropped — it has no ticket to tint.
+      jiraKeyAttempted: 'A-1',
+    }
+    const result = assembleColumns({
+      liveIssues: [],
+      jiraChange: NO_JIRA_CHANGE,
+      reviewCards: [
+        reviewCard(1, 'needs-review', 'A-1'),
+        reviewCard(2, 'needs-review', 'A-2'),
+        fake,
+      ],
+      reviewChange: reviewChange(),
+      searchQuery: '',
+      workspaceFilter: { onlyWorkspace: true, openKeys },
+    })
+    expect(allIds(result)).toEqual(['review:1'])
+  })
+})
+
+describe('assembleColumns — watchlist', () => {
+  it('pins watchlist cards into the In Implementation sub-section regardless of real status', () => {
+    const result = assembleColumns({
+      liveIssues: [],
+      jiraChange: NO_JIRA_CHANGE,
+      watchlistCards: [
+        issue('W-1', { statusName: 'Done' }),
+        issue('W-2', { statusName: 'Reviewed' }),
+      ],
+      searchQuery: '',
+    })
+    expect(result['In Implementation'].map((item) => item.id)).toEqual([
+      'watchlist:W-1',
+      'watchlist:W-2',
+    ])
+    expect(result['In Implementation'].every((item) => item.section === 'watchlist')).toBe(true)
+    expect(result['In Implementation'][0]?.card.kind).toBe('watchlist')
+    expect(result['TO DO']).toEqual([])
+    expect(result.Done).toEqual([])
+  })
+
+  it('keeps board jira cards in the main section, separate from the watchlist section', () => {
+    const result = assembleColumns({
+      liveIssues: [issue('A-2', { statusName: 'In Implementation' })],
+      jiraChange: NO_JIRA_CHANGE,
+      watchlistCards: [issue('W-1', { statusName: 'Reviewed' })],
+      searchQuery: '',
+    })
+    const col = result['In Implementation']
+    expect(col.filter((i) => i.section === 'main').map((i) => i.id)).toEqual(['A-2'])
+    expect(col.filter((i) => i.section === 'watchlist').map((i) => i.id)).toEqual(['watchlist:W-1'])
+  })
+
+  it('drops a watchlist card whose key is already a board jira issue (no duplicate render)', () => {
+    const result = assembleColumns({
+      liveIssues: [issue('A-1', { statusName: 'Reviewed' })],
+      jiraChange: NO_JIRA_CHANGE,
+      watchlistCards: [issue('A-1', { statusName: 'Reviewed' })],
+      searchQuery: '',
+    })
+    expect(result['In Implementation']).toEqual([])
+    expect(result['TO DO'].map(jiraKeyOf)).toEqual(['A-1'])
+  })
+
+  it('floats In Implementation-status watchlist cards to the top of the sub-section', () => {
+    const result = assembleColumns({
+      liveIssues: [],
+      jiraChange: NO_JIRA_CHANGE,
+      watchlistCards: [
+        issue('W-1', { statusName: 'Reviewed' }),
+        issue('W-2', { statusName: 'In Implementation' }),
+        issue('W-3', { statusName: 'Done' }),
+        issue('W-4', { statusName: 'In Implementation' }),
+      ],
+      searchQuery: '',
+    })
+    // In Implementation ones first (stable), then the rest in incoming order.
+    expect(result['In Implementation'].map((item) => item.id)).toEqual([
+      'watchlist:W-2',
+      'watchlist:W-4',
+      'watchlist:W-1',
+      'watchlist:W-3',
+    ])
+  })
+
+  it('searchQuery filters watchlist cards by key/summary', () => {
+    const result = assembleColumns({
+      liveIssues: [],
+      jiraChange: NO_JIRA_CHANGE,
+      watchlistCards: [
+        issue('W-1', { summary: 'Add login flow' }),
+        issue('W-2', { summary: 'Refactor auth' }),
+      ],
+      searchQuery: 'login',
+    })
+    expect(result['In Implementation'].map((item) => item.id)).toEqual(['watchlist:W-1'])
+  })
+
+  it('Only Workspace filter drops watchlist cards without an open workspace', () => {
+    const result = assembleColumns({
+      liveIssues: [],
+      jiraChange: NO_JIRA_CHANGE,
+      watchlistCards: [issue('W-1'), issue('W-2')],
+      searchQuery: '',
+      workspaceFilter: { onlyWorkspace: true, openKeys: new Set(['W-1']) },
+    })
+    expect(result['In Implementation'].map((item) => item.id)).toEqual(['watchlist:W-1'])
+  })
+})

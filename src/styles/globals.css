@@ -233,6 +233,128 @@
   }
 }
 
+/* The "Refine" AI button: an animated conic-gradient rainbow ring that rotates,
+   over a blurred, pulsing copy of itself for the glow. `@property` makes the
+   angle interpolable so the ring spins smoothly; the ring is drawn on ::before
+   and masked to a thin border (padding-box exclude) so the button face keeps the
+   surface palette. `.animate-spin` on lucide handles the icon. */
+@property --refine-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes refine-spin {
+  to {
+    --refine-angle: 360deg;
+  }
+}
+
+@keyframes refine-glow {
+  0%,
+  100% {
+    opacity: 0.5;
+    filter: blur(6px);
+  }
+  50% {
+    opacity: 0.85;
+    filter: blur(10px);
+  }
+}
+
+.refine-rainbow {
+  --refine-ring: 1.5px;
+  --refine-gradient: conic-gradient(
+    from var(--refine-angle),
+    #ff2f8e,
+    #ff8a3d,
+    #ffe14d,
+    #4ade80,
+    #38bdf8,
+    #a78bfa,
+    #ff2f8e
+  );
+  position: relative;
+  isolation: isolate;
+}
+
+.refine-rainbow::before,
+.refine-rainbow::after {
+  content: '';
+  position: absolute;
+  border-radius: inherit;
+  background: var(--refine-gradient);
+}
+
+/* The crisp rotating ring. */
+.refine-rainbow::before {
+  inset: 0;
+  padding: var(--refine-ring);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+  animation: refine-spin 4s linear infinite;
+  z-index: -1;
+}
+
+/* The soft pulsing glow behind it. */
+.refine-rainbow::after {
+  inset: -2px;
+  opacity: 0.6;
+  filter: blur(7px);
+  animation:
+    refine-spin 4s linear infinite,
+    refine-glow 2.8s ease-in-out infinite;
+  z-index: -2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .refine-rainbow::before,
+  .refine-rainbow::after {
+    animation: none;
+  }
+}
+
+/* Muted sibling of `.refine-rainbow`: a static 1px rainbow ring only — no glow,
+   no rotation, fixed gradient angle. For the Bulk Refine button in the header
+   bar, which should read as one of the plain bar buttons but keep the rainbow
+   in place of the gray border. */
+.refine-rainbow-border {
+  --refine-static-gradient: conic-gradient(
+    from 140deg,
+    #ff2f8e,
+    #ff8a3d,
+    #ffe14d,
+    #4ade80,
+    #38bdf8,
+    #a78bfa,
+    #ff2f8e
+  );
+  position: relative;
+  isolation: isolate;
+}
+
+.refine-rainbow-border::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: var(--refine-static-gradient);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+  z-index: -1;
+}
+
 /* E2E animation guard: zero out durations under ?e2e=1 so Playwright assertions
    are stable. Toggled by a tiny inline script in the root document head that
    sets data-e2e on <html> when the URL carries ?e2e=1. */

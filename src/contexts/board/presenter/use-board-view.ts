@@ -1,5 +1,11 @@
-import { useEffect, useReducer, useRef } from 'react'
-import { useBoardData, useMrStatuses, useReviewCards } from '~/coordinator'
+import { useEffect, useMemo, useReducer, useRef } from 'react'
+import {
+  useBoardData,
+  useMrStatuses,
+  useOpenWorkspaceKeys,
+  useReviewCards,
+  useWatchlistCards,
+} from '~/coordinator'
 import { usePolling } from '~/lib/use-polling'
 import type { BoardIssue, ReviewCard } from '~/kernel'
 import { reviewCardId } from '~/kernel'
@@ -40,12 +46,20 @@ function useExpiringKeys(
   }, [source, delayMs])
 }
 
-export function useBoardView(searchQuery: string): DisplayState {
+export function useBoardView(searchQuery: string, onlyWorkspace: boolean): DisplayState {
   const boardQuery = useBoardData()
   useMrStatuses()
+  const openWorkspaceKeys = useOpenWorkspaceKeys()
+  const workspaceFilter = useMemo(
+    () => ({ onlyWorkspace, openKeys: new Set(openWorkspaceKeys) }),
+    [onlyWorkspace, openWorkspaceKeys],
+  )
   const reviewQuery = useReviewCards()
   const reviewCards =
     reviewQuery.data && reviewQuery.data.ok === true ? reviewQuery.data.cards : undefined
+  const watchlistQuery = useWatchlistCards()
+  const watchlistCards =
+    watchlistQuery.data && watchlistQuery.data.ok === true ? watchlistQuery.data.cards : undefined
 
   usePolling(() => {
     boardQuery.refetch()
@@ -125,7 +139,9 @@ export function useBoardView(searchQuery: string): DisplayState {
       error: boardQuery.error instanceof Error ? boardQuery.error : undefined,
     },
     reviewCards,
+    watchlistCards,
     searchQuery,
+    workspaceFilter,
     retry: () => {
       boardQuery.refetch()
     },

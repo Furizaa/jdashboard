@@ -29,6 +29,8 @@ export type TicketCardViewModel = {
   epic: { key: string; summary: string } | null
   pill: { text: string; clickable: boolean }
   bodyClick: { kind: 'open-panel'; issueKey: string } | { kind: 'open-mr'; url: string }
+  /** Card-level colour accent: `'watchlist'` paints the epic-purple tint. */
+  tint: 'none' | 'watchlist'
   mrSection:
     | { mode: 'jira'; column: Column; issueKey: string }
     | {
@@ -46,6 +48,7 @@ export type TicketCardViewModel = {
 export type BuildCardViewInput =
   | { kind: 'jira'; issue: BoardIssue; column: Column; baseUrl: string }
   | { kind: 'review'; card: ReviewCard; column: Column; baseUrl: string }
+  | { kind: 'watchlist'; issue: BoardIssue; column: Column; baseUrl: string }
 
 const REVIEW_BUCKET_PILL: Record<ReviewCardReal['bucket'], string> = {
   'needs-review': 'Needs Review',
@@ -53,26 +56,50 @@ const REVIEW_BUCKET_PILL: Record<ReviewCardReal['bucket'], string> = {
   accepted: 'Review Accepted',
 }
 
+// Jira issues and watchlist cards share the same field mapping; they differ only
+// in the card kind, the tint, and whether the status pill offers transitions
+// (a watchlist ticket is advisory — read-only status).
+function buildJiraLikeView(
+  issue: BoardIssue,
+  column: Column,
+  baseUrl: string,
+  variant: { cardKind: CardKind; tint: TicketCardViewModel['tint']; pillClickable: boolean },
+): TicketCardViewModel {
+  const jiraUrl = `${baseUrl}/browse/${issue.key}`
+  return {
+    cardKind: variant.cardKind,
+    keyDisplay: issue.key,
+    keyClick: { kind: 'copy-jira' as const, url: jiraUrl },
+    keyOpenInJira: jiraUrl,
+    typeIcon: { kind: 'jira' as const, type: issue.typeName },
+    summary: issue.summary,
+    labels: issue.labels,
+    epic: issue.epic,
+    pill: { text: issue.statusName, clickable: variant.pillClickable },
+    bodyClick: { kind: 'open-panel' as const, issueKey: issue.key },
+    tint: variant.tint,
+    mrSection: { mode: 'jira' as const, column, issueKey: issue.key },
+    deemphasized: isDeemphasized(issue, column),
+    fixasap: hasFixasapLabel(issue.labels),
+  }
+}
+
 export function buildCardView(input: BuildCardViewInput): TicketCardViewModel {
   return match(input)
-    .with({ kind: 'jira' }, ({ issue, column, baseUrl }) => {
-      const jiraUrl = `${baseUrl}/browse/${issue.key}`
-      return {
-        cardKind: 'jira' as CardKind,
-        keyDisplay: issue.key,
-        keyClick: { kind: 'copy-jira' as const, url: jiraUrl },
-        keyOpenInJira: jiraUrl,
-        typeIcon: { kind: 'jira' as const, type: issue.typeName },
-        summary: issue.summary,
-        labels: issue.labels,
-        epic: issue.epic,
-        pill: { text: issue.statusName, clickable: true },
-        bodyClick: { kind: 'open-panel' as const, issueKey: issue.key },
-        mrSection: { mode: 'jira' as const, column, issueKey: issue.key },
-        deemphasized: isDeemphasized(issue, column),
-        fixasap: hasFixasapLabel(issue.labels),
-      }
-    })
+    .with({ kind: 'jira' }, ({ issue, column, baseUrl }) =>
+      buildJiraLikeView(issue, column, baseUrl, {
+        cardKind: 'jira',
+        tint: 'none',
+        pillClickable: true,
+      }),
+    )
+    .with({ kind: 'watchlist' }, ({ issue, column, baseUrl }) =>
+      buildJiraLikeView(issue, column, baseUrl, {
+        cardKind: 'watchlist',
+        tint: 'watchlist',
+        pillClickable: false,
+      }),
+    )
     .with({ kind: 'review' }, ({ card, column, baseUrl }) => {
       const pill = { text: REVIEW_BUCKET_PILL[card.bucket], clickable: false }
       const mrSection = {
@@ -97,6 +124,7 @@ export function buildCardView(input: BuildCardViewInput): TicketCardViewModel {
             epic: real.jira.epic,
             pill,
             bodyClick: { kind: 'open-panel' as const, issueKey: real.jira.key },
+            tint: 'none' as const,
             mrSection,
             deemphasized,
             fixasap: hasFixasapLabel(real.jira.labels),
@@ -113,6 +141,7 @@ export function buildCardView(input: BuildCardViewInput): TicketCardViewModel {
           epic: null,
           pill,
           bodyClick: { kind: 'open-mr' as const, url: fake.webUrl },
+          tint: 'none' as const,
           mrSection,
           deemphasized,
           fixasap: false,

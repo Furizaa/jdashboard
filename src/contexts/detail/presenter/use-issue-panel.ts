@@ -80,7 +80,7 @@ function usePanelShortcuts(active: boolean, lightboxOpen: boolean, targets: Shor
   }, [active, lightboxOpen, targets])
 }
 
-export function useIssuePanel(issueKey: string | null): IssuePanelState {
+export function useIssuePanel(issueKey: string | null, notesOpen: boolean): IssuePanelState {
   const navigateFn = useNavigate()
   const issueQuery = useTicket(issueKey)
   const boardQuery = useBoardData()
@@ -89,10 +89,23 @@ export function useIssuePanel(issueKey: string | null): IssuePanelState {
     if (issueKey !== null) issueQuery.refetch()
   }, ISSUE_PANEL_POLL_INTERVAL_MS)
 
+  // Sibling navigation (prev/next) carries the notes pane along so it stays open
+  // while stepping through a column; closing clears both params.
   const navigate = useMemo(
     () => (key: string | null) =>
-      navigateFn({ to: '/', search: key === null ? {} : { issue: key } }),
-    [navigateFn],
+      navigateFn({
+        to: '/',
+        search: key === null ? {} : { issue: key, ...(notesOpen ? { notes: true } : {}) },
+      }),
+    [navigateFn, notesOpen],
+  )
+
+  const setNotesOpen = useMemo(
+    () => (open: boolean) => {
+      if (issueKey === null) return
+      navigateFn({ to: '/', search: { issue: issueKey, ...(open ? { notes: true } : {}) } })
+    },
+    [navigateFn, issueKey],
   )
 
   const openInBrowser = useMemo(
@@ -127,6 +140,8 @@ export function useIssuePanel(issueKey: string | null): IssuePanelState {
     navigate,
     openInBrowser,
     copyJiraLinkAndToast,
+    notesOpen,
+    setNotesOpen,
   })
 
   const targets = useShortcutTargets(state, navigate, openInBrowser, copyJiraLinkAndToast)

@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react'
 import { formatDistanceToNow } from 'date-fns'
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw, TerminalSquare } from 'lucide-react'
 import { useBoardData, useRefreshAll } from '~/coordinator'
 import { QuickCreateButton } from '~/contexts/capture'
+import { WatchlistButton } from '~/contexts/watchlist'
+import { TagManagerButton } from '~/contexts/tags'
+import { BulkRefineButton } from '~/contexts/bulk-refine'
+import { cn } from '~/lib/cn'
 import { testIds } from '~/lib/testids'
 import { GitlabIndicator } from './GitlabIndicator'
 import { Logo } from './Logo'
@@ -13,9 +17,13 @@ const TICK_INTERVAL_MS = 5_000
 export function Header({
   searchQuery,
   onSearchChange,
+  onlyWorkspace,
+  onToggleOnlyWorkspace,
 }: {
   searchQuery: string
   onSearchChange: (value: string) => void
+  onlyWorkspace: boolean
+  onToggleOnlyWorkspace: () => void
 }) {
   const refresh = useRefreshAll()
   const query = useBoardData()
@@ -36,7 +44,27 @@ export function Header({
       </span>
       <span className="bg-border mx-1 h-4 w-px" aria-hidden />
       <QuickCreateButton />
+      <WatchlistButton />
+      <TagManagerButton />
+      <BulkRefineButton />
       <SearchInput value={searchQuery} onChange={onSearchChange} />
+      <button
+        type="button"
+        onClick={onToggleOnlyWorkspace}
+        aria-pressed={onlyWorkspace}
+        aria-label="Only show tickets with an open workspace"
+        title="Only show tickets with an open workspace"
+        data-testid={testIds.onlyWorkspaceToggle}
+        className={cn(
+          'focus-visible:ring-ring inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none',
+          onlyWorkspace
+            ? 'border-blue-500/40 bg-blue-500/15 text-blue-400'
+            : 'border-border text-ink-subtle hover:text-foreground hover:bg-surface-2',
+        )}
+      >
+        <TerminalSquare size={14} />
+        <span>Only Workspace</span>
+      </button>
       <div className="ml-auto flex items-center gap-2">
         <GitlabIndicator />
         <SyncIndicator query={query} onRefresh={refresh} />

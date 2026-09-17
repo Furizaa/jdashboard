@@ -1,5 +1,7 @@
-import { ChevronDown, ChevronUp, X } from 'lucide-react'
+import { ChevronDown, ChevronUp, NotebookPen, X } from 'lucide-react'
 import type { IssuePanelState } from '../view-model'
+import { cn } from '~/lib/cn'
+import { testIds } from '~/lib/testids'
 import { CopyableIssueKey } from './CopyableIssueKey'
 import { ExternalLinkButton } from './ExternalLinkButton'
 import { IconButton } from './IconButton'
@@ -26,7 +28,15 @@ function readyExtras(panel: OpenPanel): ReadyExtras {
   }
 }
 
-export function PanelHeader({ panel }: { panel: OpenPanel }) {
+export function PanelHeader({
+  panel,
+  notesOpen,
+  onToggleNotes,
+}: {
+  panel: OpenPanel
+  notesOpen: boolean
+  onToggleNotes: () => void
+}) {
   const { jiraUrl, copyJiraLink, prevKey, nextKey } = readyExtras(panel)
   return (
     <header className="border-border bg-surface-1 flex items-center gap-2 border-b px-4 py-3">
@@ -40,6 +50,23 @@ export function PanelHeader({ panel }: { panel: OpenPanel }) {
         <CopyableIssueKey issueKey={panel.issueKey} onCopy={copyJiraLink} />
       </nav>
       <div className="ml-auto flex items-center gap-1">
+        <button
+          type="button"
+          onClick={onToggleNotes}
+          aria-pressed={notesOpen}
+          aria-label="Toggle notes"
+          data-testid={testIds.notesToggle}
+          className={cn(
+            'focus-visible:ring-ring inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-xs transition-colors focus-visible:ring-2 focus-visible:outline-none',
+            notesOpen
+              ? 'border-border bg-surface-2 text-foreground'
+              : 'border-border bg-surface-1 text-ink-subtle hover:bg-surface-2 hover:text-foreground',
+          )}
+        >
+          <NotebookPen size={13} />
+          <span>Notes</span>
+        </button>
+        <span className="bg-border mx-0.5 h-4 w-px" aria-hidden />
         <IconButton
           aria-label="Previous ticket in column"
           disabled={prevKey === null}

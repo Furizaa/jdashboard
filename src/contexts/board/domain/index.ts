@@ -6,4 +6,9 @@ export {
   type ChangeOptions,
   type ChangeVisual,
 } from './change-indication'
-export { assembleColumns, type ColumnItem } from './assemble-columns'
+export {
+  assembleColumns,
+  type ColumnItem,
+  type ColumnSection,
+  type WorkspaceFilter,
+} from './assemble-columns'

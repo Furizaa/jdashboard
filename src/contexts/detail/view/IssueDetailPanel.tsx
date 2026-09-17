@@ -1,8 +1,10 @@
 import { match } from 'ts-pattern'
 import { FixasapRibbon } from '~/widgets/fixasap-ribbon'
 import { hasFixasapLabel } from '~/widgets/ticket-card'
+import { cn } from '~/lib/cn'
 import { LightboxOpenProvider, useIssuePanel } from '../presenter'
 import type { IssuePanelState } from '../view-model'
+import { NotesPanel } from './NotesPanel'
 import { PanelBody } from './PanelBody'
 import { PanelHeader } from './PanelHeader'
 import { PanelMessage } from './PanelMessage'
@@ -10,16 +12,28 @@ import { PanelSkeleton } from './PanelSkeleton'
 
 type OpenPanel = Exclude<IssuePanelState, { phase: 'closed' }>
 
-export function IssueDetailPanel({ issueKey }: { issueKey: string | null }) {
+export function IssueDetailPanel({
+  issueKey,
+  notesOpen,
+}: {
+  issueKey: string | null
+  notesOpen: boolean
+}) {
   return (
     <LightboxOpenProvider>
-      <IssueDetailPanelInner issueKey={issueKey} />
+      <IssueDetailPanelInner issueKey={issueKey} notesOpen={notesOpen} />
     </LightboxOpenProvider>
   )
 }
 
-function IssueDetailPanelInner({ issueKey }: { issueKey: string | null }) {
-  const panel = useIssuePanel(issueKey)
+function IssueDetailPanelInner({
+  issueKey,
+  notesOpen,
+}: {
+  issueKey: string | null
+  notesOpen: boolean
+}) {
+  const panel = useIssuePanel(issueKey, notesOpen)
   if (panel.phase === 'closed') return null
   return <Panel panel={panel} />
 }
@@ -40,6 +54,11 @@ function PanelContent({ panel }: { panel: OpenPanel }) {
 }
 
 function Panel({ panel }: { panel: OpenPanel }) {
+  // Notes mode widens the dialog to near-full width and reveals the note editor
+  // as a left column; the ticket detail keeps its 760px column on the right,
+  // unchanged. Open state lives in the URL (`?notes=1`) so a card's note badge can
+  // deep-link into it — see `useIssuePanel`.
+  const notesOpen = panel.notesOpen
   const showFixasap = panel.phase === 'ready' && hasFixasapLabel(panel.issue.labels)
   // Clicks on the dialog backdrop close the panel. React-synthetic events
   // bubble through portals (e.g. nested MediaLightbox), so the handler ignores
@@ -68,13 +87,28 @@ function Panel({ panel }: { panel: OpenPanel }) {
       {/* inner panel stops backdrop clicks from closing the dialog; not itself actionable */}
       {/* oxlint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events */}
       <div
-        className="border-border bg-card relative my-4 mr-4 flex h-[calc(100dvh-2rem)] w-[760px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-xl border"
+        className={cn(
+          'border-border bg-card relative my-4 mr-4 flex h-[calc(100dvh-2rem)] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border',
+          notesOpen ? 'w-[calc(100vw-2rem)]' : 'w-[760px]',
+        )}
         onClick={(e) => e.stopPropagation()}
       >
-        {showFixasap && <FixasapRibbon size="panel" />}
-        <PanelHeader panel={panel} />
-        <div className="flex-1 overflow-y-auto">
-          <PanelContent panel={panel} />
+        {notesOpen && <NotesPanel issueKey={panel.issueKey} />}
+        <div
+          className={cn(
+            'relative flex h-full min-w-0 flex-col',
+            notesOpen ? 'border-border w-[760px] max-w-full border-l' : 'w-full',
+          )}
+        >
+          {showFixasap && <FixasapRibbon size="panel" />}
+          <PanelHeader
+            panel={panel}
+            notesOpen={notesOpen}
+            onToggleNotes={() => panel.setNotesOpen(!notesOpen)}
+          />
+          <div className="flex-1 overflow-y-auto">
+            <PanelContent panel={panel} />
+          </div>
         </div>
       </div>
     </div>

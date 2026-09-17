@@ -12,6 +12,8 @@ export type OpenInWorkspaceResult = OpenInWorkspaceOk | OpenInWorkspaceErr
 
 export type CheckWorktreeResult = { readonly worktreeExists: boolean }
 
+export type ListWorkspacesResult = { readonly openIssueKeys: readonly string[] }
+
 export function worktreePathFor(issueKey: string, homeDir: string): string {
   return `${homeDir}/projects/worktrees/dr-web/${issueKey}`
 }
@@ -80,6 +82,35 @@ export function findWorkspaceRefByName(listOutput: string, name: string): string
   return null
 }
 
+// Issue keys embedded in a workspace name (e.g. `GeoCloud Invite HDR-20142`).
+// Same shape as `assertIssueKey`'s pattern, but scanned mid-string: bounded by
+// a non-alphanumeric on the left and no trailing letter/digit on the right so
+// `HDR-1` never matches inside `HDR-19`.
+const ISSUE_KEY_IN_NAME = /(?<![A-Za-z0-9])[A-Z][A-Z0-9]+-[1-9]\d*(?![0-9A-Za-z])/gu
+
+export function issueKeysInName(name: string): readonly string[] {
+  return name.match(ISSUE_KEY_IN_NAME) ?? []
+}
+
+export function listOpenIssueKeys(listOutput: string): string[] {
+  const keys = new Set<string>()
+  for (const line of listOutput.split('\n')) {
+    const match = WORKSPACE_LINE.exec(line)
+    if (match?.[2] === undefined) continue
+    for (const key of issueKeysInName(match[2])) keys.add(key)
+  }
+  return [...keys]
+}
+
+export function findWorkspaceRefByIssueKey(listOutput: string, issueKey: string): string | null {
+  for (const line of listOutput.split('\n')) {
+    const match = WORKSPACE_LINE.exec(line)
+    if (match === null || match[2] === undefined) continue
+    if (issueKeysInName(match[2]).includes(issueKey)) return match[1] ?? null
+  }
+  return null
+}
+
 function describeFailure(result: SpawnSyncReturns<string>, fallback: string): WorkspaceError {
   if (result.error !== undefined) return { message: result.error.message }
   const stderr = result.stderr?.toString().trim()
@@ -103,6 +134,7 @@ type WorktreeDeps = { homeDir: string; exists: ExistsFn; spawn: SpawnFn }
 function ensureWorktree(
   issueKey: string,
   branchName: string | undefined,
+  fromExistingBranch: boolean,
   deps: WorktreeDeps,
 ): WorkspaceError | null {
   const worktreePath = worktreePathFor(issueKey, deps.homeDir)
@@ -111,17 +143,21 @@ function ensureWorktree(
     return { message: 'branchName is required when worktree does not exist' }
   }
   const repo = repoPath(deps.homeDir)
+  // For an issue that already has an MR, base the worktree on that MR's
+  // existing remote branch; otherwise branch fresh off origin/develop.
+  const startPoint = fromExistingBranch ? `origin/${branchName}` : 'origin/develop'
+  const fetchRef = fromExistingBranch ? branchName : 'develop'
   const fetchErr = runStep(
     deps.spawn,
     'git',
-    ['-C', repo, 'fetch', 'origin', 'develop'],
+    ['-C', repo, 'fetch', 'origin', fetchRef],
     'git fetch',
   )
   if (fetchErr !== null) return fetchErr
   const addErr = runStep(
     deps.spawn,
     'git',
-    ['-C', repo, 'worktree', 'add', worktreePath, '-b', branchName, 'origin/develop'],
+    ['-C', repo, 'worktree', 'add', worktreePath, '-b', branchName, startPoint],
     'git worktree add',
   )
   if (addErr !== null) return addErr
@@ -143,9 +179,21 @@ function ensureWorktree(
   )
 }
 
+// A freshly-created workspace's color is set as a follow-up context-menu
+// action (cmux `new-workspace` has no --color). Best-effort: the workspace
+// already exists and is usable, so a color-set failure must not fail the open.
+function applyColorBestEffort(workspaceName: string, color: string, spawn: SpawnFn): void {
+  const listResult = spawn('cmux', ['list-workspaces'])
+  if (listResult.error !== undefined || listResult.status !== 0) return
+  const ref = findWorkspaceRefByName(listResult.stdout.toString(), workspaceName)
+  if (ref === null) return
+  spawn('cmux', ['workspace-action', '--action', 'set-color', '--color', color, '--workspace', ref])
+}
+
 function selectOrCreateWorkspace(
   workspaceName: string,
   worktreePath: string,
+  color: string | undefined,
   spawn: SpawnFn,
 ): WorkspaceError | null {
   const listResult = spawn('cmux', ['list-workspaces'])
@@ -161,7 +209,7 @@ function selectOrCreateWorkspace(
       'cmux select-workspace',
     )
   }
-  return runStep(
+  const createErr = runStep(
     spawn,
     'cmux',
     [
@@ -177,20 +225,100 @@ function selectOrCreateWorkspace(
     ],
     'cmux new-workspace',
   )
+  if (createErr !== null) return createErr
+  if (color !== undefined && color !== '') applyColorBestEffort(workspaceName, color, spawn)
+  return null
 }
 
 export function runOpenInWorkspace(
   issueKey: string,
   branchName: string | undefined,
   deps: WorktreeDeps,
+  options: { fromExistingBranch?: boolean; workspaceName?: string; color?: string } = {},
 ): OpenInWorkspaceResult {
-  const worktreeErr = ensureWorktree(issueKey, branchName, deps)
+  const worktreeErr = ensureWorktree(
+    issueKey,
+    branchName,
+    options.fromExistingBranch ?? false,
+    deps,
+  )
   if (worktreeErr !== null) return { ok: false, error: worktreeErr }
   const workspaceErr = selectOrCreateWorkspace(
-    workspaceNameFor(issueKey),
+    options.workspaceName ?? workspaceNameFor(issueKey),
     worktreePathFor(issueKey, deps.homeDir),
+    options.color,
     deps.spawn,
   )
   if (workspaceErr !== null) return { ok: false, error: workspaceErr }
+  return { ok: true }
+}
+
+export function runListWorkspaces(deps: { spawn: SpawnFn }): ListWorkspacesResult {
+  const result = deps.spawn('cmux', ['list-workspaces'])
+  if (result.error !== undefined || result.status !== 0) return { openIssueKeys: [] }
+  return { openIssueKeys: listOpenIssueKeys(result.stdout.toString()) }
+}
+
+export function runFocusWorkspace(
+  issueKey: string,
+  deps: { spawn: SpawnFn },
+): OpenInWorkspaceResult {
+  const listResult = deps.spawn('cmux', ['list-workspaces'])
+  if (listResult.error !== undefined || listResult.status !== 0) {
+    return { ok: false, error: describeFailure(listResult, 'cmux list-workspaces') }
+  }
+  const ref = findWorkspaceRefByIssueKey(listResult.stdout.toString(), issueKey)
+  if (ref === null) {
+    return { ok: false, error: { message: `No open workspace found for ${issueKey}` } }
+  }
+  const err = runStep(
+    deps.spawn,
+    'cmux',
+    ['select-workspace', '--workspace', ref],
+    'cmux select-workspace',
+  )
+  return err !== null ? { ok: false, error: err } : { ok: true }
+}
+
+export type DiscardDeps = WorktreeDeps & {
+  // Detached, fire-and-forget removal of the worktree directory (see below).
+  removeWorktreeInBackground: (repoPath: string, worktreePath: string) => void
+}
+
+// Tear down both halves of an open workspace: the cmux workspace and the git
+// worktree. `--force` discards uncommitted changes in the worktree; the local
+// branch is deliberately left intact so committed work survives a discard.
+//
+// Discard splits into a fast part and a slow part: closing the cmux workspace
+// is instant and is what clears the ticket's "workspace open" state, whereas
+// removing the worktree is a ~30s `rm -rf` of node_modules et al. So we await
+// the close (and surface its errors) but fire the worktree removal detached —
+// concurrent `git worktree remove` against the same repo is safe, so the user
+// can keep working and even discard other tickets while deletions overlap.
+// A background removal failure is not surfaced: a leftover worktree is
+// harmless (the next open reuses it).
+export function runDiscardWorkspace(issueKey: string, deps: DiscardDeps): OpenInWorkspaceResult {
+  const listResult = deps.spawn('cmux', ['list-workspaces'])
+  if (listResult.error !== undefined || listResult.status !== 0) {
+    return { ok: false, error: describeFailure(listResult, 'cmux list-workspaces') }
+  }
+  const ref = findWorkspaceRefByIssueKey(listResult.stdout.toString(), issueKey)
+  const worktreePath = worktreePathFor(issueKey, deps.homeDir)
+  const worktreePresent = deps.exists(worktreePath)
+  if (ref === null && !worktreePresent) {
+    return { ok: false, error: { message: `No open workspace or worktree for ${issueKey}` } }
+  }
+  if (ref !== null) {
+    const closeErr = runStep(
+      deps.spawn,
+      'cmux',
+      ['close-workspace', '--workspace', ref],
+      'cmux close-workspace',
+    )
+    if (closeErr !== null) return { ok: false, error: closeErr }
+  }
+  if (worktreePresent) {
+    deps.removeWorktreeInBackground(repoPath(deps.homeDir), worktreePath)
+  }
   return { ok: true }
 }

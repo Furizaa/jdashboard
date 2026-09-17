@@ -77,6 +77,7 @@ function detail(overrides: Partial<RawMrDetail> & { iid: number; title: string }
     iid: overrides.iid,
     title: overrides.title,
     webUrl: overrides.webUrl ?? `https://gitlab/p/-/merge_requests/${overrides.iid}`,
+    sourceBranch: overrides.sourceBranch ?? `feat/mr-${overrides.iid}`,
     state: overrides.state ?? 'opened',
     draft: overrides.draft ?? false,
     updatedAt: overrides.updatedAt ?? '2026-05-01T00:00:00Z',

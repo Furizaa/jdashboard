@@ -13,3 +13,9 @@ export {
 } from '~/server/contexts/capture/application/quick-create-schema'
 export type { SearchIssuesResult } from '~/server/server-functions/board'
 export type { GetIssueResult, GetTransitionsResult } from '~/server/server-functions/detail'
+export type {
+  GetWatchlistCardsResult,
+  SearchWatchlistCandidatesResult,
+  WatchlistCandidate,
+  WatchlistMutationResult,
+} from '~/server/server-functions/watchlist'

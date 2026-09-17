@@ -1,14 +1,22 @@
 import { match } from 'ts-pattern'
 import { COLUMNS } from '~/kernel'
-import { useBoardView } from '../presenter'
+import { useBoardView, useCollapsedDone } from '../presenter'
 import { BoardColumn } from './BoardColumn'
 import { BoardMessage } from './BoardMessage'
 import { BoardSkeleton } from './BoardSkeleton'
+import { CollapsedColumn } from './CollapsedColumn'
 import { EmptyBoard } from './EmptyBoard'
 import { ErrorBanner } from './ErrorBanner'
 
-export function Board({ searchQuery }: { searchQuery: string }) {
-  const view = useBoardView(searchQuery)
+export function Board({
+  searchQuery,
+  onlyWorkspace,
+}: {
+  searchQuery: string
+  onlyWorkspace: boolean
+}) {
+  const view = useBoardView(searchQuery, onlyWorkspace)
+  const [doneCollapsed, toggleDoneCollapsed] = useCollapsedDone()
 
   return match(view)
     .with({ phase: 'loading' }, () => <BoardSkeleton />)
@@ -24,15 +32,25 @@ export function Board({ searchQuery }: { searchQuery: string }) {
         {ready.showErrorBanner && (
           <ErrorBanner errorMessage={ready.errorMessage} onRetry={ready.retry} />
         )}
-        <div className="grid min-h-0 flex-1 grid-cols-4 gap-5 p-5">
-          {COLUMNS.map((column) => (
-            <BoardColumn
-              key={column}
-              column={column}
-              items={ready.itemsByColumn[column]}
-              baseUrl={ready.baseUrl}
-            />
-          ))}
+        <div className="flex min-h-0 flex-1 gap-5 p-5">
+          {COLUMNS.map((column) =>
+            column === 'Done' && doneCollapsed ? (
+              <CollapsedColumn
+                key={column}
+                column={column}
+                items={ready.itemsByColumn[column]}
+                onExpand={toggleDoneCollapsed}
+              />
+            ) : (
+              <BoardColumn
+                key={column}
+                column={column}
+                items={ready.itemsByColumn[column]}
+                baseUrl={ready.baseUrl}
+                onCollapse={column === 'Done' ? toggleDoneCollapsed : undefined}
+              />
+            ),
+          )}
         </div>
       </div>
     ))

@@ -18,6 +18,7 @@ function detail(overrides: Partial<RawMrDetail> = {}): RawMrDetail {
     iid: overrides.iid ?? 1,
     title: overrides.title ?? 'HDR-1: do thing',
     webUrl: overrides.webUrl ?? 'https://gitlab/p/-/merge_requests/1',
+    sourceBranch: overrides.sourceBranch ?? 'feat/HDR-1-do-thing',
     state: overrides.state ?? 'opened',
     draft: overrides.draft ?? false,
     updatedAt: overrides.updatedAt ?? '2026-01-01T00:00:00Z',

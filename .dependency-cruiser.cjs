@@ -190,6 +190,31 @@ module.exports = {
       },
     },
     {
+      name: 'watchlist-application-only-imports-kernel-and-self',
+      comment:
+        "watchlist's application layer talks to gateway/cache ports declared inside the context — it may only import ~/kernel and its own peers",
+      severity: 'error',
+      from: {
+        path: '^src/contexts/watchlist/application/',
+        pathNot: '/__fixtures__/',
+      },
+      to: {
+        path: '^src/',
+        pathNot: '^(src/contexts/watchlist/application/|src/kernel/)',
+      },
+    },
+    {
+      name: 'watchlist-view-model-only-imports-kernel-and-domain',
+      comment:
+        "watchlist's view-model is framework-free; it may only import ~/kernel and its own peers",
+      severity: 'error',
+      from: { path: '^src/contexts/watchlist/view-model/' },
+      to: {
+        path: '^src/',
+        pathNot: '^(src/contexts/watchlist/view-model/|src/kernel/)',
+      },
+    },
+    {
       name: 'widgets-stay-out-of-contexts',
       comment:
         'widgets are reusable visual surfaces — they must not depend on any bounded context. Cross-cutting wiring belongs at the route or coordinator layer.',

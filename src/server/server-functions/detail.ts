@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { createServerFn } from '@tanstack/react-start'
@@ -15,8 +15,20 @@ import { loadIssue } from '../contexts/detail/application/load-issue'
 import { loadTransitions } from '../contexts/detail/application/load-transitions'
 import { performTransition } from '../contexts/detail/application/perform-transition'
 import { assertIssueKey } from '../lib/jql'
-import { runCheckWorktree, runOpenInWorkspace } from '../lib/open-workspace'
-import type { CheckWorktreeResult, OpenInWorkspaceResult } from '../lib/open-workspace'
+import { GitlabGateway } from '../gateways/gitlab/port'
+import { appRuntime } from '../runtime/app-runtime'
+import {
+  runCheckWorktree,
+  runDiscardWorkspace,
+  runFocusWorkspace,
+  runListWorkspaces,
+  runOpenInWorkspace,
+} from '../lib/open-workspace'
+import type {
+  CheckWorktreeResult,
+  ListWorkspacesResult,
+  OpenInWorkspaceResult,
+} from '../lib/open-workspace'
 import { runWire } from './run-wire'
 import type { WireResult } from '../wire/to-wire'
 
@@ -42,6 +54,8 @@ export type ReviewMrResult =
   | { readonly ok: true }
   | { readonly ok: false; readonly error: { readonly message: string } }
 
+export type MrSourceBranchResult = { readonly sourceBranch: string | null }
+
 function requireIssueKey(label: string, value: unknown): string {
   return assertIssueKey(typeof value === 'string' ? value : '', label)
 }
@@ -58,6 +72,27 @@ function requireTransitionId(value: unknown): string {
     throw new Error('transitionIssue (transitionId): required')
   }
   return value.trim()
+}
+
+// cmux color: a named color or a #RRGGBB hex. Anything else is dropped rather
+// than rejected — the workspace still opens, just without the requested color.
+function optionalColor(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const trimmed = value.trim()
+  return /^(#[0-9A-Fa-f]{6}|[A-Za-z]+)$/.test(trimmed) ? trimmed : undefined
+}
+
+function utf8Spawn(command: string, args: ReadonlyArray<string>) {
+  return spawnSync(command, [...args], { encoding: 'utf8' })
+}
+
+// Detached, unref'd child so the ~30s worktree deletion outlives the request
+// and never blocks the caller. stdio ignored — it's best-effort cleanup.
+function removeWorktreeInBackground(repoPath: string, worktreePath: string): void {
+  spawn('git', ['-C', repoPath, 'worktree', 'remove', '--force', worktreePath], {
+    detached: true,
+    stdio: 'ignore',
+  }).unref()
 }
 
 export const getIssue = createServerFn({ method: 'GET' })
@@ -105,6 +140,24 @@ export const reviewMr = createServerFn({ method: 'POST' })
     return { ok: true }
   })
 
+// Resolve the MR's branch straight from GitLab by iid — the only reliable
+// source, since branch names don't always embed the issue key. A failed lookup
+// degrades to null so the caller falls back to creating a fresh branch.
+const mrSourceBranchProgram = (iid: number) =>
+  Effect.gen(function* () {
+    const gitlab = yield* GitlabGateway
+    const detail = yield* gitlab.getMr(iid)
+    return detail.sourceBranch
+  }).pipe(Effect.catchAll(() => Effect.succeed<string | null>(null)))
+
+export const getMrSourceBranch = createServerFn({ method: 'POST' })
+  .inputValidator((data: { iid: number }) => ({ iid: requireIid(data?.iid) }))
+  .handler(
+    async ({ data }): Promise<MrSourceBranchResult> => ({
+      sourceBranch: await appRuntime.runPromise(mrSourceBranchProgram(data.iid)),
+    }),
+  )
+
 export const checkWorktree = createServerFn({ method: 'POST' })
   .inputValidator((data: { issueKey: string }) => ({
     issueKey: requireIssueKey('checkWorktree', data?.issueKey),
@@ -115,18 +168,64 @@ export const checkWorktree = createServerFn({ method: 'POST' })
   )
 
 export const openInWorkspace = createServerFn({ method: 'POST' })
-  .inputValidator((data: { issueKey: string; branchName?: string }) => ({
-    issueKey: requireIssueKey('openInWorkspace', data?.issueKey),
-    branchName:
-      typeof data?.branchName === 'string' && data.branchName.trim() !== ''
-        ? data.branchName.trim()
-        : undefined,
+  .inputValidator(
+    (data: {
+      issueKey: string
+      branchName?: string
+      fromExistingBranch?: boolean
+      workspaceName?: string
+      color?: string
+    }) => ({
+      issueKey: requireIssueKey('openInWorkspace', data?.issueKey),
+      branchName:
+        typeof data?.branchName === 'string' && data.branchName.trim() !== ''
+          ? data.branchName.trim()
+          : undefined,
+      fromExistingBranch: data?.fromExistingBranch === true,
+      workspaceName:
+        typeof data?.workspaceName === 'string' && data.workspaceName.trim() !== ''
+          ? data.workspaceName.trim()
+          : undefined,
+      color: optionalColor(data?.color),
+    }),
+  )
+  .handler(
+    async ({ data }): Promise<OpenInWorkspaceResult> =>
+      runOpenInWorkspace(
+        data.issueKey,
+        data.branchName,
+        { homeDir: homedir(), exists: existsSync, spawn: utf8Spawn },
+        {
+          fromExistingBranch: data.fromExistingBranch,
+          workspaceName: data.workspaceName,
+          color: data.color,
+        },
+      ),
+  )
+
+export const listWorkspaces = createServerFn({ method: 'GET' }).handler(
+  async (): Promise<ListWorkspacesResult> => runListWorkspaces({ spawn: utf8Spawn }),
+)
+
+export const focusWorkspace = createServerFn({ method: 'POST' })
+  .inputValidator((data: { issueKey: string }) => ({
+    issueKey: requireIssueKey('focusWorkspace', data?.issueKey),
   }))
   .handler(
     async ({ data }): Promise<OpenInWorkspaceResult> =>
-      runOpenInWorkspace(data.issueKey, data.branchName, {
+      runFocusWorkspace(data.issueKey, { spawn: utf8Spawn }),
+  )
+
+export const discardWorkspace = createServerFn({ method: 'POST' })
+  .inputValidator((data: { issueKey: string }) => ({
+    issueKey: requireIssueKey('discardWorkspace', data?.issueKey),
+  }))
+  .handler(
+    async ({ data }): Promise<OpenInWorkspaceResult> =>
+      runDiscardWorkspace(data.issueKey, {
         homeDir: homedir(),
         exists: existsSync,
-        spawn: (command, args) => spawnSync(command, [...args], { encoding: 'utf8' }),
+        spawn: utf8Spawn,
+        removeWorktreeInBackground,
       }),
   )

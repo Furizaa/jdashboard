@@ -18,6 +18,9 @@ export type DeriveInput = {
   navigate: (key: string | null) => void
   openInBrowser: (url: string) => void
   copyJiraLinkAndToast: (url: string) => void
+  /** Whether the notes pane is open (a search param, so refresh/deep-link safe). */
+  notesOpen: boolean
+  setNotesOpen: (open: boolean) => void
 }
 
 type OpenFields = {
@@ -25,6 +28,8 @@ type OpenFields = {
   projectKey: string | null
   close: () => void
   open: (key: string) => void
+  notesOpen: boolean
+  setNotesOpen: (open: boolean) => void
 }
 
 export type IssuePanelState =
@@ -50,7 +55,16 @@ function extractProjectKey(issueKey: string): string | null {
 }
 
 export function derive(input: DeriveInput): IssuePanelState {
-  const { issueKey, issueQuery, boardIssues, navigate, openInBrowser, copyJiraLinkAndToast } = input
+  const {
+    issueKey,
+    issueQuery,
+    boardIssues,
+    navigate,
+    openInBrowser,
+    copyJiraLinkAndToast,
+    notesOpen,
+    setNotesOpen,
+  } = input
 
   if (issueKey === null) return { phase: 'closed' }
 
@@ -59,6 +73,8 @@ export function derive(input: DeriveInput): IssuePanelState {
     projectKey: extractProjectKey(issueKey),
     close: () => navigate(null),
     open: (key) => navigate(key),
+    notesOpen,
+    setNotesOpen,
   }
 
   if (issueQuery.isPending) return { ...openFields, phase: 'loading' }

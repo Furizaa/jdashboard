@@ -32,6 +32,7 @@ export type {
   GetReviewCardsResult,
   MrSummary,
   ReviewCard,
+  ReviewCardFake,
   ReviewCardReal,
 } from './gitlab'
 export {
@@ -69,3 +70,20 @@ export {
   type TagMutationResult,
   type TagsState,
 } from './tags'
+export {
+  dedupeWorkItems,
+  workItemHaystack,
+  workItemId,
+  workItemJiraKey,
+  workItemTitle,
+  type WorkItem,
+} from './work-item'
+export {
+  ACTION_GROUPS,
+  ACTION_GROUP_LABEL,
+  ACTION_GROUP_ORDER,
+  ACTION_LABELS,
+  ACTION_SHORTCUTS,
+  type ActionGroup,
+  type ActionKind,
+} from './commands'

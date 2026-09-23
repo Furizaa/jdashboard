@@ -1,4 +1,5 @@
 import { http, HttpResponse } from 'msw'
+import type { Page } from '@playwright/test'
 import { test, expect } from '../fixtures/test'
 import {
   makeApprovals,
@@ -30,9 +31,7 @@ test('the review-cards stream is gated on the Jira board, polls every 60s, pause
   // review-card flow's bulk fetch is skipped client-side. That leaves
   // the MR's `/discussions` endpoint as a clean signal for review-card
   // fan-out activity.
-  world.seedMrs([
-    makeMr({ iid: IID, title: 'no key MR', authorUsername: OTHER, state: 'opened' }),
-  ])
+  world.seedMrs([makeMr({ iid: IID, title: 'no key MR', authorUsername: OTHER, state: 'opened' })])
   world.seedMrReviewers(IID, [makeMrReviewer({ username: ME, state: 'unreviewed' })])
   world.seedMrApprovals(IID, makeApprovals())
   world.seedMrPipeline(IID, makePipeline())
@@ -78,7 +77,6 @@ test('the review-cards stream is gated on the Jira board, polls every 60s, pause
   // 60s tick — the review-card stream re-polls.
   await page.clock.fastForward(60_000)
   await expect.poll(discussionsCalls).toBeGreaterThan(afterFirstLoad)
-  const afterFirstPoll = discussionsCalls()
 
   // Hide the tab; advance 120s — polling pauses.
   await page.evaluate(() => {
@@ -88,8 +86,13 @@ test('the review-cards stream is gated on the Jira board, polls every 60s, pause
     })
     document.dispatchEvent(new Event('visibilitychange'))
   })
+  // Snapshot *after* the tab is hidden and the poll fan-out has settled: the
+  // 60s tick's requests can still be landing while `expect.poll` above returns
+  // on the first one, and counting those against the hidden window would be
+  // measuring the previous poll, not this one.
+  const beforeHidden = await settledDiscussionsCalls(page, discussionsCalls)
   await page.clock.fastForward(120_000)
-  expect(discussionsCalls()).toBe(afterFirstPoll)
+  expect(discussionsCalls()).toBe(beforeHidden)
 
   // Show the tab — re-polls immediately on the visibilitychange event.
   await page.evaluate(() => {
@@ -99,5 +102,19 @@ test('the review-cards stream is gated on the Jira board, polls every 60s, pause
     })
     document.dispatchEvent(new Event('visibilitychange'))
   })
-  await expect.poll(discussionsCalls).toBeGreaterThan(afterFirstPoll)
+  await expect.poll(discussionsCalls).toBeGreaterThan(beforeHidden)
 })
+
+/** The call count once it has stopped moving — the fan-out is several requests. */
+async function settledDiscussionsCalls(
+  page: Page,
+  count: () => number,
+  quietMs = 500,
+): Promise<number> {
+  let previous = -1
+  while (previous !== count()) {
+    previous = count()
+    await page.waitForTimeout(quietMs)
+  }
+  return previous
+}

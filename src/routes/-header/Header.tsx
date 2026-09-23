@@ -9,21 +9,21 @@ import { BulkRefineButton } from '~/contexts/bulk-refine'
 import { cn } from '~/lib/cn'
 import { testIds } from '~/lib/testids'
 import type { BoardVariant } from '../-app-shell'
+import { ActiveFilterChip } from './ActiveFilterChip'
 import { GitlabIndicator } from './GitlabIndicator'
-import { SearchInput } from './SearchInput'
 
 const TICK_INTERVAL_MS = 5_000
 
 export function Header({
   variant,
-  searchQuery,
-  onSearchChange,
+  filter,
+  onClearFilter,
   onlyWorkspace,
   onToggleOnlyWorkspace,
 }: {
   variant: BoardVariant
-  searchQuery: string
-  onSearchChange: (value: string) => void
+  filter: string
+  onClearFilter: () => void
   onlyWorkspace: boolean
   onToggleOnlyWorkspace: () => void
 }) {
@@ -51,7 +51,7 @@ export function Header({
       {isWatchlist && <LaneConfigButton />}
       <TagManagerButton />
       <BulkRefineButton />
-      <SearchInput value={searchQuery} onChange={onSearchChange} />
+      <ActiveFilterChip filter={filter} onClear={onClearFilter} />
       {!isWatchlist && (
         <button
           type="button"

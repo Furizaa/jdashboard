@@ -3,6 +3,7 @@ import { Board } from '~/contexts/board'
 import { WatchlistBoard } from '~/contexts/watchlist'
 import { IssueDetailPanel } from '~/contexts/detail'
 import { AuthGate } from './-auth-gate'
+import { CommandPaletteHost } from './-command-palette/CommandPaletteHost'
 import { Header } from './-header'
 import { Logo } from './-header/Logo'
 import { NavRail } from './-nav/NavRail'
@@ -23,9 +24,11 @@ export function validateBoardSearch(search: Record<string, unknown>): BoardSearc
 }
 
 // The app shell shared by both board routes: the left nav rail, a variant-aware
-// header, the board itself, and the detail panel. `searchQuery` / `onlyWorkspace`
-// are per-route local state — switching boards is switching routes, so each board
-// keeps its own transient filter state.
+// header, the board itself, the detail panel, and the command palette.
+// `searchQuery` / `onlyWorkspace` are per-route local state — switching boards is
+// switching routes, so each board keeps its own transient filter state. The
+// filter text now arrives from a palette command rather than a header input; the
+// header shows it as a chip.
 export function AppShell({
   variant,
   issue,
@@ -49,8 +52,8 @@ export function AppShell({
           <div className="min-w-0 flex-1">
             <Header
               variant={variant}
-              searchQuery={searchQuery}
-              onSearchChange={setSearchQuery}
+              filter={searchQuery}
+              onClearFilter={() => setSearchQuery('')}
               onlyWorkspace={onlyWorkspace}
               onToggleOnlyWorkspace={() => setOnlyWorkspace((v) => !v)}
             />
@@ -68,6 +71,9 @@ export function AppShell({
         </div>
       </div>
       <IssueDetailPanel issueKey={issue ?? null} notesOpen={notes ?? false} />
+      {/* Mounted once per board route, above the panel: ⌘K must work wherever
+          you are, including with the detail panel open. */}
+      <CommandPaletteHost filter={searchQuery} onFilterChange={setSearchQuery} />
     </AuthGate>
   )
 }

@@ -111,6 +111,11 @@ export function buildHandlers(getWorld: () => World): HttpHandler[] {
         state: mr.state,
         draft: mr.draft,
         updated_at: mr.updatedAt,
+        // `source_branch` and `labels` are required by WireMrDetailSchema — the
+        // MR-priority work added `labels`, and a detail response without them
+        // fails to decode, which silently kills the whole review-card fan-out.
+        source_branch: mr.sourceBranch,
+        labels: [...mr.labels],
         reviewers: reviewers.map((r) => ({
           username: r.username,
           name: r.displayName,

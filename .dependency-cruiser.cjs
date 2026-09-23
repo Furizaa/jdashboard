@@ -227,6 +227,29 @@ module.exports = {
       },
     },
     {
+      name: 'command-palette-domain-only-imports-kernel',
+      comment:
+        "the palette's domain layer is pure: ranking, key intents, and the action descriptors it consumes may only import ~/kernel and its own peers. This is what lets the palette be cross-context without a single cross-context import.",
+      severity: 'error',
+      from: { path: '^src/contexts/command-palette/domain/' },
+      to: {
+        path: '^src/',
+        pathNot: '^(src/contexts/command-palette/domain/|src/kernel/)',
+      },
+    },
+    {
+      name: 'command-palette-view-model-only-imports-kernel-and-domain',
+      comment:
+        "the palette's view-model is framework-free; it may only import ~/kernel, its own domain, and its own peers. Its actions and data arrive injected as plain values.",
+      severity: 'error',
+      from: { path: '^src/contexts/command-palette/view-model/' },
+      to: {
+        path: '^src/',
+        pathNot:
+          '^(src/contexts/command-palette/view-model/|src/contexts/command-palette/domain/|src/kernel/)',
+      },
+    },
+    {
       name: 'widgets-stay-out-of-contexts',
       comment:
         'widgets are reusable visual surfaces — they must not depend on any bounded context. Cross-cutting wiring belongs at the route or coordinator layer.',

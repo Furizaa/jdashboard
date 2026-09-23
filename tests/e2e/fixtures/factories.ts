@@ -82,6 +82,8 @@ type MrOverrides = {
   draft?: boolean
   updatedAt?: string
   authorUsername?: string
+  labels?: readonly string[]
+  sourceBranch?: string
 }
 
 export function makeMr(overrides: MrOverrides = {}): GitlabMr {
@@ -96,6 +98,8 @@ export function makeMr(overrides: MrOverrides = {}): GitlabMr {
     draft: overrides.draft ?? false,
     updatedAt: overrides.updatedAt ?? '2026-05-08T10:00:00Z',
     authorUsername: overrides.authorUsername ?? 'e2e-gitlab',
+    labels: overrides.labels ?? [],
+    sourceBranch: overrides.sourceBranch ?? `feat/${jiraKey.toLowerCase()}`,
   }
 }
 

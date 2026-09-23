@@ -32,6 +32,10 @@ export type GitlabMr = {
   draft: boolean
   updatedAt: string
   authorUsername: string
+  /** MR labels — `priority::*` here drives the card's priority badge. */
+  labels: readonly string[]
+  /** The MR's source branch; `Open in Workspace` reuses it for an existing MR. */
+  sourceBranch: string
 }
 
 export type GitlabMrReviewer = {

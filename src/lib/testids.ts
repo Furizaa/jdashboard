@@ -93,6 +93,14 @@ export const testIds = Object.freeze({
   laneConfigTagToggle: 'lane-config-tag-toggle',
   laneConfigMoveUp: 'lane-config-move-up',
   laneConfigMoveDown: 'lane-config-move-down',
+  commandPalette: 'command-palette',
+  commandPaletteInput: 'command-palette-input',
+  commandPaletteRow: 'command-palette-row',
+  commandPaletteSection: 'command-palette-section',
+  commandPaletteEmpty: 'command-palette-empty',
+  commandPaletteFooter: 'command-palette-footer',
+  boardFilterChip: 'board-filter-chip',
+  boardFilterClear: 'board-filter-clear',
 } as const)
 
 /** `data-card-kind` discriminator on `ticketCard`. */

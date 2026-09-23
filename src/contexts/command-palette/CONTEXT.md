@@ -36,6 +36,8 @@ There is **no `application/` layer**, and its absence is the design: the palette
 
 **Action** (`PaletteAction`): one thing legal for one work item, keyed by `ActionKind` from `kernel/commands.ts`. **Command** (`PaletteCommand`): a board-level action belonging to no work item, `Enter`-only.
 
+**Legality**: whether an action is offered at all, derived from item state and never hardcoded per surface. Illegal actions are **absent**, not disabled — `PaletteAction.enabled` is reserved for the transient case, an action that exists but whose data is still in flight. There is no `if (isReviewFake)` anywhere: a fake review card simply has no Jira key, so every ticket-shaped action falls away and only `m` / `v` survive.
+
 **Section**: a root-level result group — Assigned to me · Watchlist · Review · Commands. Grouping by source is what makes it obvious whether a hit is your own work, something you only advise on, or an MR waiting on your review.
 
 **Source note** (`PaletteSourceNote`): a source that is not contributing yet, `loading` or `unavailable`. Kept distinct because "empty because GitLab is still answering" and "empty because GitLab returned 401" are different claims about the same empty list.
@@ -45,12 +47,15 @@ _Avoid_: "filter" for what the palette does to its own list (that is **ranking**
 ## View-model state machine
 
 ```
-closed ──(⌘K)──▶ open { query, selected }
-   ▲                 │
-   └──(Esc / ⌘K)─────┘
+closed ──(⌘K)──▶ open { query, selected } ──(↵ on a result)──▶ actions { query, selected, itemId, actionIndex }
+   ▲                    │        ▲                                   │
+   └──(Esc / ⌘K)────────┘        └────────────(← / ⌫)────────────────┘
+   └──────────────────────(Esc from any depth)──────────────────────────┘
 ```
 
-The status **is** the navigation level, and each deeper level carries the shallower one's fields, so backing out of a level with the query and the selected result intact is structural rather than something the reducer has to remember. Later slices grow the union with the per-item action list and its sub-lists.
+The status **is** the navigation level, and each deeper level carries the shallower one's fields, so backing out of a level with the query and the selected result intact is structural rather than something the reducer has to remember. `Esc` closes from any depth; `← / ⌫` pops exactly one — conflating them would mean losing your query because you backed out of an action list.
+
+The action level holds the item by `workItemId`, not by index, so a board refresh that reorders the results cannot silently retarget an action. If the item disappears entirely (a Done ticket drops off, a watchlist removal lands) `derive` falls back to the results list rather than rendering an action list for nothing.
 
 Two deliberate splits of responsibility:
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { WorkItem } from '~/kernel'
-import type { PaletteCommand } from '../domain'
+import type { PaletteAction, PaletteCommand } from '../domain'
 import {
   derivePalette,
   initialPaletteState,
@@ -63,15 +63,36 @@ const ITEMS: readonly WorkItem[] = [
   fake(77, 'Bump deps'),
 ]
 
+const action = (kind: PaletteAction['kind'], label = kind, enabled = true): PaletteAction => ({
+  kind,
+  label,
+  enabled,
+  run: () => {},
+})
+
 function inputs(overrides: Partial<PaletteInputs> = {}): PaletteInputs {
-  return { items: ITEMS, commands: [], sources: [], ...overrides }
+  return { items: ITEMS, commands: [], sources: [], actionsFor: () => [], ...overrides }
 }
 
 const open = (query = '', selected = 0): PaletteState => ({ status: 'open', query, selected })
 
+const actions = (itemId: string, query = '', selected = 0, actionIndex = 0): PaletteState => ({
+  status: 'actions',
+  query,
+  selected,
+  itemId,
+  actionIndex,
+})
+
 function root(state: PaletteState, given: PaletteInputs = inputs()) {
   const display = derivePalette(state, given)
   if (display.status !== 'root') throw new Error(`expected root, got ${display.status}`)
+  return display
+}
+
+function actionsView(state: PaletteState, given: PaletteInputs) {
+  const display = derivePalette(state, given)
+  if (display.status !== 'actions') throw new Error(`expected actions, got ${display.status}`)
   return display
 }
 
@@ -194,5 +215,141 @@ describe('derivePalette', () => {
   it('passes source notes straight through so the footer can be honest', () => {
     const sources = [{ source: 'Review cards', state: 'loading' as const }]
     expect(root(open(), inputs({ sources })).sources).toBe(sources)
+  })
+})
+
+describe('the results ↔ actions transitions', () => {
+  it("enters an item's action list, keeping the query and the selected result", () => {
+    const entered = reducePalette(open('hdr', 1), { type: 'enteredActions', itemId: 'HDR-2' })
+    expect(entered).toEqual(actions('HDR-2', 'hdr', 1, 0))
+  })
+
+  it('pops back to the results with the query and the selected result intact', () => {
+    const popped = reducePalette(actions('HDR-2', 'hdr', 1, 3), { type: 'wentBack' })
+    expect(popped).toEqual(open('hdr', 1))
+  })
+
+  it('moves the action highlight, not the result highlight', () => {
+    const moved = reducePalette(actions('HDR-2', 'hdr', 1, 0), {
+      type: 'moved',
+      delta: 1,
+      count: 3,
+    })
+    expect(moved).toEqual(actions('HDR-2', 'hdr', 1, 1))
+    expect(reducePalette(moved, { type: 'moved', delta: -1, count: 3 })).toEqual(
+      actions('HDR-2', 'hdr', 1, 0),
+    )
+  })
+
+  it('wraps the action highlight at both ends', () => {
+    expect(
+      reducePalette(actions('HDR-2', '', 0, 0), { type: 'moved', delta: -1, count: 3 }),
+    ).toEqual(actions('HDR-2', '', 0, 2))
+  })
+
+  it('closes to the top from the action list, not back one level', () => {
+    expect(reducePalette(actions('HDR-2', 'hdr', 1, 2), { type: 'closed' })).toEqual({
+      status: 'closed',
+    })
+  })
+
+  it('keeps the query visible at the action level', () => {
+    expect(paletteQuery(actions('HDR-2', 'hdr'))).toBe('hdr')
+  })
+})
+
+describe('derivePalette at the action level', () => {
+  const catalogue = inputs({
+    actionsFor: () => [
+      action('copy-issue-key'),
+      action('open-detail'),
+      action('open-in-jira'),
+      action('open-notes'),
+    ],
+  })
+
+  it('names the item the actions belong to', () => {
+    const display = actionsView(actions('HDR-1'), catalogue)
+    expect(display.itemBadge).toBe('HDR-1')
+    expect(display.itemTitle).toBe('Assigned one')
+  })
+
+  it('groups actions in the kernel group order, whatever order the catalogue gave', () => {
+    const display = actionsView(actions('HDR-1'), catalogue)
+    expect(display.groups.map((g) => g.group)).toEqual(['workflow', 'links'])
+    expect(display.groups.flatMap((g) => g.rows.map((r) => r.kind))).toEqual([
+      'open-detail',
+      'open-notes',
+      'copy-issue-key',
+      'open-in-jira',
+    ])
+  })
+
+  it('numbers actions so the keyboard index matches the visual order', () => {
+    const display = actionsView(actions('HDR-1'), catalogue)
+    expect(display.groups.flatMap((g) => g.rows.map((r) => r.index))).toEqual([0, 1, 2, 3])
+    expect(display.actionCount).toBe(4)
+  })
+
+  it("prints each action's curated shortcut", () => {
+    const display = actionsView(actions('HDR-1'), catalogue)
+    const shortcuts = new Map(
+      display.groups.flatMap((g) => g.rows).map((r) => [r.kind, r.shortcut]),
+    )
+    expect(shortcuts.get('open-detail')).toBe('d')
+    expect(shortcuts.get('copy-issue-key')).toBe('y')
+  })
+
+  it('exposes a by-kind index so a letter can dispatch straight to an action', () => {
+    const display = actionsView(actions('HDR-1'), catalogue)
+    expect(display.byKind.get('open-notes')?.label).toBe('open-notes')
+    expect(display.byKind.has('discard-workspace')).toBe(false)
+  })
+
+  it('offers exactly what the catalogue deems legal — a fake review card gets the MR pair', () => {
+    const display = actionsView(
+      actions('review:77'),
+      inputs({ actionsFor: () => [action('open-mr'), action('review-mr')] }),
+    )
+    expect(display.groups.flatMap((g) => g.rows.map((r) => r.kind))).toEqual([
+      'open-mr',
+      'review-mr',
+    ])
+    expect(display.byKind.has('open-detail')).toBe(false)
+    expect(display.byKind.has('change-status')).toBe(false)
+  })
+
+  it('says so rather than rendering an empty list when nothing is legal', () => {
+    const display = actionsView(actions('HDR-1'), inputs({ actionsFor: () => [] }))
+    expect(display.groups).toEqual([])
+    expect(display.actionCount).toBe(0)
+    expect(display.selectedAction).toBeNull()
+  })
+
+  it('clamps an action highlight that the list shrank out from under', () => {
+    const display = actionsView(
+      actions('HDR-1', '', 0, 9),
+      inputs({ actionsFor: () => [action('open-detail')] }),
+    )
+    expect(display.actionIndex).toBe(0)
+    expect(display.selectedAction?.kind).toBe('open-detail')
+  })
+
+  it('keeps a transiently-unrunnable action in the list, marked not enabled', () => {
+    const display = actionsView(
+      actions('HDR-1'),
+      inputs({
+        actionsFor: () => [
+          { kind: 'change-status', label: 'Change Status…', enabled: false, run: () => {} },
+        ],
+      }),
+    )
+    expect(display.selectedAction?.enabled).toBe(false)
+  })
+
+  it('falls back to the results when the item vanishes under it', () => {
+    // A board refresh drops a Done ticket, or a watchlist removal lands.
+    const display = derivePalette(actions('HDR-GONE', 'assigned', 0), catalogue)
+    expect(display.status).toBe('root')
   })
 })

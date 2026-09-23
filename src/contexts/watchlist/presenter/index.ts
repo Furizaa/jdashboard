@@ -1,5 +1,9 @@
 export { useWatchlistCards, useWatchlistMembership } from './use-watchlist-cards'
-export { useInvalidateWatchlist, useRemoveFromWatchlist } from './use-watchlist-mutations'
+export {
+  useAddToWatchlist,
+  useInvalidateWatchlist,
+  useRemoveFromWatchlist,
+} from './use-watchlist-mutations'
 export {
   useWatchlistModal,
   type WatchlistModalApi,

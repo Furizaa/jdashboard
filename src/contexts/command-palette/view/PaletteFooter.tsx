@@ -3,11 +3,16 @@ import { testIds } from '~/lib/testids'
 import type { PaletteSourceNote } from '../domain'
 
 /**
- * The hint strip along the bottom: what the keyboard does here, and an honest
- * note when a source has not arrived or cannot be reached. Later slices fill it
- * out with the per-level shortcut hints.
+ * The hint strip along the bottom: what the keyboard does at this level, and an
+ * honest note when a source has not arrived or cannot be reached.
  */
-export function PaletteFooter({ sources }: { sources: readonly PaletteSourceNote[] }) {
+export function PaletteFooter({
+  level,
+  sources,
+}: {
+  level: 'root' | 'actions'
+  sources: readonly PaletteSourceNote[]
+}) {
   const loading = sources.filter((s) => s.state === 'loading')
   const unavailable = sources.filter((s) => s.state === 'unavailable')
 
@@ -16,9 +21,20 @@ export function PaletteFooter({ sources }: { sources: readonly PaletteSourceNote
       data-testid={testIds.commandPaletteFooter}
       className="border-border bg-surface-1 text-ink-tertiary flex h-9 shrink-0 items-center gap-3 border-t px-4 text-[11px]"
     >
-      <Hint keys={['↑', '↓']}>Navigate</Hint>
-      <Hint keys={['↵']}>Open</Hint>
-      <Hint keys={['esc']}>Close</Hint>
+      {level === 'root' ? (
+        <>
+          <Hint keys={['↑', '↓']}>Navigate</Hint>
+          <Hint keys={['↵']}>Actions</Hint>
+          <Hint keys={['esc']}>Close</Hint>
+        </>
+      ) : (
+        <>
+          <Hint keys={['↑', '↓']}>Navigate</Hint>
+          <Hint keys={['↵']}>Run</Hint>
+          <Hint keys={['⌫']}>Back</Hint>
+          <span>or press an action&apos;s key</span>
+        </>
+      )}
       <span className="ml-auto flex items-center gap-3">
         {loading.length > 0 && (
           <span className="flex items-center gap-1.5">

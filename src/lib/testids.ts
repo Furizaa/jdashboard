@@ -99,6 +99,8 @@ export const testIds = Object.freeze({
   commandPaletteSection: 'command-palette-section',
   commandPaletteEmpty: 'command-palette-empty',
   commandPaletteFooter: 'command-palette-footer',
+  commandPaletteAction: 'command-palette-action',
+  commandPaletteItemHeader: 'command-palette-item-header',
   boardFilterChip: 'board-filter-chip',
   boardFilterClear: 'board-filter-clear',
 } as const)

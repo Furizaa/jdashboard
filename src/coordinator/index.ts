@@ -19,11 +19,14 @@ export {
   useRefineNote,
   useAskTicket,
   useRouteTranscript,
+  useBrowserActions,
+  type BrowserActions,
 } from './hooks'
 export type { CreateIssueSnapshot } from './coordinator'
 export { CreateIssueRejected, CreateIssueTimeout, type CreateIssueError } from './errors'
 export { useReviewCards } from '~/contexts/review'
 export {
+  useAddToWatchlist,
   useInvalidateWatchlist,
   useRemoveFromWatchlist,
   useWatchlistCards,

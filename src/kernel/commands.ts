@@ -114,6 +114,15 @@ export const ACTION_LABELS: Record<ActionKind, string> = {
 }
 
 /**
+ * The reverse lookup the palette's key map needs: which action a letter runs.
+ * Derived from `ACTION_SHORTCUTS` rather than declared, so there is exactly one
+ * map to keep honest.
+ */
+export const ACTION_FOR_SHORTCUT: Readonly<Record<string, ActionKind>> = Object.fromEntries(
+  (Object.entries(ACTION_SHORTCUTS) as [ActionKind, string][]).map(([kind, key]) => [key, kind]),
+)
+
+/**
  * The guard that keeps the curated-map decision honest as actions get added: two
  * kinds claiming the same letter is a load-time crash, not a mystery keypress
  * that runs the wrong action. Runs unconditionally — the map is static, so a map

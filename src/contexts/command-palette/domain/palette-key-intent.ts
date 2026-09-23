@@ -1,3 +1,5 @@
+import { ACTION_FOR_SHORTCUT, type ActionKind } from '~/kernel'
+
 /**
  * Keyboard intents, mirroring the shape of
  * `contexts/detail/domain/panel-key-intent.ts`. Pure over the event — no DOM
@@ -9,6 +11,10 @@ export type PaletteIntent =
   | { readonly kind: 'enter' }
   | { readonly kind: 'back' }
   | { readonly kind: 'close' }
+  // Only ever produced at a `list` level, where there is no query field for a
+  // letter to type into. That is the whole reason the action list has no text
+  // filter: one keypress runs one action.
+  | { readonly kind: 'action'; readonly action: ActionKind }
 
 /**
  * Which kind of level the keypress arrived at, which changes what a bare letter
@@ -49,7 +55,15 @@ export function paletteKeyIntent(
   const shared = SHARED[event.key]
   if (shared !== undefined) return shared
   if (level === 'root') return null
-  return LIST_ONLY[event.key.toLowerCase()] ?? null
+
+  const lower = event.key.toLowerCase()
+  // List navigation wins over the shortcut map. It can only ever shadow `j`/`k`,
+  // which `ACTION_SHORTCUTS` is asserted never to claim.
+  const listOnly = LIST_ONLY[lower]
+  if (listOnly !== undefined) return listOnly
+
+  const action = ACTION_FOR_SHORTCUT[lower]
+  return action === undefined ? null : { kind: 'action', action }
 }
 
 /** ⌘K / Ctrl-K: the global open-and-close hotkey. */

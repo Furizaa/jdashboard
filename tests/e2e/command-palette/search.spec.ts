@@ -98,7 +98,7 @@ test('a ticket that is both assigned and an MR we review appears once', async ({
   await expect(items.first()).toHaveAttribute('data-row-id', 'HDR-703')
 })
 
-test('arrows move the highlight, wrapping at both ends; Enter opens the highlighted ticket', async ({
+test('arrows move the highlight, wrapping at both ends; Enter steps into its actions', async ({
   page,
   world,
 }) => {
@@ -135,6 +135,10 @@ test('arrows move the highlight, wrapping at both ends; Enter opens the highligh
   await expect(rows.nth(0)).toHaveAttribute('data-active', 'true')
 
   await page.keyboard.press('ArrowDown')
+  await page.keyboard.press('Enter')
+  // Enter steps into the highlighted item's action list; "Open detail" is the
+  // first row there, so a second Enter is what reaches the panel.
+  await expect(page.getByTestId(testIds.commandPaletteItemHeader)).toContainText('HDR-711')
   await page.keyboard.press('Enter')
   await expect(page.getByTestId(testIds.commandPalette)).toHaveCount(0)
   await expect(page).toHaveURL(/issue=HDR-711/u)

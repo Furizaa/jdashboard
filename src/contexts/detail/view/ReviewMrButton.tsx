@@ -1,34 +1,18 @@
 import { Terminal } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { useMrFor, useReviewCards } from '~/coordinator'
-import type { GetReviewCardsResult } from '~/kernel'
 import { reviewMr } from '~/server/server-functions/detail'
-
-function findReviewMrIid(data: GetReviewCardsResult | undefined, issueKey: string): number | null {
-  if (data === undefined || data.ok !== true) return null
-  for (const card of data.cards) {
-    if (card.kind === 'review-real' && card.jira.key === issueKey) return card.iid
-  }
-  return null
-}
+import { useMrRef } from '../presenter'
 
 export function ReviewMrButton({ issueKey }: { issueKey: string }) {
-  const authorResult = useMrFor(issueKey)
-  const reviewQuery = useReviewCards()
+  const mr = useMrRef(issueKey)
   const [pending, setPending] = useState(false)
-
-  const authorIid =
-    authorResult.state === 'ready' && authorResult.summary !== null
-      ? authorResult.summary.iid
-      : null
-  const iid = authorIid ?? findReviewMrIid(reviewQuery.data, issueKey)
-  if (iid === null) return null
+  if (mr === null) return null
 
   const handleClick = async () => {
     setPending(true)
     try {
-      const result = await reviewMr({ data: { iid } })
+      const result = await reviewMr({ data: { iid: mr.iid } })
       if (!result.ok) toast.error(`Review MR failed: ${result.error.message}`)
     } finally {
       setPending(false)

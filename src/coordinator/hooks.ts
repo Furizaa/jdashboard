@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query'
 import type { Result } from 'neverthrow'
 import {
@@ -33,6 +33,8 @@ import type { RefineClarification } from '~/server/lib/refine-grilling'
 import type { QuickCreateInput } from '~/server/contexts/capture/application/quick-create-schema'
 import type { MrSummary } from '~/server/gateways/gitlab/types'
 import { usePolling } from '~/lib/use-polling'
+import { createBrowserWindowAdapter } from './adapters/browser-window'
+import { createSonnerToastAdapter } from './adapters/sonner-toast'
 import { useCoordinator } from './provider'
 import { DASHBOARD_QUERY_KEYS, DASHBOARD_STALE_TIMES } from './adapters/tanstack-cache'
 import type { ApplyTransitionError, CreateIssueError, HandleMrMergedError } from './errors'
@@ -379,4 +381,31 @@ export function useHasNote(issueKey: string): boolean {
     select: (data) => (issueKey === '' ? false : data.keys.includes(issueKey)),
   })
   return query.data ?? false
+}
+
+// Opening a URL and copying text with a toast were inlined in `use-issue-panel`
+// (`window.open` + `navigator.clipboard` + two `toast` calls). The palette needs
+// the same two behaviours for its `o` / `c` / `y` actions, and a second copy
+// would be a second failure message to keep in sync — so they live here, behind
+// the coordinator's existing Browser and Toast ports.
+export type BrowserActions = {
+  openInNewTab: (url: string) => void
+  /** `label` names what was copied, e.g. "Link" → "Link copied". */
+  copyWithToast: (text: string, label: string) => void
+}
+
+export function useBrowserActions(): BrowserActions {
+  return useMemo(() => {
+    const browser = createBrowserWindowAdapter()
+    const toast = createSonnerToastAdapter()
+    return {
+      openInNewTab: browser.openInNewTab,
+      copyWithToast: (text, label) => {
+        browser.copyToClipboard(text).then(
+          () => toast.success(`${label} copied`),
+          () => toast.error(`Couldn't copy ${label.toLowerCase()} to clipboard`),
+        )
+      },
+    }
+  }, [])
 }

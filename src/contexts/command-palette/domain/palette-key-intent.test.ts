@@ -52,12 +52,39 @@ describe('paletteKeyIntent at a list level', () => {
   })
 })
 
+describe('paletteKeyIntent action shortcuts', () => {
+  it('resolves a curated letter to its action, at a list level only', () => {
+    expect(paletteKeyIntent(key('s'), 'list')).toEqual({ kind: 'action', action: 'change-status' })
+    expect(paletteKeyIntent(key('y'), 'list')).toEqual({ kind: 'action', action: 'copy-issue-key' })
+    expect(paletteKeyIntent(key('W'), 'list')).toEqual({
+      kind: 'action',
+      action: 'watchlist-toggle',
+    })
+    // At root the same letters are just text.
+    expect(paletteKeyIntent(key('s'), 'root')).toBeNull()
+    expect(paletteKeyIntent(key('y'), 'root')).toBeNull()
+  })
+
+  it('lets list navigation win over the shortcut map', () => {
+    // The map is asserted never to claim j/k, so this can only ever confirm the
+    // precedence rather than mask a real action.
+    expect(paletteKeyIntent(key('j'), 'list')).toEqual({ kind: 'next' })
+    expect(paletteKeyIntent(key('k'), 'list')).toEqual({ kind: 'prev' })
+  })
+
+  it('yields nothing for a letter no action claims', () => {
+    expect(paletteKeyIntent(key('q'), 'list')).toBeNull()
+    expect(paletteKeyIntent(key('z'), 'list')).toBeNull()
+  })
+})
+
 describe('paletteKeyIntent modifiers', () => {
   it('yields nothing for a modified keypress at any level', () => {
     for (const level of ['root', 'list'] as const) {
       expect(paletteKeyIntent(key('ArrowDown', { metaKey: true }), level)).toBeNull()
       expect(paletteKeyIntent(key('ArrowLeft', { altKey: true }), level)).toBeNull()
       expect(paletteKeyIntent(key('j', { ctrlKey: true }), level)).toBeNull()
+      expect(paletteKeyIntent(key('s', { metaKey: true }), level)).toBeNull()
     }
   })
 })

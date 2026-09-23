@@ -3,6 +3,8 @@ export {
   initialPaletteState,
   paletteQuery,
   reducePalette,
+  type PaletteActionGroupView,
+  type PaletteActionRow,
   type PaletteDisplay,
   type PaletteEvent,
   type PaletteInputs,

@@ -42,6 +42,7 @@ export {
   reviewSearchHaystack,
 } from './review'
 export { WATCHLIST_CARD_ID_PREFIX, watchlistCardId } from './watchlist'
+export { resolveMrForKey, resolveMrForWorkItem, type MrRef, type MrSources } from './mr-for-key'
 export type {
   GetWatchlistLanesResult,
   SetWatchlistLanesResult,
@@ -79,6 +80,7 @@ export {
   type WorkItem,
 } from './work-item'
 export {
+  ACTION_FOR_SHORTCUT,
   ACTION_GROUPS,
   ACTION_GROUP_LABEL,
   ACTION_GROUP_ORDER,

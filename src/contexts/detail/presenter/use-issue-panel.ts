@@ -1,7 +1,6 @@
 import { useEffect, useMemo } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { toast } from 'sonner'
-import { useBoardData, useTicket } from '~/coordinator'
+import { useBoardData, useBrowserActions, useTicket } from '~/coordinator'
 import { usePolling } from '~/lib/use-polling'
 import { panelKeyIntent, shouldHandleShortcut, type PanelKeyIntent } from '../domain'
 import { derive, type IssuePanelState } from '../view-model'
@@ -110,21 +109,12 @@ export function useIssuePanel(issueKey: string | null, notesOpen: boolean): Issu
     [navigateFn, issueKey],
   )
 
-  const openInBrowser = useMemo(
-    () => (url: string) => {
-      window.open(url, '_blank', 'noopener,noreferrer')
-    },
-    [],
-  )
-
+  // Shared with the command palette's `o` / `c` actions so the two surfaces
+  // cannot drift apart on the clipboard failure message.
+  const { openInNewTab: openInBrowser, copyWithToast } = useBrowserActions()
   const copyJiraLinkAndToast = useMemo(
-    () => (url: string) => {
-      navigator.clipboard.writeText(url).then(
-        () => toast.success('Link copied'),
-        () => toast.error("Couldn't copy link to clipboard"),
-      )
-    },
-    [],
+    () => (url: string) => copyWithToast(url, 'Link'),
+    [copyWithToast],
   )
 
   const boardIssues =

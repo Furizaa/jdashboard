@@ -56,6 +56,7 @@ function reviewCard(
     reviewers: [],
     unresolvedCount: 0,
     ciState: 'none',
+    priority: null,
     jira: {
       key: jiraKey,
       summary: `summary for ${jiraKey}`,
@@ -348,6 +349,7 @@ describe('assembleColumns — Only Workspace filter', () => {
       reviewers: [],
       unresolvedCount: 0,
       ciState: 'none',
+      priority: null,
       // 'A-1' is in openKeys, yet the fake is still dropped — it has no ticket to tint.
       jiraKeyAttempted: 'A-1',
     }

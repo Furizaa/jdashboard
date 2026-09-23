@@ -27,7 +27,9 @@ import {
   type GetChangelogResult,
   type RefineNoteResult,
 } from '~/server/server-functions/refine'
+import { askTicket, type AskTicketResult } from '~/server/server-functions/ask'
 import { routeTranscript, type RouteTranscriptResult } from '~/server/server-functions/bulk-refine'
+import type { RefineClarification } from '~/server/lib/refine-grilling'
 import type { QuickCreateInput } from '~/server/contexts/capture/application/quick-create-schema'
 import type { MrSummary } from '~/server/gateways/gitlab/types'
 import { usePolling } from '~/lib/use-polling'
@@ -265,21 +267,69 @@ export function useChangelog(key: string): UseQueryResult<GetChangelogResult> {
 // entry), and the has-note set (a first refine can create the note), so all three
 // refetch — mirroring `useSaveNote`, with no optimistic patch.
 export function useRefineNote(): {
-  refine: (key: string, refineText: string) => Promise<RefineNoteResult>
+  refine: (
+    key: string,
+    refineText: string,
+    priorAnswers?: readonly RefineClarification[],
+    round?: number,
+  ) => Promise<RefineNoteResult>
   isPending: boolean
 } {
   const queryClient = useQueryClient()
-  const mutation = useMutation<RefineNoteResult, Error, { key: string; refineText: string }>({
+  const mutation = useMutation<
+    RefineNoteResult,
+    Error,
+    {
+      key: string
+      refineText: string
+      priorAnswers?: readonly RefineClarification[]
+      round?: number
+    }
+  >({
     mutationFn: (data) => refineNote({ data }),
     onSuccess: (result, { key }) => {
-      if (!result.ok) return
+      // Only a completed note touches disk; a questions reply writes nothing, so
+      // there is nothing to invalidate until the agent finally returns the note.
+      if (!result.ok || result.kind !== 'note') return
       queryClient.invalidateQueries({ queryKey: DASHBOARD_QUERY_KEYS.note(key) })
       queryClient.invalidateQueries({ queryKey: DASHBOARD_QUERY_KEYS.changelog(key) })
       queryClient.invalidateQueries({ queryKey: DASHBOARD_QUERY_KEYS.noteKeys })
     },
   })
   return {
-    refine: (key, refineText) => mutation.mutateAsync({ key, refineText }),
+    refine: (key, refineText, priorAnswers, round) =>
+      mutation.mutateAsync({ key, refineText, priorAnswers, round }),
+    isPending: mutation.isPending,
+  }
+}
+
+// Ask answers a question about a ticket with a headless read-only agent. Unlike
+// Refine it writes nothing — the answer is returned for display only — so there is no
+// `onSuccess` cache work. Same grilling loop shape (`priorAnswers` + `round`).
+export function useAskTicket(): {
+  ask: (
+    key: string,
+    question: string,
+    priorAnswers?: readonly RefineClarification[],
+    round?: number,
+  ) => Promise<AskTicketResult>
+  isPending: boolean
+} {
+  const mutation = useMutation<
+    AskTicketResult,
+    Error,
+    {
+      key: string
+      question: string
+      priorAnswers?: readonly RefineClarification[]
+      round?: number
+    }
+  >({
+    mutationFn: (data) => askTicket({ data }),
+  })
+  return {
+    ask: (key, question, priorAnswers, round) =>
+      mutation.mutateAsync({ key, question, priorAnswers, round }),
     isPending: mutation.isPending,
   }
 }

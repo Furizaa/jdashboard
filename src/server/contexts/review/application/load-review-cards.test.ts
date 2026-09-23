@@ -84,6 +84,7 @@ function detail(overrides: Partial<RawMrDetail> & { iid: number; title: string }
     reviewers: overrides.reviewers ?? [],
     headPipelineStatus: overrides.headPipelineStatus ?? null,
     hasConflicts: overrides.hasConflicts ?? false,
+    labels: overrides.labels ?? [],
   }
 }
 
@@ -287,6 +288,36 @@ describe('loadReviewCards', () => {
         epic: { key: 'HDR-100', summary: 'epic' },
       })
       expect(result.baseUrl).toBe('https://j.example')
+    }),
+  )
+
+  it.effect('reads the MR priority from the scoped label on the MR detail', () =>
+    Effect.gen(function* () {
+      const gitlab = fakeGitlabGateway({
+        getCurrentUser: () => Effect.succeed(ME),
+        listMrs: () =>
+          Effect.succeed([
+            summary({ iid: 1, title: 'HDR-1: prioritised' }),
+            summary({ iid: 2, title: 'HDR-2: unprioritised' }),
+          ]),
+        getMr: (iid) =>
+          Effect.succeed(
+            detail({
+              iid,
+              title: `HDR-${iid}`,
+              labels: iid === 1 ? ['small', 'priority::high'] : ['small'],
+            }),
+          ),
+        getMrDiscussions: () => Effect.succeed([]),
+        getMrApprovals: () => Effect.succeed(approvals([])),
+        getMrReviewers: () => Effect.succeed([meReviewer('unreviewed')]),
+      })
+      const jira = fakeJiraGateway({
+        searchIssues: () => Effect.succeed(emptySearch()),
+      })
+      const result = yield* withClockAt(loadReviewCards, FIXED_NOW, gitlab, jira)
+      expect(result.cards.find((c) => c.iid === 1)?.priority).toBe('high')
+      expect(result.cards.find((c) => c.iid === 2)?.priority).toBe(null)
     }),
   )
 

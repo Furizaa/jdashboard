@@ -1,9 +1,18 @@
 import { useRef, type ReactNode, type RefObject } from 'react'
-import { AlertCircle, Check, CircleDashed, Loader2, Wand2, X } from 'lucide-react'
+import {
+  AlertCircle,
+  Check,
+  CircleDashed,
+  Loader2,
+  MessageCircleQuestion,
+  Wand2,
+  X,
+} from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '~/design-system'
 import { cn } from '~/lib/cn'
 import { testIds } from '~/lib/testids'
-import type { ApplyItem, BulkRefineDisplay, SelectableMatch } from '../view-model'
+import { RefineQuestions } from '~/widgets/refine-questions'
+import type { ApplyItem, BulkRefineDisplay, SelectableMatch, TicketGrill } from '../view-model'
 import type { BulkRefineApi } from '../presenter'
 
 // The Bulk Refine wizard: one modal that walks paste → route → pick → apply →
@@ -54,6 +63,10 @@ export function BulkRefineModal({ bulk }: { bulk: BulkRefineApi }) {
           </>
         ) : display.step === 'preview' ? (
           <PreviewStep bulk={bulk} display={display} />
+        ) : display.step === 'gathering' ? (
+          <GatheringStep display={display} />
+        ) : display.step === 'questions' ? (
+          <QuestionsStep bulk={bulk} display={display} />
         ) : (
           <ApplyStep bulk={bulk} display={display} />
         )}
@@ -185,6 +198,85 @@ function MatchRow({ match, onToggle }: { match: SelectableMatch; onToggle: () =>
   )
 }
 
+function GatheringStep({
+  display,
+}: {
+  display: Extract<BulkRefineDisplay, { step: 'gathering' }>
+}) {
+  return (
+    <div data-testid={testIds.bulkRefineGathering} className="flex min-h-0 flex-col gap-4">
+      <p className="text-ink-subtle text-xs">
+        Reading what was said about each ticket… {display.finishedCount} of {display.total} done
+      </p>
+      <ul className="-mx-1 flex min-h-0 flex-col gap-1.5 overflow-y-auto px-1">
+        {display.items.map((item) => (
+          <ProgressRow key={item.key} item={item} />
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function QuestionsStep({
+  bulk,
+  display,
+}: {
+  bulk: BulkRefineApi
+  display: Extract<BulkRefineDisplay, { step: 'questions' }>
+}) {
+  const count = display.grills.length
+  return (
+    <div data-testid={testIds.bulkRefineQuestions} className="flex min-h-0 flex-col gap-4">
+      <p className="text-ink-subtle text-xs">
+        {count} ticket{count === 1 ? '' : 's'} need a clarification before refining
+        {display.settledCount > 0 ? ` · ${display.settledCount} already refined` : ''}. Answer what
+        you can — anything you skip uses the recommended answer.
+      </p>
+      <ul className="-mx-1 flex min-h-0 flex-col gap-4 overflow-y-auto px-1">
+        {display.grills.map((grill) => (
+          <TicketQuestions
+            key={grill.key}
+            grill={grill}
+            onChangeAnswers={(answers) => bulk.setAnswers(grill.key, answers)}
+          />
+        ))}
+      </ul>
+      <Footer>
+        <SecondaryButton onClick={bulk.close}>Cancel</SecondaryButton>
+        <PrimaryButton testId={testIds.bulkRefineQuestionsApply} onClick={bulk.submitAnswers}>
+          <Wand2 size={14} />
+          <span>
+            Refine {count} note{count === 1 ? '' : 's'}
+          </span>
+        </PrimaryButton>
+      </Footer>
+    </div>
+  )
+}
+
+function TicketQuestions({
+  grill,
+  onChangeAnswers,
+}: {
+  grill: TicketGrill
+  onChangeAnswers: (answers: TicketGrill['answers']) => void
+}) {
+  return (
+    <li>
+      <div className="mb-2 flex items-baseline gap-2">
+        <MessageCircleQuestion size={13} className="translate-y-0.5 text-[#c084fc]" />
+        <span className="text-foreground font-mono text-xs font-semibold">{grill.key}</span>
+        <span className="text-ink-subtle truncate text-xs">{grill.summary}</span>
+      </div>
+      <RefineQuestions
+        questions={grill.questions}
+        value={grill.answers}
+        onChange={onChangeAnswers}
+      />
+    </li>
+  )
+}
+
 function ApplyStep({
   bulk,
   display,
@@ -244,6 +336,8 @@ function StatusIcon({ status }: { status: ApplyItem['status'] }) {
       return <CircleDashed size={14} className="text-ink-tertiary" />
     case 'refining':
       return <Loader2 size={14} className="animate-spin text-[#c084fc]" />
+    case 'awaiting':
+      return <MessageCircleQuestion size={14} className="text-[#c084fc]" />
     case 'done':
       return <Check size={14} className="text-emerald-500" strokeWidth={2.5} />
     case 'failed':

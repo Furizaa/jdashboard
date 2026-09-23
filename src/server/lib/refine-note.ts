@@ -11,6 +11,7 @@
 // convention the agent is trusted to follow.
 
 import { firstJsonObject, type ClaudeRunResult, type RunClaude } from './claude-cli'
+import { parseQuestions, type RefineClarification, type RefineQuestion } from './refine-grilling'
 
 // Re-exported so existing importers (server function, tests) keep their import
 // site; the types now live in `claude-cli` alongside the shared runner.
@@ -25,10 +26,18 @@ export type RefineInput = {
   readonly comments: string
   // Pasted transcript / instruction — the newest signal driving the rewrite.
   readonly refineText: string
+  // Answers to questions the agent asked in earlier rounds (see `refine-grilling`).
+  // Empty / absent on the first round; the loop keeps re-running with these folded
+  // in until the agent has enough to write the note.
+  readonly priorAnswers?: readonly RefineClarification[]
 }
 
+// The agent replies with EITHER a rewritten note or a set of clarifying
+// questions — never both. `kind` discriminates the two success shapes; every
+// failure path stays a tagged `{ ok: false }`.
 export type RefineParse =
-  | { readonly ok: true; readonly notes: string; readonly changelog: string }
+  | { readonly ok: true; readonly kind: 'note'; readonly notes: string; readonly changelog: string }
+  | { readonly ok: true; readonly kind: 'questions'; readonly questions: readonly RefineQuestion[] }
   | { readonly ok: false; readonly error: { readonly message: string } }
 
 // The model alias resolved by the local CLI to the latest Opus.
@@ -57,8 +66,11 @@ function section(title: string, body: string): string {
 
 // The stdin prompt: the four inputs under clear headings, then the task. The
 // skill (system prompt) already carries the philosophy and the output contract,
-// so this stays data + a one-line instruction.
+// so this stays data + a one-line instruction. When earlier rounds resolved an
+// ambiguity, those answers ride in as a fifth section so the agent doesn't ask
+// them again.
 export function buildRefinePrompt(input: RefineInput): string {
+  const priorAnswers = input.priorAnswers ?? []
   return [
     'Rewrite the ticket note from the inputs below, following your instructions.',
     '',
@@ -69,6 +81,15 @@ export function buildRefinePrompt(input: RefineInput): string {
     section('COMMENTS (context, do not edit)', input.comments),
     '',
     section('REFINE (the new input to fold in)', input.refineText),
+    ...(priorAnswers.length > 0
+      ? [
+          '',
+          section(
+            'PRIOR CLARIFICATIONS (already answered — treat as settled, do not ask again)',
+            priorAnswers.map((p) => `Q: ${p.question}\nA: ${p.answer}`).join('\n\n'),
+          ),
+        ]
+      : []),
     '',
     'Return only the JSON object described in your instructions.',
   ].join('\n')
@@ -100,16 +121,25 @@ export function parseRefineResult(run: ClaudeRunResult): RefineParse {
   const objectText = firstJsonObject(envelope.result)
   if (objectText === null) return fail('refine agent did not return a notes object')
 
-  let content: { notes?: unknown; changelog?: unknown }
+  let content: { notes?: unknown; changelog?: unknown; questions?: unknown }
   try {
     content = JSON.parse(objectText) as typeof content
   } catch {
     return fail('refine agent returned a malformed notes object')
   }
+  // A questions reply means the transcript was ambiguous: the agent is asking
+  // before it guesses. Checked first — a well-formed questions object has no
+  // `notes`/`changelog` to fall through to.
+  if ('questions' in content) {
+    const questions = parseQuestions(content.questions)
+    if (questions === null)
+      return fail('refine agent returned an empty or malformed questions list')
+    return { ok: true, kind: 'questions', questions }
+  }
   if (typeof content.notes !== 'string' || typeof content.changelog !== 'string') {
     return fail('refine agent returned a notes object missing `notes` or `changelog`')
   }
-  return { ok: true, notes: content.notes, changelog: content.changelog }
+  return { ok: true, kind: 'note', notes: content.notes, changelog: content.changelog }
 }
 
 function fail(message: string): RefineParse {

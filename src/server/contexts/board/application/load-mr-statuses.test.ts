@@ -70,6 +70,7 @@ function detail(overrides: Partial<RawMrDetail> & { iid: number; title: string }
     reviewers: overrides.reviewers ?? [],
     headPipelineStatus: overrides.headPipelineStatus ?? null,
     hasConflicts: overrides.hasConflicts ?? false,
+    labels: overrides.labels ?? [],
   }
 }
 

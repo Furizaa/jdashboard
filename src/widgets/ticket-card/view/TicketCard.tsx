@@ -133,6 +133,7 @@ function CardMrJira({ issueKey, column }: { issueKey: string; column: Column }) 
   return (
     <Mr.Root state={state} summary={summary} layout="row" issueKey={issueKey} column={column}>
       <Mr.ReviewerRow />
+      <Mr.PriorityBadge />
       <Mr.CiIndicator />
       <Mr.UnresolvedChip />
       <Mr.WarningRow />
@@ -151,6 +152,7 @@ function CardMrReview({
     iid: 0,
     title: '',
     webUrl: '',
+    priority: data.priority,
     reviewers: [...data.reviewers],
     unresolvedCount: data.unresolvedCount,
     allApprovedAndClean: false,
@@ -159,6 +161,7 @@ function CardMrReview({
   return (
     <Mr.Root state={{ kind: 'ready' }} summary={summary} layout="row" issueKey={null} column={null}>
       <Mr.ReviewerRow />
+      <Mr.PriorityBadge />
       <Mr.CiIndicator />
       <Mr.UnresolvedChip />
       <Mr.WarningRow />

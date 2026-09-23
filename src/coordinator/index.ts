@@ -17,6 +17,7 @@ export {
   useHasNote,
   useChangelog,
   useRefineNote,
+  useAskTicket,
   useRouteTranscript,
 } from './hooks'
 export type { CreateIssueSnapshot } from './coordinator'

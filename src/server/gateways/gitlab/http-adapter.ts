@@ -52,6 +52,7 @@ const WireMrDetailSchema = Schema.Struct({
   reviewers: Schema.Array(WireReviewerSchema),
   head_pipeline: Schema.NullOr(Schema.Struct({ status: Schema.String })),
   has_conflicts: Schema.Boolean,
+  labels: Schema.Array(Schema.String),
 })
 type WireMrDetail = Schema.Schema.Type<typeof WireMrDetailSchema>
 
@@ -116,6 +117,7 @@ function toRawMrDetail(wire: WireMrDetail): RawMrDetail {
     })),
     headPipelineStatus: wire.head_pipeline?.status ?? null,
     hasConflicts: wire.has_conflicts,
+    labels: wire.labels,
   }
 }
 

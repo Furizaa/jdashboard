@@ -4,6 +4,7 @@ import {
   type BoardIssue,
   type CiVisualState,
   type Column,
+  type MrPriority,
   type ReviewCard,
   type ReviewCardReal,
   type ReviewerVisualState,
@@ -39,6 +40,7 @@ export type TicketCardViewModel = {
         ciState: CiVisualState
         unresolvedCount: number
         mrState: 'opened' | 'merged'
+        priority: MrPriority | null
       }
     | null
   deemphasized: boolean
@@ -108,6 +110,7 @@ export function buildCardView(input: BuildCardViewInput): TicketCardViewModel {
         ciState: card.ciState,
         unresolvedCount: card.unresolvedCount,
         mrState: card.mrState,
+        priority: card.priority,
       }
       const deemphasized = isDeemphasized({ statusName: pill.text }, column)
       return match(card)

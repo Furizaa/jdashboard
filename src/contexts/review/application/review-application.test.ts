@@ -23,6 +23,7 @@ describe('ReviewApplicationService.loadReviewCards', () => {
           reviewers: [],
           unresolvedCount: 0,
           ciState: 'none',
+          priority: null,
           jiraKeyAttempted: null,
         },
       ],

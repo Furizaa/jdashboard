@@ -16,7 +16,8 @@ function fakeDeps(overrides: Partial<BulkRefineDeps> = {}): BulkRefineDeps {
         Promise.resolve({ ok: true, matches: [{ key: 'HDR-1', brief: 'Drop the cookie.' }] }),
     ),
     refine: vi.fn(
-      (): Promise<RefineNoteResult> => Promise.resolve({ ok: true, note: 'rewritten' }),
+      (): Promise<RefineNoteResult> =>
+        Promise.resolve({ ok: true, kind: 'note', note: 'rewritten' }),
     ),
     ...overrides,
   }
@@ -95,7 +96,9 @@ describe('useBulkRefineWithDeps — applying (stage 2)', () => {
   }
 
   it('refines each selected ticket and ends in done with an ok count', async () => {
-    const refine = vi.fn(() => Promise.resolve<RefineNoteResult>({ ok: true, note: 'n' }))
+    const refine = vi.fn(() =>
+      Promise.resolve<RefineNoteResult>({ ok: true, kind: 'note', note: 'n' }),
+    )
     const route = vi.fn(() =>
       Promise.resolve<RouteTranscriptResult>({
         ok: true,
@@ -113,8 +116,8 @@ describe('useBulkRefineWithDeps — applying (stage 2)', () => {
     await waitFor(() => expect(result.current.display).toMatchObject({ step: 'done' }))
 
     expect(refine).toHaveBeenCalledTimes(2)
-    expect(refine).toHaveBeenCalledWith('HDR-1', 'b1')
-    expect(refine).toHaveBeenCalledWith('HDR-2', 'b2')
+    expect(refine).toHaveBeenCalledWith('HDR-1', 'b1', [], 1)
+    expect(refine).toHaveBeenCalledWith('HDR-2', 'b2', [], 1)
     expect(result.current.display).toMatchObject({ step: 'done', okCount: 2, failCount: 0 })
   })
 
@@ -122,7 +125,7 @@ describe('useBulkRefineWithDeps — applying (stage 2)', () => {
     const refine = vi.fn((key: string) =>
       key === 'HDR-2'
         ? Promise.resolve<RefineNoteResult>({ ok: false, error: { message: 'boom' } })
-        : Promise.resolve<RefineNoteResult>({ ok: true, note: 'n' }),
+        : Promise.resolve<RefineNoteResult>({ ok: true, kind: 'note', note: 'n' }),
     )
     const route = vi.fn(() =>
       Promise.resolve<RouteTranscriptResult>({
@@ -143,7 +146,7 @@ describe('useBulkRefineWithDeps — applying (stage 2)', () => {
     await waitFor(() => expect(result.current.display).toMatchObject({ step: 'done' }))
 
     expect(refine).toHaveBeenCalledTimes(1)
-    expect(refine).toHaveBeenCalledWith('HDR-2', 'b2')
+    expect(refine).toHaveBeenCalledWith('HDR-2', 'b2', [], 1)
     const display = result.current.display
     expect(display).toMatchObject({ step: 'done', okCount: 0, failCount: 1 })
     if (display.open && display.step === 'done') {
@@ -152,11 +155,97 @@ describe('useBulkRefineWithDeps — applying (stage 2)', () => {
   })
 
   it('does nothing when no ticket is selected', async () => {
-    const refine = vi.fn(() => Promise.resolve<RefineNoteResult>({ ok: true, note: 'n' }))
+    const refine = vi.fn(() =>
+      Promise.resolve<RefineNoteResult>({ ok: true, kind: 'note', note: 'n' }),
+    )
     const { result } = await toPreview(fakeDeps({ refine }))
     act(() => result.current.toggle('HDR-1')) // the only match, now deselected
     act(() => result.current.apply())
     expect(refine).not.toHaveBeenCalled()
     expect(result.current.display).toMatchObject({ step: 'preview' })
+  })
+})
+
+describe('useBulkRefineWithDeps — grilling (stage 2, batched by ticket)', () => {
+  async function toPreview(deps: BulkRefineDeps) {
+    const hook = render(deps)
+    act(() => hook.result.current.open())
+    act(() => hook.result.current.setTranscript('t'))
+    await act(async () => {
+      hook.result.current.route()
+    })
+    return hook
+  }
+
+  const twoTickets = () =>
+    vi.fn(() =>
+      Promise.resolve<RouteTranscriptResult>({
+        ok: true,
+        matches: [
+          { key: 'HDR-1', brief: 'b1' },
+          { key: 'HDR-2', brief: 'b2' },
+        ],
+      }),
+    )
+
+  it('gathers clear tickets, surfaces questions, then applies answers to finish', async () => {
+    // HDR-1 refines cleanly on the gather pass; HDR-2 asks, then finishes once
+    // answered.
+    const question = {
+      id: 'owner',
+      title: 'Who owns it?',
+      body: '',
+      options: [{ id: 'ada', label: 'Ada', recommended: true as const }],
+      allowFreeText: true,
+    }
+    let hdr2Calls = 0
+    const refine = vi.fn((key: string): Promise<RefineNoteResult> => {
+      if (key === 'HDR-1') return Promise.resolve({ ok: true, kind: 'note', note: 'n1' })
+      hdr2Calls += 1
+      return hdr2Calls === 1
+        ? Promise.resolve({ ok: true, kind: 'questions', round: 1, questions: [question] })
+        : Promise.resolve({ ok: true, kind: 'note', note: 'n2' })
+    })
+    const { result } = await toPreview(fakeDeps({ route: twoTickets(), refine }))
+
+    await act(async () => {
+      result.current.apply()
+    })
+    // The gather pass lands on the question review: HDR-1 already refined, HDR-2
+    // awaiting.
+    await waitFor(() => expect(result.current.display).toMatchObject({ step: 'questions' }))
+    const review = result.current.display
+    expect(review.open && review.step === 'questions' && review.settledCount).toBe(1)
+    if (review.open && review.step === 'questions') {
+      expect(review.grills.map((g) => g.key)).toEqual(['HDR-2'])
+    }
+
+    // Answer HDR-2 and apply.
+    act(() => result.current.setAnswers('HDR-2', [{ questionId: 'owner', optionId: 'ada' }]))
+    await act(async () => {
+      result.current.submitAnswers()
+    })
+    await waitFor(() => expect(result.current.display).toMatchObject({ step: 'done' }))
+
+    // HDR-2's second call carries the resolved answer as a prior clarification.
+    expect(refine).toHaveBeenLastCalledWith(
+      'HDR-2',
+      'b2',
+      [{ question: 'Who owns it?', answer: 'Ada' }],
+      2,
+    )
+    expect(result.current.display).toMatchObject({ step: 'done', okCount: 2, failCount: 0 })
+  })
+
+  it('goes straight to done when no ticket has questions', async () => {
+    const refine = vi.fn(() =>
+      Promise.resolve<RefineNoteResult>({ ok: true, kind: 'note', note: 'n' }),
+    )
+    const { result } = await toPreview(fakeDeps({ route: twoTickets(), refine }))
+    await act(async () => {
+      result.current.apply()
+    })
+    await waitFor(() => expect(result.current.display).toMatchObject({ step: 'done' }))
+    expect(result.current.display).toMatchObject({ step: 'done', okCount: 2 })
   })
 })

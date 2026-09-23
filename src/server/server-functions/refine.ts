@@ -10,6 +10,7 @@ import { appRuntime } from '../runtime/app-runtime'
 import { adfToText } from '../lib/adf-to-text'
 import { assertIssueKey } from '../lib/jql'
 import { loadSkillBody, spawnClaude } from '../lib/claude-cli'
+import type { RefineClarification, RefineQuestion } from '../lib/refine-grilling'
 import { readNote, writeNote, type NotesStoreDeps } from '../lib/notes-store'
 import {
   appendChangelog,
@@ -29,7 +30,16 @@ import { runRefine } from '../lib/refine-note'
 export type RefineNoteResult =
   // `note` is the rewritten markdown, returned so the editor can adopt it
   // immediately rather than waiting on (and racing) the note query's refetch.
-  | { readonly ok: true; readonly note: string }
+  | { readonly ok: true; readonly kind: 'note'; readonly note: string }
+  // The transcript was ambiguous: the agent asks before it guesses. Nothing is
+  // written; the UI collects answers and calls again with them (see
+  // `refine-grilling`). `round` is the 1-based round these questions belong to.
+  | {
+      readonly ok: true
+      readonly kind: 'questions'
+      readonly round: number
+      readonly questions: readonly RefineQuestion[]
+    }
   | { readonly ok: false; readonly error: { readonly message: string } }
 
 export type GetChangelogResult = { readonly entries: readonly ChangelogEntry[] }
@@ -38,6 +48,22 @@ const SKILL_PATH = join(process.cwd(), '.claude', 'skills', 'refine-ticket-notes
 
 function str(value: unknown): string {
   return typeof value === 'string' ? value : ''
+}
+
+// Answers from earlier grilling rounds, sanitised: each must be a
+// `{ question, answer }` pair of non-empty strings. Anything else is dropped so a
+// malformed client payload degrades to "no clarifications" rather than throwing.
+function parsePriorAnswers(value: unknown): RefineClarification[] {
+  if (!Array.isArray(value)) return []
+  const pairs: RefineClarification[] = []
+  for (const item of value) {
+    if (typeof item !== 'object' || item === null) continue
+    const p = item as Record<string, unknown>
+    const question = str(p.question).trim()
+    const answer = str(p.answer).trim()
+    if (question !== '' && answer !== '') pairs.push({ question, answer })
+  }
+  return pairs
 }
 
 function notesStoreDeps(): NotesStoreDeps & ChangelogStoreDeps {
@@ -74,11 +100,19 @@ function commentsToText(issue: DetailIssue | null): string {
 }
 
 export const refineNote = createServerFn({ method: 'POST' })
-  .inputValidator((data: { key: string; refineText: string }) => {
-    const refineText = str(data?.refineText).trim()
-    if (refineText === '') throw new Error('refineNote (refineText): required')
-    return { key: assertIssueKey(str(data?.key), 'refineNote'), refineText }
-  })
+  .inputValidator(
+    (data: { key: string; refineText: string; priorAnswers?: unknown; round?: unknown }) => {
+      const refineText = str(data?.refineText).trim()
+      if (refineText === '') throw new Error('refineNote (refineText): required')
+      const round = typeof data?.round === 'number' && Number.isFinite(data.round) ? data.round : 1
+      return {
+        key: assertIssueKey(str(data?.key), 'refineNote'),
+        refineText,
+        priorAnswers: parsePriorAnswers(data?.priorAnswers),
+        round,
+      }
+    },
+  )
   .handler(async ({ data }): Promise<RefineNoteResult> => {
     let skillBody: string
     try {
@@ -97,11 +131,18 @@ export const refineNote = createServerFn({ method: 'POST' })
         description: adfToText(issue?.description ?? null),
         comments: commentsToText(issue),
         refineText: data.refineText,
+        priorAnswers: data.priorAnswers,
         skillBody,
       },
       spawnClaude,
     )
     if (!parsed.ok) return parsed
+
+    // Ambiguous transcript: hand the questions back, write nothing. The client
+    // collects answers and calls again with them folded into `priorAnswers`.
+    if (parsed.kind === 'questions') {
+      return { ok: true, kind: 'questions', round: data.round, questions: parsed.questions }
+    }
 
     try {
       await writeNote(data.key, parsed.notes, deps)
@@ -113,7 +154,7 @@ export const refineNote = createServerFn({ method: 'POST' })
     } catch (e) {
       return { ok: false, error: { message: e instanceof Error ? e.message : 'unknown error' } }
     }
-    return { ok: true, note: parsed.notes }
+    return { ok: true, kind: 'note', note: parsed.notes }
   })
 
 export const getChangelog = createServerFn({ method: 'GET' })

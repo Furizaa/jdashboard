@@ -32,6 +32,7 @@ function reviewCard(iid: number, bucket: ReviewCardReal['bucket']): ReviewCardRe
     reviewers: [],
     unresolvedCount: 0,
     ciState: 'none',
+    priority: null,
     jira: { key: 'A-1', summary: 's', typeName: 'Task', labels: [], epic: null },
   }
 }

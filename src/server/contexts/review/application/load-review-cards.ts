@@ -13,9 +13,11 @@ import type {
 import {
   ciVisualState,
   countUnresolvedThreads,
+  mrPriorityFromLabels,
   reviewBucket,
   reviewerVisualState,
   type CiVisualState,
+  type MrPriority,
   type MrState,
   type ReviewerApprovalStatus,
   type ReviewerVisualState,
@@ -53,6 +55,7 @@ type Pre = {
   reviewers: ReviewerVisual[]
   unresolvedCount: number
   ciState: CiVisualState
+  priority: MrPriority | null
   firstKey: string | null
 }
 
@@ -150,6 +153,7 @@ function preFromFanOut(fo: MrFanOut, currentUsername: string, projectKey: string
     reviewers: reviewersVisual,
     unresolvedCount,
     ciState: ci,
+    priority: mrPriorityFromLabels(fo.detail.labels),
     firstKey,
   }
 }
@@ -177,6 +181,7 @@ function buildCard(p: Pre, foundByKey: ReadonlyMap<string, BoardIssue>): ReviewC
     reviewers: p.reviewers,
     unresolvedCount: p.unresolvedCount,
     ciState: p.ciState,
+    priority: p.priority,
   } as const
   const found = p.firstKey !== null ? foundByKey.get(p.firstKey) : undefined
   if (found !== undefined) {

@@ -90,6 +90,7 @@ describe('GitlabGatewayLive — project path encoding', () => {
           reviewers: [],
           head_pipeline: null,
           has_conflicts: false,
+          labels: [],
         }),
       captured,
     )
@@ -212,6 +213,7 @@ describe('GitlabGatewayLive — wire shape normalisation', () => {
         reviewers: [{ username: 'alice', name: 'Alice', avatar_url: 'https://avatars/a' }],
         head_pipeline: { status: 'success' },
         has_conflicts: false,
+        labels: ['priority::high', 'backend'],
       }),
     )
     const program = Effect.gen(function* () {
@@ -228,6 +230,7 @@ describe('GitlabGatewayLive — wire shape normalisation', () => {
         reviewers: [{ username: 'alice', displayName: 'Alice', avatarUrl: 'https://avatars/a' }],
         headPipelineStatus: 'success',
         hasConflicts: false,
+        labels: ['priority::high', 'backend'],
       })
     })
     return provideTestLayers(program, client)

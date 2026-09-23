@@ -16,6 +16,7 @@ const COMMON = {
   unresolvedCount: 0,
   ciState: 'none' as const,
   mrState: 'opened' as const,
+  priority: null,
 }
 
 function fake(overrides: Partial<ReviewCardFake> = {}): ReviewCardFake {

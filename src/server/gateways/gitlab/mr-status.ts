@@ -1,19 +1,27 @@
 import {
   ciVisualState,
   countUnresolvedThreads,
+  mrPriorityFromLabels,
   reviewerVisualState,
+  type MrPriority,
   type ReviewerApprovalStatus,
 } from './mr'
-import type { MrReviewerState, MrSummary, RawDiscussion, RawMrDetail, RawMrSummary } from './types'
+import type { MrReviewerState, MrSummary, RawDiscussion, RawMrDetail } from './types'
 
 type CommonMrFields = {
   iid: number
   title: string
   webUrl: string
+  priority: MrPriority | null
 }
 
-function commonFields(mr: RawMrSummary): CommonMrFields {
-  return { iid: mr.iid, title: mr.title, webUrl: mr.webUrl }
+function commonFields(mr: RawMrDetail): CommonMrFields {
+  return {
+    iid: mr.iid,
+    title: mr.title,
+    webUrl: mr.webUrl,
+    priority: mrPriorityFromLabels(mr.labels),
+  }
 }
 
 function hasNotesFromUser(discussions: readonly RawDiscussion[], username: string): boolean {

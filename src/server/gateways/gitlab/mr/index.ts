@@ -1,5 +1,6 @@
 export { ciVisualState, type CiVisualState } from './ci-state'
 export { countUnresolvedThreads } from './count-unresolved'
+export { mrPriorityFromLabels, MR_PRIORITY_LABEL, type MrPriority } from './priority'
 export { reviewBucket, type MrState } from './review-state'
 export {
   reviewerVisualState,

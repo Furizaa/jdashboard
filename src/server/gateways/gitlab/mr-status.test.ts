@@ -25,6 +25,7 @@ function detail(overrides: Partial<RawMrDetail> = {}): RawMrDetail {
     reviewers: overrides.reviewers ?? [],
     headPipelineStatus: overrides.headPipelineStatus ?? null,
     hasConflicts: overrides.hasConflicts ?? false,
+    labels: overrides.labels ?? [],
   }
 }
 
@@ -133,6 +134,32 @@ describe('summarizeMr', () => {
     if (result.kind !== 'review') throw new Error('expected review')
     expect(result.reviewers[0]?.visualState).toBe('gray-dashed')
     expect(result.ciState).toBe('none')
+  })
+
+  it('carries the MR priority from its priority:: scoped label onto every summary kind', () => {
+    const review = summarizeMr(
+      detail({ state: 'opened', reviewers: [reviewer('alice')], labels: ['priority::hotfix'] }),
+      NO_DISCUSSIONS,
+      NO_APPROVALS,
+      NO_REQUESTED_CHANGES,
+    )
+    expect(review.priority).toBe('hotfix')
+
+    const draft = summarizeMr(
+      detail({ state: 'opened', draft: true, labels: ['priority::high'] }),
+      NO_DISCUSSIONS,
+      NO_APPROVALS,
+      NO_REQUESTED_CHANGES,
+    )
+    expect(draft.priority).toBe('high')
+
+    const noPriority = summarizeMr(
+      detail({ state: 'opened', reviewers: [reviewer('alice')], labels: ['backend'] }),
+      NO_DISCUSSIONS,
+      NO_APPROVALS,
+      NO_REQUESTED_CHANGES,
+    )
+    expect(noPriority.priority).toBeNull()
   })
 
   it('marks reviewer red-solid when in requestedChangesUsernames', () => {

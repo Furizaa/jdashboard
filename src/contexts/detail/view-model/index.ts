@@ -15,3 +15,10 @@ export {
   type RefineModalDisplay,
   type RefineModalState,
 } from './refine-modal-view-model'
+export {
+  deriveAskModal,
+  initialAskModalState,
+  reduceAskModal,
+  type AskModalDisplay,
+  type AskModalState,
+} from './ask-modal-view-model'

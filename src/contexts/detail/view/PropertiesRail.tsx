@@ -133,6 +133,7 @@ function PanelMrBlock({ issueKey }: { issueKey: string }) {
   return (
     <Mr.Root state={state} summary={summary} layout="stack" issueKey={issueKey} column={column}>
       <Mr.ReviewerStack />
+      <Mr.PriorityBadge />
       <Mr.WarningRow />
       <Mr.OpenLink />
     </Mr.Root>

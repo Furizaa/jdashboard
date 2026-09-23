@@ -7,7 +7,9 @@ export {
   type ApplyStatus,
   type BulkRefineDisplay,
   type Event,
+  type Grills,
   type RoutedMatch,
   type SelectableMatch,
   type State,
+  type TicketGrill,
 } from './bulk-refine-view-model'

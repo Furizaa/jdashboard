@@ -28,6 +28,7 @@ function realReviewCard(overrides: Partial<ReviewCardReal> = {}): ReviewCardReal
     reviewers: [],
     unresolvedCount: 0,
     ciState: 'none',
+    priority: null,
     jira: {
       key: 'HDR-1',
       summary: 'jira summary',
@@ -50,6 +51,7 @@ function fakeReviewCard(overrides: Partial<ReviewCardFake> = {}): ReviewCardFake
     reviewers: [],
     unresolvedCount: 0,
     ciState: 'none',
+    priority: null,
     jiraKeyAttempted: null,
     ...overrides,
   }
@@ -152,7 +154,18 @@ describe('buildCardView — review-real', () => {
       ciState: 'none',
       unresolvedCount: 0,
       mrState: 'opened',
+      priority: null,
     })
+  })
+
+  it('carries the MR priority into the review MR section', () => {
+    const view = buildCardView({
+      kind: 'review',
+      card: realReviewCard({ priority: 'high' }),
+      column: 'TO DO',
+      baseUrl: BASE_URL,
+    })
+    expect(view.mrSection).toMatchObject({ mode: 'review', priority: 'high' })
   })
 
   it('maps the bucket to the pill text for each review state', () => {
@@ -242,6 +255,7 @@ describe('buildCardView — review-fake', () => {
       ciState: 'none',
       unresolvedCount: 0,
       mrState: 'opened',
+      priority: null,
     })
     expect(view.fixasap).toBe(false)
   })

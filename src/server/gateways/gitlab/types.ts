@@ -1,4 +1,4 @@
-import type { CiVisualState, ReviewerVisualState } from './mr'
+import type { CiVisualState, MrPriority, ReviewerVisualState } from './mr'
 
 export type GitlabUser = {
   username: string
@@ -25,6 +25,7 @@ export type RawMrDetail = RawMrSummary & {
   reviewers: RawReviewer[]
   headPipelineStatus: string | null
   hasConflicts: boolean
+  labels: readonly string[]
 }
 
 export type RawNote = {
@@ -73,6 +74,7 @@ type CommonMrFields = {
   iid: number
   title: string
   webUrl: string
+  priority: MrPriority | null
 }
 
 export type MrSummary =
@@ -103,6 +105,7 @@ type ReviewCardCommon = {
   reviewers: ReviewerVisual[]
   unresolvedCount: number
   ciState: CiVisualState
+  priority: MrPriority | null
 }
 
 export type ReviewCardJira = {

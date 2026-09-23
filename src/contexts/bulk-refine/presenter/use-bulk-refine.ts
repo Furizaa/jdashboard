@@ -1,5 +1,11 @@
 import { useMemo, useReducer } from 'react'
-import type { RefineNoteResult, RouteTranscriptResult } from '~/kernel'
+import {
+  resolveRefineAnswers,
+  type RefineAnswer,
+  type RefineClarification,
+  type RefineNoteResult,
+  type RouteTranscriptResult,
+} from '~/kernel'
 import { useBoardData, useRefineNote, useRouteTranscript, useWatchlistCards } from '~/coordinator'
 import { bulkRefineTargets, type RefineTarget } from '../domain'
 import {
@@ -9,7 +15,6 @@ import {
   reduce,
   type ApplyItem,
   type BulkRefineDisplay,
-  type SelectableMatch,
 } from '../view-model'
 
 // How many refines run at once in stage 2. The CLI spawn is async (non-blocking),
@@ -26,6 +31,8 @@ export type BulkRefineApi = {
   route: () => void
   toggle: (key: string) => void
   apply: () => void
+  setAnswers: (key: string, answers: readonly RefineAnswer[]) => void
+  submitAnswers: () => void
 }
 
 // Injected so the orchestration (stage 1 routing + stage 2 fan-out) is testable
@@ -33,7 +40,21 @@ export type BulkRefineApi = {
 export type BulkRefineDeps = {
   targets: readonly RefineTarget[]
   route: (transcript: string, tickets: readonly RefineTarget[]) => Promise<RouteTranscriptResult>
-  refine: (key: string, refineText: string) => Promise<RefineNoteResult>
+  refine: (
+    key: string,
+    refineText: string,
+    priorAnswers?: readonly RefineClarification[],
+    round?: number,
+  ) => Promise<RefineNoteResult>
+}
+
+// One ticket fed to a stage-2 pass: its routed brief (re-sent every pass) plus any
+// clarifications settled in earlier rounds.
+type PassTicket = {
+  key: string
+  summary: string
+  brief: string
+  priorAnswers: readonly RefineClarification[]
 }
 
 export function useBulkRefineWithDeps(deps: BulkRefineDeps): BulkRefineApi {
@@ -67,11 +88,13 @@ export function useBulkRefineWithDeps(deps: BulkRefineDeps): BulkRefineApi {
       })
   }
 
-  // Stage 2: a bounded pool of per-ticket refines. Each ticket reports start and
-  // finish so the modal shows live per-ticket progress; a failed refine marks
-  // just that ticket and never stops the others.
-  const runApply = async (selected: readonly SelectableMatch[]) => {
-    const queue = [...selected]
+  // A bounded pool of per-ticket refines, shared by the gathering pass (round 1,
+  // no prior answers) and each applying pass (answers folded in). Each ticket
+  // reports start and outcome — a note, a question, or a failure — so the modal
+  // shows live progress; a failed refine marks just that ticket and never stops
+  // the others. `passSettled` at the end routes to the review or the summary.
+  const runPass = async (tickets: readonly PassTicket[], round: number) => {
+    const queue = [...tickets]
     const worker = async () => {
       for (;;) {
         const next = queue.shift()
@@ -79,28 +102,34 @@ export function useBulkRefineWithDeps(deps: BulkRefineDeps): BulkRefineApi {
         dispatch({ type: 'ticketStarted', key: next.key })
         try {
           // Sequential within one worker by design — concurrency comes from
-          // running `APPLY_CONCURRENCY` of these workers over the shared queue.
+          // running `APPLY_CONCURRENCY` of these over the shared queue.
           // oxlint-disable-next-line no-await-in-loop -- see comment above
-          const result = await deps.refine(next.key, next.brief)
-          dispatch({
-            type: 'ticketFinished',
-            key: next.key,
-            ok: result.ok,
-            message: result.ok ? undefined : result.error.message,
-          })
+          const result = await deps.refine(next.key, next.brief, next.priorAnswers, round)
+          if (!result.ok) {
+            dispatch({ type: 'ticketFailed', key: next.key, message: result.error.message })
+          } else if (result.kind === 'questions') {
+            dispatch({
+              type: 'ticketAsked',
+              key: next.key,
+              summary: next.summary,
+              brief: next.brief,
+              questions: result.questions,
+            })
+          } else {
+            dispatch({ type: 'ticketNoted', key: next.key })
+          }
         } catch (error: unknown) {
           dispatch({
-            type: 'ticketFinished',
+            type: 'ticketFailed',
             key: next.key,
-            ok: false,
             message: error instanceof Error ? error.message : 'refine failed',
           })
         }
       }
     }
-    const workers = Array.from({ length: Math.min(APPLY_CONCURRENCY, selected.length) }, worker)
+    const workers = Array.from({ length: Math.min(APPLY_CONCURRENCY, tickets.length) }, worker)
     await Promise.all(workers)
-    dispatch({ type: 'applyFinished' })
+    dispatch({ type: 'passSettled' })
   }
 
   return {
@@ -122,8 +151,33 @@ export function useBulkRefineWithDeps(deps: BulkRefineDeps): BulkRefineApi {
         summary: m.summary,
         status: 'pending',
       }))
-      dispatch({ type: 'applyStarted', items })
-      void runApply(selected)
+      dispatch({ type: 'gatherStarted', items })
+      void runPass(
+        selected.map((m) => ({ key: m.key, summary: m.summary, brief: m.brief, priorAnswers: [] })),
+        1,
+      )
+    },
+    setAnswers: (key, answers) => dispatch({ type: 'answersChanged', key, answers }),
+    submitAnswers: () => {
+      if (state.phase !== 'questions') return
+      const awaiting = state.items
+        .filter((i) => i.status === 'awaiting')
+        .map((i) => state.grills[i.key])
+        .filter((g): g is NonNullable<typeof g> => g !== undefined)
+      if (awaiting.length === 0) return
+      const resolved: Record<string, readonly RefineClarification[]> = {}
+      const tickets: PassTicket[] = awaiting.map((grill) => {
+        const clarifications = resolveRefineAnswers(grill.questions, grill.answers)
+        resolved[grill.key] = clarifications
+        return {
+          key: grill.key,
+          summary: grill.summary,
+          brief: grill.brief,
+          priorAnswers: [...grill.priorAnswers, ...clarifications],
+        }
+      })
+      dispatch({ type: 'applyStarted', resolved })
+      void runPass(tickets, state.round + 1)
     },
   }
 }

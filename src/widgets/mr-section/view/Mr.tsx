@@ -7,6 +7,7 @@ import { cn } from '~/lib/cn'
 import { mrWarningKind, testIds, type MrWarningKind } from '~/lib/testids'
 import { REVIEWER_BADGE_LABEL, type Column, type MrSummary } from '~/kernel'
 import { MrCiIndicator } from './MrCiIndicator'
+import { MrPriorityBadge } from './MrPriorityBadge'
 import { ReviewerAvatar } from './ReviewerAvatar'
 
 const MERGED_TARGET_STATUS = 'In STG'
@@ -218,6 +219,20 @@ function ReviewerStackRow({ reviewer }: { reviewer: ReviewSummary['reviewers'][n
   )
 }
 
+// Priority is only meaningful while the MR is open, so it's suppressed once
+// merged. The review row already has a padded flex row (CardShell) the chip
+// joins; the panel and the author-summary rows need their own wrapper.
+function PriorityBadge() {
+  const { summary, layout } = useMrCtx()
+  if (summary === null || summary.kind === 'merged' || summary.priority === null) return null
+  const chip = <MrPriorityBadge priority={summary.priority} />
+  if (layout === 'stack') return <div className="mt-2">{chip}</div>
+  if (summary.kind !== 'review') {
+    return <div className="flex items-center gap-2 px-3.5 py-2">{chip}</div>
+  }
+  return chip
+}
+
 function CiIndicator() {
   const summary = useReviewSummary('row')
   if (summary === null || summary.ciState === 'none') return null
@@ -375,6 +390,7 @@ function OpenLink() {
 
 export const Mr = {
   Root,
+  PriorityBadge,
   ReviewerRow,
   ReviewerStack,
   CiIndicator,

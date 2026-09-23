@@ -47,23 +47,76 @@ describe('buildRefinePrompt', () => {
     const prompt = buildRefinePrompt({ note: '', description: '', comments: '', refineText: 'x' })
     expect(prompt).toContain('(none)')
   })
+
+  it('omits the prior-clarifications section on the first round', () => {
+    const prompt = buildRefinePrompt({ note: '', description: '', comments: '', refineText: 'x' })
+    expect(prompt).not.toContain('PRIOR CLARIFICATIONS')
+  })
+
+  it('renders prior clarifications as Q/A pairs when present', () => {
+    const prompt = buildRefinePrompt({
+      note: '',
+      description: '',
+      comments: '',
+      refineText: 'x',
+      priorAnswers: [{ question: 'Who owns it?', answer: 'Ada' }],
+    })
+    expect(prompt).toContain('## PRIOR CLARIFICATIONS')
+    expect(prompt).toContain('Q: Who owns it?')
+    expect(prompt).toContain('A: Ada')
+  })
 })
 
 describe('parseRefineResult', () => {
   it('extracts notes and changelog from a clean JSON reply', () => {
     const result = parseRefineResult(envelope(reply('# New note', 'Rewrote the plan.')))
-    expect(result).toEqual({ ok: true, notes: '# New note', changelog: 'Rewrote the plan.' })
+    expect(result).toEqual({
+      ok: true,
+      kind: 'note',
+      notes: '# New note',
+      changelog: 'Rewrote the plan.',
+    })
   })
 
   it('tolerates prose and ```json fences around the object', () => {
     const wrapped = 'Here you go:\n```json\n' + reply('N', 'C') + '\n```\nthanks!'
     const result = parseRefineResult(envelope(wrapped))
-    expect(result).toEqual({ ok: true, notes: 'N', changelog: 'C' })
+    expect(result).toEqual({ ok: true, kind: 'note', notes: 'N', changelog: 'C' })
   })
 
   it('handles braces inside JSON string values without truncating', () => {
     const result = parseRefineResult(envelope(reply('code: `{ a: 1 }`', 'C')))
-    expect(result).toMatchObject({ ok: true, notes: 'code: `{ a: 1 }`' })
+    expect(result).toMatchObject({ ok: true, kind: 'note', notes: 'code: `{ a: 1 }`' })
+  })
+
+  it('parses a questions reply instead of a note', () => {
+    const questions = JSON.stringify({
+      questions: [
+        {
+          id: 'owner',
+          title: 'Who owns it?',
+          body: 'Both Ada and Grace volunteered.',
+          options: [
+            { id: 'ada', label: 'Ada', recommended: true },
+            { id: 'grace', label: 'Grace' },
+          ],
+          allowFreeText: true,
+        },
+      ],
+    })
+    const result = parseRefineResult(envelope(questions))
+    expect(result).toMatchObject({ ok: true, kind: 'questions' })
+    if (result.ok && result.kind === 'questions') {
+      expect(result.questions).toHaveLength(1)
+      expect(result.questions[0]).toMatchObject({ id: 'owner', title: 'Who owns it?' })
+      expect(result.questions[0]?.options.filter((o) => o.recommended)).toHaveLength(1)
+    }
+  })
+
+  it('fails on an empty questions list', () => {
+    expect(parseRefineResult(envelope(JSON.stringify({ questions: [] })))).toMatchObject({
+      ok: false,
+    })
   })
 
   it('fails on a spawn error', () => {
@@ -116,7 +169,7 @@ describe('runRefine', () => {
       { note: 'n', description: 'd', comments: 'c', refineText: 'r', skillBody: 'SKILL' },
       run,
     )
-    expect(result).toEqual({ ok: true, notes: 'done', changelog: 'changed' })
+    expect(result).toEqual({ ok: true, kind: 'note', notes: 'done', changelog: 'changed' })
     expect(seenArgs[seenArgs.indexOf('--append-system-prompt') + 1]).toBe('SKILL')
     expect(seenStdin).toContain('## REFINE')
   })

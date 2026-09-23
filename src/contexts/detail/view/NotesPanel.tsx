@@ -1,11 +1,12 @@
 import { match } from 'ts-pattern'
-import { useNoteEditor, useRefineModal } from '../presenter'
+import { useAskModal, useNoteEditor, useRefineModal } from '../presenter'
 import type { NoteMode, SaveState } from '../view-model'
 import { cn } from '~/lib/cn'
 import { testIds } from '~/lib/testids'
 import { NotesMarkdown } from './NotesMarkdown'
 import { NotesChangelog } from './NotesChangelog'
-import { RefineButton } from './RefineButton'
+import { NotesAiMenu } from './NotesAiMenu'
+import { AskModal } from './AskModal'
 import { RefineModal } from './RefineModal'
 
 // The left pane of the widened detail panel: a private, local markdown note for
@@ -19,6 +20,7 @@ export function NotesPanel({ issueKey }: { issueKey: string }) {
   // the panel shows it without a reopen (the query also refetches, but this wins
   // the race with the editor's own save/seed cycle).
   const refine = useRefineModal(issueKey, editor.adoptContent)
+  const ask = useAskModal(issueKey)
 
   return (
     <section
@@ -31,7 +33,7 @@ export function NotesPanel({ issueKey }: { issueKey: string }) {
         {display.status === 'ready' && <SaveState state={display.saveState} />}
         {display.status === 'ready' && (
           <div className="ml-auto flex items-center gap-2">
-            <RefineButton onClick={refine.open} />
+            <NotesAiMenu onRefine={refine.open} onAsk={ask.open} />
             <ModeToggle mode={display.mode} onChange={editor.setMode} />
           </div>
         )}
@@ -77,6 +79,24 @@ export function NotesPanel({ issueKey }: { issueKey: string }) {
         onChangeText={refine.setText}
         onSubmit={refine.submit}
         onClose={refine.close}
+        onChangeAnswers={refine.setAnswers}
+        onSubmitAnswers={refine.submitAnswers}
+      />
+      <AskModal
+        display={ask.display}
+        issueKey={issueKey}
+        onChangeQuestion={ask.setQuestion}
+        onSubmit={ask.submit}
+        onClose={ask.close}
+        onChangeAnswers={ask.setAnswers}
+        onSubmitAnswers={ask.submitAnswers}
+        onAskAgain={ask.askAgain}
+        // "Refine to note" hands the answer to the existing Refine flow: the user (not
+        // the read-only Ask agent) chooses to fold it into the note.
+        onRefineToNote={(answer) => {
+          ask.close()
+          refine.openWith(answer)
+        }}
       />
     </section>
   )

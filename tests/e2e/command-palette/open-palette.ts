@@ -27,3 +27,11 @@ export function itemRows(page: Page): Locator {
 export function commandRows(page: Page): Locator {
   return page.locator(`[data-testid="${testIds.commandPaletteRow}"][data-row-kind="command"]`)
 }
+
+/**
+ * One command row by its id. Matching by text is not enough: "Filter board by
+ * 'new ticket'" also contains "New Ticket".
+ */
+export function commandRow(page: Page, id: string): Locator {
+  return page.locator(`[data-testid="${testIds.commandPaletteRow}"][data-row-id="command:${id}"]`)
+}

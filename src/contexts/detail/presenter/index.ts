@@ -1,3 +1,4 @@
+export { useAiHandoff, type AiModal } from './use-ai-handoff'
 export { useIssuePanel } from './use-issue-panel'
 export { useMrRef } from './use-mr-ref'
 export {

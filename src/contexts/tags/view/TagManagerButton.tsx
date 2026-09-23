@@ -1,10 +1,14 @@
 import { Tags } from 'lucide-react'
 import { testIds } from '~/lib/testids'
+import { useRegisterCommand } from '~/coordinator'
 import { useTagManager } from '../presenter'
 import { TagManagerModal } from './TagManagerModal'
 
 export function TagManagerButton() {
   const manager = useTagManager()
+  // The palette opens this modal through the command bus; the button keeps
+  // owning its state (ADR-0008).
+  useRegisterCommand('manage-tags', manager.openModal)
   return (
     <>
       <button

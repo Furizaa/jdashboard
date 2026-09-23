@@ -1,9 +1,13 @@
 import { Plus } from 'lucide-react'
+import { useRegisterCommand } from '~/coordinator'
 import { useQuickCreate } from '../presenter'
 import { QuickCreateModal } from './QuickCreateModal'
 
 export function QuickCreateButton() {
   const qc = useQuickCreate()
+  // The palette opens this modal through the command bus; the button keeps
+  // owning its state (ADR-0008).
+  useRegisterCommand('new-ticket', qc.openModal)
   return (
     <>
       <button

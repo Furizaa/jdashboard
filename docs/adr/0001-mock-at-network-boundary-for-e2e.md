@@ -4,10 +4,10 @@ The e2e harness exists to give the upcoming architectural refactor — which wil
 
 ## Considered Options
 
-- **Mock at the server-function level.** Replace the TanStack Start server functions with test doubles. *Rejected:* skips the entire server pipeline — error mapping, JQL building, bulk-fetch composition — which is exactly the composition layer the refactor will reshape and the harness must protect.
-- **Mock at the gateway level (`server/jira/http-gateway.ts`, `server/gitlab/http-gateway.ts`).** Inject fake gateways in test mode. *Rejected:* tied to the gateway files surviving the refactor recognisably. The PRDs explicitly contemplate restructuring these modules.
-- **Use Playwright's `page.route()` for HTTP interception.** *Rejected:* `page.route` only intercepts requests the *browser* makes, but Jira/GitLab calls are made by the *server* (the API token never reaches the browser, by design). `page.route` cannot see them.
-- **Mock at the network boundary with an MSW Node sidecar.** *Selected.* The app boots with `JIRA_BASE_URL` / GitLab base URL pointed at a local MSW server. The whole stack — server functions, gateways, query hooks, components — runs unmodified. The seam is the Atlassian/GitLab HTTP contract, which the refactor cannot move.
+- **Mock at the server-function level.** Replace the TanStack Start server functions with test doubles. _Rejected:_ skips the entire server pipeline — error mapping, JQL building, bulk-fetch composition — which is exactly the composition layer the refactor will reshape and the harness must protect.
+- **Mock at the gateway level (`server/jira/http-gateway.ts`, `server/gitlab/http-gateway.ts`).** Inject fake gateways in test mode. _Rejected:_ tied to the gateway files surviving the refactor recognisably. The PRDs explicitly contemplate restructuring these modules.
+- **Use Playwright's `page.route()` for HTTP interception.** _Rejected:_ `page.route` only intercepts requests the _browser_ makes, but Jira/GitLab calls are made by the _server_ (the API token never reaches the browser, by design). `page.route` cannot see them.
+- **Mock at the network boundary with an MSW Node sidecar.** _Selected._ The app boots with `JIRA_BASE_URL` / GitLab base URL pointed at a local MSW server. The whole stack — server functions, gateways, query hooks, components — runs unmodified. The seam is the Atlassian/GitLab HTTP contract, which the refactor cannot move.
 
 ## Consequences
 

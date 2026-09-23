@@ -48,7 +48,7 @@ export type ActionCatalogueDeps = {
 }
 
 type RunnerDeps = {
-  readonly navigate: (search: { issue: string; notes?: true }) => void
+  readonly navigate: (search: { issue: string; notes?: true; ai?: 'refine' | 'ask' }) => void
   readonly browser: BrowserActions
   readonly addToWatchlist: (key: string) => Promise<{ ok: boolean }>
   readonly removeFromWatchlist: (key: string) => Promise<{ ok: boolean }>
@@ -150,11 +150,17 @@ function performFor(
       .with('discard-workspace', () =>
         workspaceKey === null ? null : run(() => deps.workspace.requestDiscard(workspaceKey)),
       )
-      // The AI hand-offs arrive in slice 88. `legalActions` does not offer them
-      // yet, so this arm is unreachable today — it exists so that adding a kind
-      // to the kernel union fails the build here until it is wired, rather than
-      // silently going missing from the palette.
-      .with('ai-refine', 'ai-ask', () => null)
+      // Refine and Ask cannot be hoisted out of the note editor — `useRefineModal`
+      // adopts refined content straight into it, and both modals are mounted
+      // inside `NotesPanel` — so the palette hands off through the URL, extending
+      // the mechanism `notes=true` already uses. Re-hosting them here would mean
+      // duplicating two multi-round grilling flows.
+      .with('ai-refine', () =>
+        key === null ? null : run(() => deps.navigate({ issue: key, notes: true, ai: 'refine' })),
+      )
+      .with('ai-ask', () =>
+        key === null ? null : run(() => deps.navigate({ issue: key, notes: true, ai: 'ask' })),
+      )
       .exhaustive()
   )
 }
@@ -182,7 +188,8 @@ export function useActionCatalogue({
   const reviewCards = reviewQuery.data?.ok === true ? reviewQuery.data.cards : undefined
 
   const navigate = useCallback(
-    (search: { issue: string; notes?: true }) => navigateFn({ to: '.', search }),
+    (search: { issue: string; notes?: true; ai?: 'refine' | 'ask' }) =>
+      navigateFn({ to: '.', search }),
     [navigateFn],
   )
 

@@ -7,6 +7,6 @@ export const Route = createFileRoute('/watchlist')({
 })
 
 function WatchlistPage() {
-  const { issue, notes } = Route.useSearch()
-  return <AppShell variant="watchlist" issue={issue} notes={notes} />
+  const { issue, notes, ai } = Route.useSearch()
+  return <AppShell variant="watchlist" issue={issue} notes={notes} ai={ai} />
 }

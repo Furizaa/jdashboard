@@ -2,7 +2,7 @@ import { match } from 'ts-pattern'
 import { FixasapRibbon } from '~/widgets/fixasap-ribbon'
 import { hasFixasapLabel } from '~/widgets/ticket-card'
 import { cn } from '~/lib/cn'
-import { LightboxOpenProvider, useIssuePanel } from '../presenter'
+import { LightboxOpenProvider, useIssuePanel, type AiModal } from '../presenter'
 import type { IssuePanelState } from '../view-model'
 import { NotesPanel } from './NotesPanel'
 import { PanelBody } from './PanelBody'
@@ -12,16 +12,18 @@ import { PanelSkeleton } from './PanelSkeleton'
 
 type OpenPanel = Exclude<IssuePanelState, { phase: 'closed' }>
 
-export function IssueDetailPanel({
-  issueKey,
-  notesOpen,
-}: {
+export type IssueDetailPanelProps = {
   issueKey: string | null
   notesOpen: boolean
-}) {
+  /** A deep-linked AI modal to open once on arrival (the palette's `r` / `a`). */
+  aiModal: AiModal | null
+  onAiModalConsumed: () => void
+}
+
+export function IssueDetailPanel(props: IssueDetailPanelProps) {
   return (
     <LightboxOpenProvider>
-      <IssueDetailPanelInner issueKey={issueKey} notesOpen={notesOpen} />
+      <IssueDetailPanelInner {...props} />
     </LightboxOpenProvider>
   )
 }
@@ -29,13 +31,12 @@ export function IssueDetailPanel({
 function IssueDetailPanelInner({
   issueKey,
   notesOpen,
-}: {
-  issueKey: string | null
-  notesOpen: boolean
-}) {
+  aiModal,
+  onAiModalConsumed,
+}: IssueDetailPanelProps) {
   const panel = useIssuePanel(issueKey, notesOpen)
   if (panel.phase === 'closed') return null
-  return <Panel panel={panel} />
+  return <Panel panel={panel} aiModal={aiModal} onAiModalConsumed={onAiModalConsumed} />
 }
 
 function panelLabel(panel: OpenPanel): string {
@@ -53,7 +54,15 @@ function PanelContent({ panel }: { panel: OpenPanel }) {
     .exhaustive()
 }
 
-function Panel({ panel }: { panel: OpenPanel }) {
+function Panel({
+  panel,
+  aiModal,
+  onAiModalConsumed,
+}: {
+  panel: OpenPanel
+  aiModal: AiModal | null
+  onAiModalConsumed: () => void
+}) {
   // Notes mode widens the dialog to near-full width and reveals the note editor
   // as a left column; the ticket detail keeps its 760px column on the right,
   // unchanged. Open state lives in the URL (`?notes=1`) so a card's note badge can
@@ -93,7 +102,13 @@ function Panel({ panel }: { panel: OpenPanel }) {
         )}
         onClick={(e) => e.stopPropagation()}
       >
-        {notesOpen && <NotesPanel issueKey={panel.issueKey} />}
+        {notesOpen && (
+          <NotesPanel
+            issueKey={panel.issueKey}
+            aiModal={aiModal}
+            onAiModalConsumed={onAiModalConsumed}
+          />
+        )}
         <div
           className={cn(
             'relative flex h-full min-w-0 flex-col',

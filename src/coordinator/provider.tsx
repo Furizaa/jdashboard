@@ -4,6 +4,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { createIssue } from '~/server/server-functions/capture'
 import { transitionIssue } from '~/server/server-functions/detail'
 import { createBrowserWindowAdapter } from './adapters/browser-window'
+import { CommandBusProvider } from './adapters/command-bus'
 import { createRouterNavigateAdapter } from './adapters/router-navigate'
 import { createSonnerToastAdapter } from './adapters/sonner-toast'
 import { createTanstackCacheAdapter } from './adapters/tanstack-cache'
@@ -38,5 +39,11 @@ export function CoordinatorProvider({ children }: { children: ReactNode }) {
     })
   }, [queryClient, navigate])
 
-  return <CoordinatorCtx.Provider value={coord}>{children}</CoordinatorCtx.Provider>
+  return (
+    <CoordinatorCtx.Provider value={coord}>
+      {/* The command bus is part of the coordinator's composition root: it is a
+          cross-context wiring concern, not any one context's. */}
+      <CommandBusProvider>{children}</CommandBusProvider>
+    </CoordinatorCtx.Provider>
+  )
 }

@@ -3,7 +3,7 @@ import { CommandPalette } from '~/contexts/command-palette'
 import { useWorkspaceActions, WorkspaceActionModals } from '~/contexts/detail'
 import { workItemJiraKey, type WorkItem } from '~/kernel'
 import { useActionCatalogue } from './use-action-catalogue'
-import { useBoardCommands, type BoardFilterState } from './use-board-commands'
+import { useBoardCommands, type BoardCommandsState } from './use-board-commands'
 import { usePaletteItems } from './use-palette-items'
 import { useSubLists } from './use-sub-lists'
 
@@ -14,9 +14,9 @@ import { useSubLists } from './use-sub-lists'
 // The workspace dialogs are mounted here rather than inside the palette, because
 // they outlive it: running `e` closes the palette and leaves the branch prompt
 // standing, which is the point — the prompt is where you name the branch.
-export function CommandPaletteHost({ filter, onFilterChange }: BoardFilterState) {
+export function CommandPaletteHost(board: BoardCommandsState) {
   const { items, sources } = usePaletteItems()
-  const commands = useBoardCommands({ filter, onFilterChange })
+  const commands = useBoardCommands(board)
   const workspace = useWorkspaceActions()
 
   // Which ticket the palette is pointed at, announced by the palette when an

@@ -1,5 +1,6 @@
 import { Wand2 } from 'lucide-react'
 import { testIds } from '~/lib/testids'
+import { useRegisterCommand } from '~/coordinator'
 import { useBulkRefine } from '../presenter'
 import { BulkRefineModal } from './BulkRefineModal'
 
@@ -9,6 +10,9 @@ import { BulkRefineModal } from './BulkRefineModal'
 // the Header just drops it in like QuickCreateButton / WatchlistButton.
 export function BulkRefineButton() {
   const bulk = useBulkRefine()
+  // The palette opens this modal through the command bus; the button keeps
+  // owning its state (ADR-0008).
+  useRegisterCommand('bulk-refine', bulk.open)
   return (
     <>
       <button

@@ -1,4 +1,6 @@
 export { CoordinatorProvider } from './provider'
+export { useCommands, useRegisterCommand } from './adapters/command-bus'
+export type { CommandTarget, Commands } from './ports'
 export {
   useBoardData,
   useTicket,

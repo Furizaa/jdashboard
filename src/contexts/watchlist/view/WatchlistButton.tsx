@@ -1,10 +1,14 @@
 import { Eye } from 'lucide-react'
 import { testIds } from '~/lib/testids'
+import { useRegisterCommand } from '~/coordinator'
 import { useWatchlistModal } from '../presenter'
 import { WatchlistModal } from './WatchlistModal'
 
 export function WatchlistButton() {
   const wl = useWatchlistModal()
+  // The palette opens this modal through the command bus; the button keeps
+  // owning its state (ADR-0008).
+  useRegisterCommand('add-to-watchlist', wl.openModal)
   return (
     <>
       <button

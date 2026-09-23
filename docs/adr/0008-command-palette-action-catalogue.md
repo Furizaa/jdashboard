@@ -9,7 +9,7 @@ type PaletteAction = {
   kind: ActionKind // discriminated union in kernel/, matched exhaustively
   label: string
   enabled: boolean
-  run: () => void
+  perform: { effect: 'run'; run: () => void } | { effect: 'sub-list'; subList: SubListKind }
 }
 ```
 
@@ -42,3 +42,9 @@ Alongside it, `src/kernel/commands.ts` declares `ActionKind`, the curated `ACTIO
 - **Global commands are `Enter`-only, not keyed.** The palette's root level owns a text query, so a bare letter there types rather than runs. Per-item actions get letters because the action list has no text filter — that asymmetry is the price of having one input.
 
 - **Adding an action is a compile error until it is handled everywhere.** `ActionKind` is matched exhaustively via `ts-pattern`, and a duplicate letter in `ACTION_SHORTCUTS` throws at module load.
+
+- **`PaletteAction` carries a `perform`, not a bare `run`.** The PRD sketched `run: () => void`; two actions open a nested list instead of acting, and a callback that secretly navigates would be a callback that lies. `perform` is a two-case union the palette matches exhaustively, so the assembly declares which actions are sub-lists and the palette stays ignorant of which `ActionKind`s happen to be.
+
+- **A `Commands` port opens the five header modals.** Each lives in a header button that owns its own open state; `coordinator/adapters/command-bus.tsx` lets the button register an opener upward in one line (`useRegisterCommand`), where lifting five modals into the shell would change five contexts' public surfaces and split each button from its modal. React in `coordinator/adapters/` is what `coordinator-effects-only-in-adapters` permits, with `provider.tsx` as precedent. An unregistered target makes the command **illegal**, not inert: registration is scoped to the button's lifetime, so `Configure lanes` is simply absent on `/`.
+
+- **Two actions reuse a Detail flow rather than reimplementing it.** `contexts/detail` exposes `useWorkspaceActions` + `WorkspaceActionModals` so `e` opens the real branch-name prompt (which carries the worktree-already-exists warning and the existing-MR-branch reuse) and `x` opens the real discard confirmation. Skipping either would have meant inventing behaviour the app does not have — a branch the user never saw, or a force-removed worktree on one keystroke.

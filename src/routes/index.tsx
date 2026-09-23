@@ -7,6 +7,6 @@ export const Route = createFileRoute('/')({
 })
 
 function HomePage() {
-  const { issue, notes } = Route.useSearch()
-  return <AppShell variant="main" issue={issue} notes={notes} />
+  const { issue, notes, ai } = Route.useSearch()
+  return <AppShell variant="main" issue={issue} notes={notes} ai={ai} />
 }

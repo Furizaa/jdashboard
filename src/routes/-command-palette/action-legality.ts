@@ -53,8 +53,11 @@ export function legalActions(item: WorkItem, context: ActionContext): readonly A
       },
     )
     // `t` against no definitions would open an empty list; the Manage Tags
-    // command (slice 88) is where you go instead, and it is one level up.
+    // command is where you go instead, and it is one level up.
     if (context.tagCount > 0) descriptors.push({ kind: 'tags', label: 'Tags…' })
+    // Both hand off to the note editor's own modals through the URL, so they are
+    // legal on anything with a ticket and absent on a fake review card.
+    descriptors.push({ kind: 'ai-refine', label: 'AI Refine' }, { kind: 'ai-ask', label: 'AI Ask' })
     if (context.jiraBaseUrl !== null) {
       descriptors.push(
         { kind: 'open-in-jira', label: 'Open in Jira' },

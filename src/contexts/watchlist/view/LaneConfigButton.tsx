@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { SlidersHorizontal } from 'lucide-react'
-import { useTagDefinitions } from '~/coordinator'
+import { useRegisterCommand, useTagDefinitions } from '~/coordinator'
 import type { WatchlistLaneConfig } from '~/kernel'
 import { testIds } from '~/lib/testids'
 import { useSetWatchlistLanes, useWatchlistLanes } from '../presenter'
@@ -29,6 +29,10 @@ export function LaneConfigButton() {
     setDraft(lanesQuery.data?.lanes ?? [])
     setOpen(true)
   }
+
+  // Registered only while this button is mounted — it exists on `/watchlist`
+  // alone, so on the main board the palette simply does not offer the command.
+  useRegisterCommand('configure-lanes', openModal)
 
   const save = () => {
     void setLanes(draft).then((result) => {

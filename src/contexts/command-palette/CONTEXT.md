@@ -34,7 +34,9 @@ There is **no `application/` layer**, and its absence is the design: the palette
 
 **Work item** (kernel `WorkItem`): a thing the palette can find, from any of the three sources. The distinction the whole feature reads off it is `workItemJiraKey(item) !== null` — "is there a Jira ticket behind this?" — which gates almost every action's legality. A `review-fake` card is an MR with no resolvable key, so there is no ticket to transition, tag, or note.
 
-**Action** (`PaletteAction`): one thing legal for one work item, keyed by `ActionKind` from `kernel/commands.ts`. **Command** (`PaletteCommand`): a board-level action belonging to no work item, `Enter`-only.
+**Action** (`PaletteAction`): one thing legal for one work item, keyed by `ActionKind` from `kernel/commands.ts`. **Command** (`PaletteCommand`): a board-level action belonging to no work item, `Enter`-only — the root level owns a text query, so a bare letter there types rather than runs.
+
+**Hand-off**: an action that routes to an existing UI instead of re-hosting it. `r` / `a` navigate to `?issue=KEY&notes=true&ai=refine|ask` because Refine and Ask are coupled to the note editor (`useRefineModal` adopts refined content into it) and mounted inside `NotesPanel`. The five header modals are opened through the coordinator's **command bus**: each button registers an opener, the palette calls `open(target)`, and a target with no registered opener is **not offered** — `Configure lanes` exists on `/watchlist` alone.
 
 **Legality**: whether an action is offered at all, derived from item state and never hardcoded per surface. Illegal actions are **absent**, not disabled — `PaletteAction.enabled` is reserved for the transient case, an action that exists but whose data is still in flight. There is no `if (isReviewFake)` anywhere: a fake review card simply has no Jira key, so every ticket-shaped action falls away and only `m` / `v` survive.
 

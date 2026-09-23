@@ -1,5 +1,11 @@
 import { match } from 'ts-pattern'
-import { useAskModal, useNoteEditor, useRefineModal } from '../presenter'
+import {
+  useAiHandoff,
+  useAskModal,
+  useNoteEditor,
+  useRefineModal,
+  type AiModal,
+} from '../presenter'
 import type { NoteMode, SaveState } from '../view-model'
 import { cn } from '~/lib/cn'
 import { testIds } from '~/lib/testids'
@@ -13,7 +19,16 @@ import { RefineModal } from './RefineModal'
 // one ticket. All logic (draft, dirty, save triggers) lives in `useNoteEditor` +
 // its view-model; this file is the dumb renderer. It mirrors the right column's
 // header height/padding so the two panes line up.
-export function NotesPanel({ issueKey }: { issueKey: string }) {
+export function NotesPanel({
+  issueKey,
+  aiModal,
+  onAiModalConsumed,
+}: {
+  issueKey: string
+  /** A deep-linked AI modal to open once on arrival (the palette's `r` / `a`). */
+  aiModal: AiModal | null
+  onAiModalConsumed: () => void
+}) {
   const editor = useNoteEditor(issueKey)
   const { display } = editor
   // On a successful refine, adopt the rewritten note straight into the editor so
@@ -21,6 +36,7 @@ export function NotesPanel({ issueKey }: { issueKey: string }) {
   // the race with the editor's own save/seed cycle).
   const refine = useRefineModal(issueKey, editor.adoptContent)
   const ask = useAskModal(issueKey)
+  useAiHandoff(aiModal, { refine: refine.open, ask: ask.open }, onAiModalConsumed)
 
   return (
     <section

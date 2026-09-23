@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ReviewCardFake, ReviewCardReal } from '~/kernel'
-import type { ActionKind, BoardIssue, WorkItem } from '~/kernel'
+import { ACTION_SHORTCUTS, type ActionKind, type BoardIssue, type WorkItem } from '~/kernel'
 import { legalActions, workspaceTargetFields, workspaceTargetKey } from './action-legality'
 import type { ActionContext } from './action-legality'
 
@@ -77,6 +77,8 @@ describe('legalActions for a Jira-backed item', () => {
       'open-notes',
       'watchlist-toggle',
       'tags',
+      'ai-refine',
+      'ai-ask',
       'open-in-jira',
       'copy-jira-link',
       'copy-issue-key',
@@ -98,6 +100,21 @@ describe('legalActions for a Jira-backed item', () => {
     expect(early).not.toContain('copy-jira-link')
     // The key is still copyable — that needs no base URL.
     expect(early).toContain('copy-issue-key')
+  })
+})
+
+describe('the AI hand-offs', () => {
+  it('are legal on anything with a ticket behind it', () => {
+    for (const item of [JIRA, WATCHED, REVIEW_REAL]) {
+      expect(kinds(item)).toContain('ai-refine')
+      expect(kinds(item)).toContain('ai-ask')
+    }
+  })
+
+  it('are absent on a fake review card — there is no ticket and so no note', () => {
+    const fake = kinds(REVIEW_FAKE, context({ mr: { iid: 77, webUrl: fakeCard.webUrl } }))
+    expect(fake).not.toContain('ai-refine')
+    expect(fake).not.toContain('ai-ask')
   })
 })
 
@@ -242,16 +259,14 @@ describe('legalActions invariants', () => {
     }
   })
 
-  // The kinds the palette cannot run yet arrive in slice 88. Until they do,
-  // offering one would render a row that does nothing.
-  it('never emits an action kind that has no runner yet', () => {
-    const notYetWired: readonly ActionKind[] = ['ai-refine', 'ai-ask']
-    for (const item of everyShape) {
-      for (const ctx of everyContext) {
-        for (const kind of kinds(item, ctx)) {
-          expect(notYetWired).not.toContain(kind)
-        }
-      }
+  // Every kind the palette can offer now has an effect behind it; nothing is
+  // still a placeholder.
+  it('offers every kind in the kernel map across the shapes and states above', () => {
+    const offered = new Set(
+      everyShape.flatMap((item) => everyContext.flatMap((ctx) => kinds(item, ctx))),
+    )
+    for (const kind of Object.keys(ACTION_SHORTCUTS) as ActionKind[]) {
+      expect(offered).toContain(kind)
     }
   })
 })

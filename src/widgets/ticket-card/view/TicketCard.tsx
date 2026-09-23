@@ -95,7 +95,11 @@ export function TicketCard({
         onOpenNotes={openNotes}
       />
 
+      {/* The one region of the card guaranteed to carry no interactive child.
+          The card's centre can land on the status pill (which stops
+          propagation), so "click the card" in a test means clicking here. */}
       <div
+        data-testid={testIds.cardSummary}
         className="text-foreground mt-1.5 overflow-hidden text-[13px] leading-snug tracking-[-0.005em]"
         style={{
           display: '-webkit-box',

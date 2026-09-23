@@ -58,6 +58,7 @@ const LEVEL_FOR_STATUS: Record<Exclude<PaletteDisplay['status'], 'closed'>, Pale
   root: 'root',
   actions: 'actions',
   'sub-list': 'sub-list',
+  help: 'help',
 }
 
 /**
@@ -210,11 +211,15 @@ type IntentTargets = {
 type OpenDisplay = Exclude<PaletteDisplay, { status: 'closed' }>
 
 function listLength(display: OpenDisplay): number {
-  return match(display)
-    .with({ status: 'root' }, (d) => d.rowCount)
-    .with({ status: 'actions' }, (d) => d.actionCount)
-    .with({ status: 'sub-list' }, (d) => d.rowCount)
-    .exhaustive()
+  return (
+    match(display)
+      .with({ status: 'root' }, (d) => d.rowCount)
+      .with({ status: 'actions' }, (d) => d.actionCount)
+      .with({ status: 'sub-list' }, (d) => d.rowCount)
+      // The help table is not navigable — the browser scrolls it.
+      .with({ status: 'help' }, () => 0)
+      .exhaustive()
+  )
 }
 
 /** Returns whether the intent was handled, so the caller can `preventDefault`. */
@@ -249,6 +254,7 @@ function dispatchIntent(
           targets.runSubItem(d.selectedRow)
           return true
         })
+        .with({ status: 'help' }, () => false)
         .exhaustive(),
     )
     .with({ kind: 'close' }, () => {
@@ -269,6 +275,13 @@ function dispatchIntent(
       // Handled either way. A letter bound to an action that is not currently
       // legal must be a **no-op** — not a fall-through to another handler, and
       // not a close. Swallowing it here is what makes that true.
+      return true
+    })
+    .with({ kind: 'help' }, () => {
+      // Only from the root level, and only with an empty query — otherwise a
+      // question mark could not be typed into a search.
+      if (display.status !== 'root' || display.query !== '') return false
+      targets.dispatch({ type: 'enteredHelp' })
       return true
     })
     .with({ kind: 'pick' }, ({ index }) => {

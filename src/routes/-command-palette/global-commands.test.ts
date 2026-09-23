@@ -49,6 +49,14 @@ describe('the board-filter commands', () => {
       "Clear board filter 'apple'",
     )
   })
+
+  it('ranks last, so a query that names a command does not filter the board instead', () => {
+    // Its label embeds the query, so it matches *everything* — first place would
+    // mean ↵ on "go to watchlist" narrowing the board rather than switching.
+    const offered = ids(context({ query: 'go to watchlist' }))
+    expect(offered.at(-1)).toBe('filter-board')
+    expect(offered.indexOf('go-to-watchlist')).toBeLessThan(offered.indexOf('filter-board'))
+  })
 })
 
 describe('the header-modal commands', () => {

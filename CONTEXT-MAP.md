@@ -4,14 +4,15 @@ clashboard is organised as **bounded contexts**, each with its own internal hexa
 
 ## Contexts
 
-| Context     | Lives in                | Purpose                                  | Key concepts                                                             |
-| ----------- | ----------------------- | ---------------------------------------- | ------------------------------------------------------------------------ |
-| **Board**   | `src/contexts/board/`   | Renders my work as columns               | `BoardView`, `Column`, status-mapping, deemphasis, sort, filter          |
-| **Detail**  | `src/contexts/detail/`  | Renders a single ticket in a side panel  | `IssuePanelState`, ADF rendering, sibling navigation, keyboard shortcuts |
-| **Review**  | `src/contexts/review/`  | Surfaces MRs waiting on me as fake cards | `ReviewCard`, review-state buckets                                       |
-| **Capture** | `src/contexts/capture/` | Quick-create modal                       | `QuickCreateInput`, parent selection, type segmentation                  |
+| Context             | Lives in                        | Purpose                                             | Key concepts                                                                                        |
+| ------------------- | ------------------------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| **Board**           | `src/contexts/board/`           | Renders my work as columns                          | `BoardView`, `Column`, status-mapping, deemphasis, sort, filter                                     |
+| **Detail**          | `src/contexts/detail/`          | Renders a single ticket in a side panel             | `IssuePanelState`, ADF rendering, sibling navigation, keyboard shortcuts                            |
+| **Review**          | `src/contexts/review/`          | Surfaces MRs waiting on me as fake cards            | `ReviewCard`, review-state buckets                                                                  |
+| **Capture**         | `src/contexts/capture/`         | Quick-create modal                                  | `QuickCreateInput`, parent selection, type segmentation                                             |
+| **Command Palette** | `src/contexts/command-palette/` | ⌘K: find any work item, run any action legal for it | `WorkItem` ranking, `PaletteAction` / `PaletteCommand` descriptors, the three-deep navigation stack |
 
-The **Board** and **Review** contexts both place items on the same column grid, so they share _Column_ as kernel terminology. **Detail** and **Capture** are independent surfaces that compose with Board.
+The **Board** and **Review** contexts both place items on the same column grid, so they share _Column_ as kernel terminology. **Detail** and **Capture** are independent surfaces that compose with Board. **Command Palette** is the odd one out: it drives all of them and imports none of them — see [the dependency law](#the-dependency-law) and [ADR-0008](docs/adr/0008-command-palette-action-catalogue.md).
 
 There is no top-level "domain layer" above the contexts. clashboard's domain _is_ the set of contexts; cross-cutting concepts (`IssueKey`, status-name strings) are kernel types, not entities.
 
@@ -22,6 +23,7 @@ Some workflows span contexts and don't belong inside any one of them:
 - **Apply transition** — Board patches its cache, Detail patches its cache, gateway is called, both roll back on failure. Touches Board + Detail.
 - **Handle MR merged** — Detail/Review surface the action; Board needs the resulting transition reflected. Touches Review + Board (+ Detail).
 - **Create issue** — Capture submits; Board invalidates so the new card appears.
+- **Open a header modal from the palette** — the palette asks for `new-ticket` / `manage-tags` / `bulk-refine` / `add-to-watchlist` / `configure-lanes`; whichever header button owns that modal has registered an opener. Touches Capture + Tags + Bulk Refine + Watchlist.
 
 These live in a **cross-context coordinator** (`src/coordinator/`). The coordinator depends on per-context application services; contexts never depend on the coordinator.
 
@@ -52,8 +54,9 @@ Trivial hooks (one piece of `useState`, no derivation) stay as plain hooks. The 
 ## Glossary (in-progress — extend as terms get resolved)
 
 - **BoardView** — the projection of my issues + review cards onto the four columns. Owned by Board context.
-- **WorkItem** _(candidate term — not yet adopted)_ — a thing on the board, regardless of source (Jira issue or GitLab MR fake-card). Currently modelled as a discriminated union at the assembly layer; not a first-class type.
-- **Coordinator** — the cross-context workflow object (formerly the misnamed `DashboardService`).
+- **WorkItem** — a thing on the board, regardless of source: an assigned Jira issue, a watchlist card, or a GitLab review card (real or fake). A kernel type (`kernel/work-item.ts`) with identity, search text, and a documented dedupe precedence, since the same ticket can arrive from more than one source. The predicate the command palette turns on is `workItemJiraKey(item) !== null` — "is there a Jira ticket behind this?" — which gates almost every action's legality. Adopted by [ADR-0008](docs/adr/0008-command-palette-action-catalogue.md).
+- **Action** / **Command** — an `ActionKind` legal for one work item (`PaletteAction`), versus a board-level command belonging to none (`PaletteCommand`). Both reach the palette as plain descriptors; the shortcut letters live in `kernel/commands.ts`.
+- **Coordinator** — the cross-context workflow object (formerly the misnamed `DashboardService`). Its ports are `Cache`, `Toast`, `Navigate`, `Browser`, and `Commands` — the last being the command bus the palette uses to open a header modal whose state stays inside its own button.
 - **Application service** — the use-case layer of one context. Replaces the overloaded "service."
 - **Gateway** — the port to an external system. The HTTP gateway adapter implements the port.
 - **View-model** — framework-free state machine for one screen / one widget. Replaces the React-bound "hook returns a state" pattern where the state shape is non-trivial.
@@ -70,6 +73,9 @@ src/kernel/
 ├── columns.ts  # Column / columnForStatus / statusesForColumn / isDeemphasized / COLUMNS
 ├── status.ts   # normalizeStatus
 ├── review.ts   # reviewCardId / reviewBucketColumn / reviewSearchHaystack / REVIEW_BUCKET_STATUS_NAME
+├── work-item.ts # WorkItem union + workItemId / workItemJiraKey / workItemHaystack / dedupeWorkItems
+├── commands.ts # ActionKind / ACTION_SHORTCUTS / ActionGroup — the palette's curated key map
+├── mr-for-key.ts # resolveMrForKey / resolveMrForWorkItem — the MR for a ticket (authored, or reviewed)
 ├── mr/         # REVIEWER_STATE_LABEL / REVIEWER_BADGE_LABEL / CiVisualState / ReviewerVisualState
 └── index.ts
 ```
@@ -88,6 +94,7 @@ Kernel types are the lingua franca of cross-context dependencies (e.g. both Boar
 | Cache                    | TanStack Query                        | Adapter behind the `Cache` port; only presenters (and the coordinator's adapter) import `useQuery`/`useMutation`.                                                                                                                                                      |
 | Routing                  | TanStack Router                       | Adapter; `useNavigate` only in presenters; the `navigate` function is passed into view-models / coordinator as a dep.                                                                                                                                                  |
 | Toasts                   | sonner                                | Adapter behind a `Toast` port owned by the coordinator. View-models and application services do not import `sonner`.                                                                                                                                                   |
+| Command palette          | none (hand-rolled)                    | `cmdk` deliberately skipped: it would own the query, selection, and navigation state ADR-0003 assigns to the view-model. Radix Dialog is already in via `design-system/dialog.tsx`, which is the only primitive the palette needs.                                     |
 | Design-system primitives | Shadcn/ui (already configured)        | **Adopt-on-second-use** rule: when a primitive (button, dialog, popover, ...) is needed in 2+ places, pull in the shadcn version into `design-system/`. Single-use primitives stay inline at first.                                                                    |
 | Architecture analysis    | `fallow`                              | Local-only `npx fallow`; reads `.fallow/` cache. Used for unused-code, duplication, complexity, and architecture-drift signal.                                                                                                                                         |
 | Dependency rules         | `dependency-cruiser`                  | Codifies the dependency law as `forbidden` rules — one rule per edge in `.dependency-cruiser.cjs`. All rules are `error` post-lockdown.                                                                                                                                |
@@ -130,6 +137,8 @@ The import graph is a strict DAG. Edges that exist:
 - `routes` → `contexts/<name>` (via barrel), `coordinator/provider`
 - `routes/api/<name>` → `server/runtime/*`, `server/gateways/<X>/{port, types, errors}`, `server/contexts/<name>/application` (HTTP-shaped entry points; see ADR-0006)
 - `contexts/<name>` → `kernel`, `coordinator`, `widgets/<name>`, `design-system`, `lib`
+- `contexts/command-palette` → `kernel`, `design-system`, `lib` **only** — not even `coordinator`. Its work items, actions, commands, and sub-lists all arrive injected as plain values and plain functions, which is what lets a context that drives six others import none of them. Pinned by `command-palette-domain-only-imports-kernel` and `command-palette-view-model-only-imports-kernel-and-domain`.
+- `routes/-command-palette/` → every context the palette touches. This is **the** cross-context assembly, legal because `routes/` is the only place multiple contexts compose (ADR-0007, ADR-0008). Legality is pure and unit-tested (`action-legality.ts`, `global-commands.ts`); only the effects live in the hooks.
 - `widgets/<name>` → `kernel`, `coordinator`, `design-system`, `lib`, sibling widgets _only_ within the same widget family (e.g. `mr-section` and `fixasap-ribbon` may compose inside `ticket-card`)
 - `coordinator` → `contexts/<name>/application` (per-context use-cases), `kernel`, `lib`
 - `contexts/<name>/application` → `kernel`, gateway/cache **ports** (declared inside the context)
@@ -178,6 +187,17 @@ TS strictness stays at today's level (`strict`, `strictNullChecks`, `noUnchecked
 | Heavy            | nightly / pre-release       | `playwright test`. Multiple minutes.                                                     |
 
 Pre-commit wired via `simple-git-hooks` (config in `package.json`, zero extra deps).
+
+### The palette's rules
+
+Added at `error` severity from inception, alongside the per-context rules:
+
+| Rule                                                        | What it says                                                                    |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `command-palette-domain-only-imports-kernel`                | Ranking, key intents, and the action descriptors see `~/kernel` and each other. |
+| `command-palette-view-model-only-imports-kernel-and-domain` | The state machine and its projection add only the palette's own `domain/`.      |
+
+Together with the generic `no-cross-context` rule, these are what make "a context that drives six others and imports none of them" a checked claim rather than a good intention. `no-cross-context` was observed to fail against a deliberate violation before being relied on.
 
 ### Architectural rules: graduated
 

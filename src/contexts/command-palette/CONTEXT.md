@@ -120,3 +120,18 @@ export type {
 ```
 
 `CommandPalette` is mounted once per board route by `AppShell`. The descriptor types are exported because `routes/` has to build them; everything else — the state machine, the ranking, the key map — is internal.
+
+## The mouse-free session, walked
+
+The PRD's success test is "a full working session — triage, status changes, tagging, notes, AI refine — without touching the mouse." It is mechanised as `tests/e2e/command-palette/mouse-free-session.spec.ts`, which contains **no `.click()` at all**: if a step needed a mouse, that spec could not express it.
+
+Three things the walk turned up, all fixed:
+
+- **The filter command outranked everything.** "Filter board by '‹query›'" embeds the query in its label, so it matched every query and always came first — `⌘K`, "go to watchlist", `↵` narrowed the board instead of switching to it. It is the fallback, so it now ranks **last** among commands.
+- **Backing out of an AI hand-off reopened it.** Clearing the `ai` param pushed a history entry, so the back button landed on `?ai=refine` again. It now `replace`s.
+- **Escape from the note editor used to be the only way out.** Still true, and correct: the guard that stops ⌘K stealing focus from a text input is the same one the deleted search box had. `Esc` leaves the editor, then ⌘K works.
+
+Two known limits, deliberately left:
+
+- **Typing ahead into a loading sub-list is dropped, not queued.** Transitions come from Jira per ticket, so `s` then `1` faster than the fetch does nothing. The list does say "Loading…", so it is visible rather than silent, but a fast keypress is lost. Queueing it would mean running an action against a list the user never saw.
+- **The note editor is not autofocused** when `n` opens the notes pane, because the pane is as often opened to read as to write. Reaching the textarea is `Tab`.

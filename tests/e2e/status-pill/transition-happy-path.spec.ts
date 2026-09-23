@@ -28,9 +28,7 @@ test('lazy-fetches transitions, applies optimistic update, and reflects world-co
   expect(transitionGets()).toBe(0)
 
   // Open the dropdown — this is what should trigger the GET.
-  await card
-    .getByRole('button', { name: 'Change status from Reviewed' })
-    .click()
+  await card.getByRole('button', { name: 'Change status from Reviewed' }).click()
 
   await expect(page.getByRole('menu')).toBeVisible()
   await expect.poll(transitionGets).toBe(1)
@@ -75,8 +73,8 @@ test('lazy-fetches transitions, applies optimistic update, and reflects world-co
     .filter((r) => r.method === 'POST' && r.path === SEARCH_PATH).length
   await page.clock.fastForward(60_000)
   await expect
-    .poll(() =>
-      mocks.requests().filter((r) => r.method === 'POST' && r.path === SEARCH_PATH).length,
+    .poll(
+      () => mocks.requests().filter((r) => r.method === 'POST' && r.path === SEARCH_PATH).length,
     )
     .toBeGreaterThan(searchesBefore)
 

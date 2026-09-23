@@ -21,7 +21,11 @@ test('reviewer row renders one avatar per assigned reviewer (with and without av
   world.seedGitlabCurrentUser({ username: 'me-gitlab', displayName: 'Me' })
 
   world.seedIssues([
-    makeIssue({ key: ISSUE_KEY, summary: `${ISSUE_KEY}: Reviewer row`, statusName: 'In Code Review' }),
+    makeIssue({
+      key: ISSUE_KEY,
+      summary: `${ISSUE_KEY}: Reviewer row`,
+      statusName: 'In Code Review',
+    }),
   ])
 
   const reviewerWithAvatar = makeMrReviewer({

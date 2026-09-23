@@ -1,7 +1,25 @@
+import { mkdirSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { defineConfig, devices } from '@playwright/test'
 
 const PORT = 4004
 const MOCK_PORT = 9999
+
+// The app's local state — watchlist, tags, notes, lane config — lives in
+// `~/.clashboard/*`, read by the server through `os.homedir()`. Point HOME at a
+// throwaway directory so the suite neither reads nor writes the developer's real
+// board, and so specs can seed that state deterministically. Node's `homedir()`
+// honours $HOME on POSIX, so this is the whole isolation.
+//
+// The path is fixed rather than `mkdtemp`'d: Playwright re-evaluates this config
+// in every worker process, so a random name would give the server and the specs
+// two different directories. The suite runs single-worker and non-parallel, so a
+// shared fixed path is safe, and each spec wipes it (see the `local` fixture).
+const E2E_HOME = join(tmpdir(), 'clashboard-e2e-home')
+mkdirSync(E2E_HOME, { recursive: true })
+// Surfaced to the runner process so fixtures write where the server reads.
+process.env.CLASHBOARD_E2E_HOME = E2E_HOME
 
 const JIRA_LABEL_FILTER = 'Frontend'
 // Surface the configured filter to the runner process so specs can read it
@@ -27,6 +45,7 @@ const baseEnv: Record<string, string> = {
   GITLAB_TOKEN: 'e2e-gitlab-token',
   GITLAB_PROJECT_PATH: 'e2e/test-project',
   NODE_ENV: 'production',
+  HOME: E2E_HOME,
 }
 
 export default defineConfig({

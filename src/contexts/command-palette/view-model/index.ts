@@ -8,9 +8,12 @@ export {
 } from './palette-state'
 export {
   derivePalette,
+  deriveHelpGroups,
   type PaletteActionGroupView,
   type PaletteActionRow,
   type PaletteDisplay,
+  type PaletteHelpGroupView,
+  type PaletteHelpRow,
   type PaletteInputs,
   type PaletteRow,
   type PaletteRowTarget,

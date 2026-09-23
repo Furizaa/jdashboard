@@ -6,6 +6,7 @@ import {
   type FailNextResponse,
 } from '../mocks/server'
 import { World, seedBaselineWorld } from '../world/World'
+import { LocalStore } from './local-store'
 import type { HttpHandler } from 'msw'
 
 export type MocksHandle = {
@@ -24,6 +25,8 @@ export type MocksHandle = {
 type TestFixtures = {
   world: World
   mocks: MocksHandle
+  /** The app's local-only state (tags, watchlist) on the e2e server's disk. */
+  local: LocalStore
 }
 
 type WorkerFixtures = {
@@ -49,10 +52,7 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
     },
     { scope: 'worker', auto: true },
   ],
-  world: async (
-    { page, mockServerHandle }: { page: Page; mockServerHandle: MockServer },
-    use,
-  ) => {
+  world: async ({ page, mockServerHandle }: { page: Page; mockServerHandle: MockServer }, use) => {
     const world = new World()
     seedBaselineWorld(world)
     mockServerHandle.setWorld(world)
@@ -60,11 +60,25 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
     await use(world)
     mockServerHandle.reset()
   },
+  // Auto-used so every spec starts from an empty `~/.clashboard`, whether or not
+  // it seeds anything: otherwise one spec's tags would leak into the next.
+  local: [
+    // Playwright requires a destructuring pattern; this fixture has no upstream
+    // dependencies, so the pattern is empty (as with `mockServerHandle` above).
+    // eslint-disable-next-line no-empty-pattern
+    // oxlint-disable-next-line no-empty-pattern
+    async ({}, use) => {
+      const store = new LocalStore()
+      await store.reset()
+      await use(store)
+      await store.reset()
+    },
+    { auto: true },
+  ],
   mocks: async ({ mockServerHandle, world: _world }, use) => {
     await use({
       use: (...handlers) => mockServerHandle.use(...handlers),
-      failNext: (method, pattern, response) =>
-        mockServerHandle.failNext(method, pattern, response),
+      failNext: (method, pattern, response) => mockServerHandle.failNext(method, pattern, response),
       requests: () => mockServerHandle.requests(),
     })
   },

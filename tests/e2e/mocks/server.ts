@@ -28,7 +28,11 @@ export type MockServer = {
   /** Register handler overrides for the current test. Call `reset()` to clear them. */
   use: (...overrides: HttpHandler[]) => void
   /** Register a one-shot override that fires for the next matching request and is then dropped. */
-  failNext: (method: 'GET' | 'POST' | 'PUT' | 'DELETE', pattern: string, response: FailNextResponse) => void
+  failNext: (
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+    pattern: string,
+    response: FailNextResponse,
+  ) => void
   /** Snapshot of all requests served since the last `reset()`. */
   requests: () => readonly RequestLogEntry[]
   reset: () => void
@@ -73,9 +77,7 @@ export function createMockServer(): MockServer {
       }
 
       // One-shots are matched first; the first that matches is consumed.
-      const oneShotMatches = await Promise.all(
-        oneShots.map((h) => getResponse([h], request)),
-      )
+      const oneShotMatches = await Promise.all(oneShots.map((h) => getResponse([h], request)))
       const oneShotIdx = oneShotMatches.findIndex((m): m is Response => m != null)
       let matched: Response | undefined
       if (oneShotIdx !== -1) {
@@ -106,7 +108,7 @@ export function createMockServer(): MockServer {
     } catch (err) {
       response.statusCode = 500
       response.setHeader('content-type', 'text/plain; charset=utf-8')
-      response.end(err instanceof Error ? err.stack ?? err.message : String(err))
+      response.end(err instanceof Error ? (err.stack ?? err.message) : String(err))
     }
   }
 

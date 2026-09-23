@@ -3,6 +3,7 @@ import {
   ACTION_GROUPS,
   ACTION_GROUP_LABEL,
   ACTION_GROUP_ORDER,
+  ACTION_LABELS,
   ACTION_SHORTCUTS,
   REVIEW_BUCKET_STATUS_NAME,
   workItemId,
@@ -69,6 +70,18 @@ export type PaletteSubItemRow = PaletteSubItem & {
   readonly index: number
   /** `1`–`9` for the first nine rows, `null` beyond — see `palette-key-intent`. */
   readonly digit: string | null
+}
+
+export type PaletteHelpRow = {
+  readonly kind: ActionKind
+  readonly label: string
+  readonly shortcut: string
+}
+
+export type PaletteHelpGroupView = {
+  readonly group: ActionGroup
+  readonly label: string
+  readonly rows: readonly PaletteHelpRow[]
 }
 
 export type PaletteSubListContent =
@@ -143,6 +156,10 @@ export type PaletteDisplay =
        * transition list both close on success. An intentional difference.
        */
       readonly staysOpen: boolean
+    }
+  | {
+      readonly status: 'help'
+      readonly groups: readonly PaletteHelpGroupView[]
     }
 
 function itemBadge(item: WorkItem): string {
@@ -297,6 +314,22 @@ function findItem(state: { itemId: string }, inputs: PaletteInputs): WorkItem | 
   return inputs.items.find((candidate) => workItemId(candidate) === state.itemId)
 }
 
+/**
+ * The shortcut reference, **generated** from `kernel/commands.ts` rather than
+ * hand-written beside it. A hand-written table would rot on the first action
+ * added; this one cannot disagree with the map it is built from.
+ */
+export function deriveHelpGroups(): readonly PaletteHelpGroupView[] {
+  const kinds = Object.keys(ACTION_SHORTCUTS) as ActionKind[]
+  return ACTION_GROUP_ORDER.map((group) => ({
+    group,
+    label: ACTION_GROUP_LABEL[group],
+    rows: kinds
+      .filter((kind) => ACTION_GROUPS[kind] === group)
+      .map((kind) => ({ kind, label: ACTION_LABELS[kind], shortcut: ACTION_SHORTCUTS[kind] })),
+  })).filter((view) => view.rows.length > 0)
+}
+
 export function derivePalette(state: PaletteState, inputs: PaletteInputs): PaletteDisplay {
   return match(state)
     .with({ status: 'closed' }, () => ({ status: 'closed' as const }))
@@ -324,6 +357,10 @@ export function derivePalette(state: PaletteState, inputs: PaletteInputs): Palet
         byKind: new Map(rows.map((row) => [row.kind, row])),
       }
     })
+    .with({ status: 'help' }, () => ({
+      status: 'help' as const,
+      groups: deriveHelpGroups(),
+    }))
     .with({ status: 'sub-list' }, (s) => {
       const item = findItem(s, inputs)
       if (item === undefined) {

@@ -5,6 +5,7 @@ import { testIds } from '~/lib/testids'
 import { useCommandPalette, type CommandPaletteDeps } from '../presenter'
 import { PaletteActions } from './PaletteActions'
 import { PaletteEmpty } from './PaletteEmpty'
+import { PaletteHelp } from './PaletteHelp'
 import { PaletteFooter } from './PaletteFooter'
 import { PaletteResults } from './PaletteResults'
 import { PaletteSubList } from './PaletteSubList'
@@ -24,6 +25,10 @@ export function CommandPalette(deps: CommandPaletteDeps) {
 
   // Both deep levels list an item's own things; only the root owns the query.
   const inItem = display.status === 'actions' || display.status === 'sub-list'
+  // Help is a peer of the results rather than a level under an item, but it
+  // shares the "no query field, back one level" shape.
+  const inHelp = display.status === 'help'
+  const showQuery = !inItem && !inHelp
 
   // The query field only exists at the root level — the action list has no text
   // filter, because typing a letter there *runs* an action. So focus moves to
@@ -31,9 +36,9 @@ export function CommandPalette(deps: CommandPaletteDeps) {
   // Keystrokes are handled on the dialog either way, which is where they bubble.
   useEffect(() => {
     if (display.status === 'closed') return
-    if (inItem) contentRef.current?.focus()
-    else inputRef.current?.focus()
-  }, [display.status, inItem])
+    if (showQuery) inputRef.current?.focus()
+    else contentRef.current?.focus()
+  }, [display.status, showQuery])
 
   if (display.status === 'closed') return null
 
@@ -52,7 +57,7 @@ export function CommandPalette(deps: CommandPaletteDeps) {
       >
         <DialogTitle className="sr-only">Command palette</DialogTitle>
         <div className="border-border flex h-12 items-center gap-2.5 border-b px-4">
-          {inItem ? (
+          {!showQuery ? (
             <button
               type="button"
               onClick={palette.back}
@@ -64,7 +69,11 @@ export function CommandPalette(deps: CommandPaletteDeps) {
           ) : (
             <Search size={15} className="text-ink-tertiary shrink-0" aria-hidden />
           )}
-          {display.status === 'actions' || display.status === 'sub-list' ? (
+          {display.status === 'help' ? (
+            <div className="text-foreground flex min-w-0 flex-1 items-center text-sm">
+              Keyboard shortcuts
+            </div>
+          ) : display.status === 'actions' || display.status === 'sub-list' ? (
             // At a deep level the header reads as a breadcrumb for the item
             // whose things are listed, so it is obvious what the next keypress
             // acts on — and one level deeper, which list you are in.
@@ -103,7 +112,9 @@ export function CommandPalette(deps: CommandPaletteDeps) {
           )}
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto py-1.5">
-          {display.status === 'sub-list' ? (
+          {display.status === 'help' ? (
+            <PaletteHelp groups={display.groups} />
+          ) : display.status === 'sub-list' ? (
             <PaletteSubList
               content={display.content}
               subIndex={display.subIndex}

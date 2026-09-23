@@ -20,6 +20,7 @@ export type PaletteIntent =
   // but a transition list is short, dynamic and homogeneous, so there is nothing
   // stable to memorise there and a digit is the fastest thing available.
   | { readonly kind: 'pick'; readonly index: number }
+  | { readonly kind: 'help' }
 
 /**
  * Which level the keypress arrived at, which changes what a bare character means:
@@ -31,8 +32,10 @@ export type PaletteIntent =
  *   a level, and a curated letter runs its action.
  * - `sub-list` navigates the same way but takes **digits** instead of letters:
  *   a nested list is a pick, not a menu of named actions.
+ * - `help` is a static reference table. Only dismissal applies, so the arrows
+ *   fall through to the browser and scroll it.
  */
-export type PaletteLevel = 'root' | 'actions' | 'sub-list'
+export type PaletteLevel = 'root' | 'actions' | 'sub-list' | 'help'
 
 const SHARED: Readonly<Record<string, PaletteIntent>> = {
   ArrowDown: { kind: 'next' },
@@ -58,9 +61,20 @@ export function paletteKeyIntent(
   // the global hotkey, and ⌘← / ⌥← belong to the browser and the caret.
   if (event.metaKey || event.ctrlKey || event.altKey) return null
 
+  if (level === 'help') {
+    if (event.key === 'Escape') return { kind: 'close' }
+    if (event.key === 'Backspace' || event.key === 'ArrowLeft') return { kind: 'back' }
+    // Everything else, arrows included, is left to the browser so the table
+    // scrolls the way a table should.
+    return null
+  }
+
   const shared = SHARED[event.key]
   if (shared !== undefined) return shared
-  if (level === 'root') return null
+  // `?` opens the shortcut reference. The caller only offers it while the query
+  // is empty — a curated map is only an advantage if it is discoverable, but not
+  // at the cost of being unable to type a question mark.
+  if (level === 'root') return event.key === '?' ? { kind: 'help' } : null
 
   const lower = event.key.toLowerCase()
   // List navigation wins over the shortcut map. It can only ever shadow `j`/`k`,

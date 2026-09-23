@@ -10,7 +10,7 @@ export function PaletteFooter({
   level,
   sources,
 }: {
-  level: 'root' | 'actions' | 'sub-list'
+  level: 'root' | 'actions' | 'sub-list' | 'help'
   sources: readonly PaletteSourceNote[]
 }) {
   const loading = sources.filter((s) => s.state === 'loading')
@@ -21,11 +21,18 @@ export function PaletteFooter({
       data-testid={testIds.commandPaletteFooter}
       className="border-border bg-surface-1 text-ink-tertiary flex h-9 shrink-0 items-center gap-3 border-t px-4 text-[11px]"
     >
-      <Hint keys={['↑', '↓']}>Navigate</Hint>
+      {level !== 'help' && <Hint keys={['↑', '↓']}>Navigate</Hint>}
       {level === 'root' && (
         <>
           <Hint keys={['↵']}>Actions</Hint>
+          <Hint keys={['?']}>Shortcuts</Hint>
           <Hint keys={['esc']}>Close</Hint>
+        </>
+      )}
+      {level === 'help' && (
+        <>
+          <span>Source of truth: kernel/commands.ts</span>
+          <Hint keys={['⌫']}>Back</Hint>
         </>
       )}
       {level === 'actions' && (

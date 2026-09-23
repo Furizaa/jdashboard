@@ -81,10 +81,7 @@ test('MR with a Jira key absent from the bulk fetch and an MR with no Jira key b
 
   // Click the body of the no-key card → opens the MR URL in a new tab and
   // does NOT open the Jira detail panel (no `?issue=` on the original tab).
-  const [bodyTab] = await Promise.all([
-    context.waitForEvent('page'),
-    cardNoKey.click(),
-  ])
+  const [bodyTab] = await Promise.all([context.waitForEvent('page'), cardNoKey.click()])
   await expect.poll(() => bodyTab.url(), { timeout: 5_000 }).toBe(URL_NO_KEY)
   await bodyTab.close()
   await expect(page.getByRole('dialog')).toHaveCount(0)
@@ -94,10 +91,7 @@ test('MR with a Jira key absent from the bulk fetch and an MR with no Jira key b
   const keyButton = cardDeleted.getByRole('button', {
     name: `Open MR for MR !${IID_DELETED_KEY}`,
   })
-  const [keyTab] = await Promise.all([
-    context.waitForEvent('page'),
-    keyButton.click(),
-  ])
+  const [keyTab] = await Promise.all([context.waitForEvent('page'), keyButton.click()])
   await expect.poll(() => keyTab.url(), { timeout: 5_000 }).toBe(URL_DELETED_KEY)
   await keyTab.close()
   await expect(page.getByRole('dialog')).toHaveCount(0)

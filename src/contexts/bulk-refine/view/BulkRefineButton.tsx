@@ -1,6 +1,6 @@
 import { Wand2 } from 'lucide-react'
 import { testIds } from '~/lib/testids'
-import { useRegisterCommand } from '~/coordinator'
+import { useRegisterCommand } from '~/coordinator/adapters/command-bus'
 import { useBulkRefine } from '../presenter'
 import { BulkRefineModal } from './BulkRefineModal'
 

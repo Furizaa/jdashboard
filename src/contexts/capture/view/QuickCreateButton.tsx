@@ -1,5 +1,5 @@
 import { Plus } from 'lucide-react'
-import { useRegisterCommand } from '~/coordinator'
+import { useRegisterCommand } from '~/coordinator/adapters/command-bus'
 import { useQuickCreate } from '../presenter'
 import { QuickCreateModal } from './QuickCreateModal'
 

@@ -28,6 +28,13 @@ export type PaletteState =
       readonly subList: SubListKind
       readonly subIndex: number
     }
+  // The generated shortcut reference. It sits beside `open` rather than under
+  // it: it belongs to no work item, and backing out returns to the results.
+  | {
+      readonly status: 'help'
+      readonly query: string
+      readonly selected: number
+    }
 
 export type PaletteEvent =
   | { readonly type: 'opened' }
@@ -37,6 +44,7 @@ export type PaletteEvent =
   | { readonly type: 'highlighted'; readonly index: number }
   | { readonly type: 'enteredActions'; readonly itemId: string }
   | { readonly type: 'enteredSubList'; readonly subList: SubListKind }
+  | { readonly type: 'enteredHelp' }
   | { readonly type: 'wentBack' }
 
 export const initialPaletteState: PaletteState = { status: 'closed' }
@@ -63,6 +71,7 @@ type ClosedState = Extract<PaletteState, { status: 'closed' }>
 type OpenState = Extract<PaletteState, { status: 'open' }>
 type ActionsState = Extract<PaletteState, { status: 'actions' }>
 type SubListState = Extract<PaletteState, { status: 'sub-list' }>
+type HelpState = Extract<PaletteState, { status: 'help' }>
 
 function reduceClosed(state: ClosedState, event: PaletteEvent): PaletteState {
   return match(event)
@@ -94,10 +103,24 @@ function reduceOpen(state: OpenState, event: PaletteEvent): PaletteState {
           actionIndex: 0,
         }),
       )
+      .with(
+        { type: 'enteredHelp' },
+        (): PaletteState => ({ status: 'help', query: state.query, selected: state.selected }),
+      )
       // Root has no level above it, so `wentBack` here is a no-op — the key map
       // does not even produce it, and this is the belt to those braces.
       .otherwise(() => state)
   )
+}
+
+function reduceHelp(state: HelpState, event: PaletteEvent): PaletteState {
+  return match(event)
+    .with({ type: 'closed' }, () => initialPaletteState)
+    .with(
+      { type: 'wentBack' },
+      (): PaletteState => ({ status: 'open', query: state.query, selected: state.selected }),
+    )
+    .otherwise(() => state)
 }
 
 function reduceActions(state: ActionsState, event: PaletteEvent): PaletteState {
@@ -152,6 +175,7 @@ export function reducePalette(state: PaletteState, event: PaletteEvent): Palette
     .with({ status: 'open' }, (s) => reduceOpen(s, event))
     .with({ status: 'actions' }, (s) => reduceActions(s, event))
     .with({ status: 'sub-list' }, (s) => reduceSubList(s, event))
+    .with({ status: 'help' }, (s) => reduceHelp(s, event))
     .exhaustive()
 }
 
@@ -159,7 +183,13 @@ export function reducePalette(state: PaletteState, event: PaletteEvent): Palette
 export function paletteQuery(state: PaletteState): string {
   return match(state)
     .with({ status: 'closed' }, () => '')
-    .with({ status: 'open' }, { status: 'actions' }, { status: 'sub-list' }, (s) => s.query)
+    .with(
+      { status: 'open' },
+      { status: 'actions' },
+      { status: 'sub-list' },
+      { status: 'help' },
+      (s) => s.query,
+    )
     .exhaustive()
 }
 
@@ -170,7 +200,7 @@ export function paletteQuery(state: PaletteState): string {
  */
 export function paletteActiveItemId(state: PaletteState): string | null {
   return match(state)
-    .with({ status: 'closed' }, { status: 'open' }, () => null)
+    .with({ status: 'closed' }, { status: 'open' }, { status: 'help' }, () => null)
     .with({ status: 'actions' }, { status: 'sub-list' }, (s) => s.itemId)
     .exhaustive()
 }

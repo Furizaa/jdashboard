@@ -1,6 +1,7 @@
 import { test, expect } from '../fixtures/test'
 import { makeIssue } from '../fixtures/factories'
 import { testIds } from '~/lib/testids'
+import { clickCardBody } from '../fixtures/cards'
 
 const PARENT = 'HDR-400'
 const LINKED = 'OUTSIDE-1'
@@ -58,7 +59,7 @@ test('renders sub-issues progress + linked-issues, and fetches a linked-issue ke
   ])
 
   await page.goto('/?e2e=1')
-  await page.locator(`[data-issue-key="${PARENT}"]`).click()
+  await clickCardBody(page, PARENT)
 
   const dialog = page.getByRole('dialog')
   await expect(dialog).toBeVisible()
@@ -82,9 +83,7 @@ test('renders sub-issues progress + linked-issues, and fetches a linked-issue ke
   // the path that proves the panel can resolve issues outside the board.
   await expect
     .poll(() =>
-      mocks
-        .requests()
-        .some((r) => r.method === 'GET' && r.path === `/rest/api/3/issue/${LINKED}`),
+      mocks.requests().some((r) => r.method === 'GET' && r.path === `/rest/api/3/issue/${LINKED}`),
     )
     .toBe(true)
 })

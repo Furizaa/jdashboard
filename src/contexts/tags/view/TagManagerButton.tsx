@@ -1,6 +1,6 @@
 import { Tags } from 'lucide-react'
 import { testIds } from '~/lib/testids'
-import { useRegisterCommand } from '~/coordinator'
+import { useRegisterCommand } from '~/coordinator/adapters/command-bus'
 import { useTagManager } from '../presenter'
 import { TagManagerModal } from './TagManagerModal'
 

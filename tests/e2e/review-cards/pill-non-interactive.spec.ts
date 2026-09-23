@@ -84,10 +84,7 @@ test('the status pill on a review card renders the bucket name and is non-intera
   // fire either.
   await Promise.all(
     cards.map(([iid, pillText]) =>
-      page
-        .locator(`[data-issue-key="MR !${iid}"]`)
-        .getByText(pillText, { exact: true })
-        .click(),
+      page.locator(`[data-issue-key="MR !${iid}"]`).getByText(pillText, { exact: true }).click(),
     ),
   )
 

@@ -6,14 +6,18 @@ A clean-architecture reference implementation for React + TypeScript, in the for
 
 clashboard is a small but complete demonstration of four architectural claims, each verifiable by reading a named layer or rule:
 
-- **Bounded contexts as the organising axis.** The codebase is split into `contexts/{board, detail, capture, review}/`, each an internal hexagon (domain → application → view-model → presenter → view); cross-context workflows live in a single `coordinator/`. See [ADR 0002 — Bounded contexts and layer vocabulary](docs/adr/0002-bounded-contexts-and-layer-vocabulary.md).
+- **Bounded contexts as the organising axis.** The codebase is split into `contexts/{board, detail, capture, review, …}/`, each an internal hexagon (domain → application → view-model → presenter → view); cross-context workflows live in a single `coordinator/`. The clearest test of the boundary is `contexts/command-palette/`, which drives six other contexts and imports none of them. See [ADR 0002 — Bounded contexts and layer vocabulary](docs/adr/0002-bounded-contexts-and-layer-vocabulary.md) and [ADR 0008 — Command-palette action catalogue](docs/adr/0008-command-palette-action-catalogue.md).
 - **Framework-free view-models with thin React presenters.** Every non-trivial screen splits into `view-model.ts` (plain TS, no React import) plus `use-*.ts` (the only React-bound shell), so the logic is portable and unit-testable as ordinary functions. See [ADR 0003 — Framework-free view-models](docs/adr/0003-framework-free-view-models.md).
 - **Tagged-error result types, matched exhaustively.** `neverthrow` on the client and `Effect` on the server share a JSON-shaped tagged-union wire format; `ts-pattern.exhaustive()` makes "errors as values" a compile-time invariant. See [ADR 0004 — neverthrow on the client, Effect on the server](docs/adr/0004-neverthrow-client-effect-server.md) and [ADR 0005 — Effect-TS server architecture](docs/adr/0005-effect-server-architecture.md).
 - **Architectural rules enforced as CI gates.** The dependency law is codified one rule per edge in `.dependency-cruiser.cjs`; `oxlint`, `dependency-cruiser`, `fallow`, and `ts-pattern.exhaustive` make drift a CI failure with a named rule attached. See [CONTEXT-MAP — Governance: one tool per concern](CONTEXT-MAP.md#governance-one-tool-per-concern).
 
 ## What this app is
 
-clashboard is a personal Jira / GitLab dashboard: a Kanban board of my tickets with the four columns I think in (TO DO · In Implementation · In Code Review · Done), a side-panel detail view with native ADF rendering, optimistic status transitions, GitLab MR review cards, and a quick-create modal. It is read-mostly; the only mutations are status changes and ticket creation. The product surface is documented in [`.agents/prds/clashboard.md`](.agents/prds/clashboard.md); supplementary PRDs cover [GitLab MR review cards](.agents/prds/gitlab-mr-review-cards.md), [GitLab MR status on Code Review cards](.agents/prds/gitlab-mr-status.md), [Quick Create](.agents/prds/quick-create.md), [e2e harness](.agents/prds/e2e-harness.md), [misc improvements](.agents/prds/misc-improvements.md), and the [clean-architecture refactor](.agents/prds/clean-architecture-refactor.md) this README is part of.
+clashboard is a personal Jira / GitLab dashboard: a Kanban board of my tickets with the four columns I think in (TO DO · In Implementation · In Code Review · Done), a side-panel detail view with native ADF rendering, optimistic status transitions, GitLab MR review cards, and a quick-create modal.
+
+Its **primary interaction is a ⌘K command palette**, not the mouse. One popup searches every work item at once — assigned tickets, watchlist cards, and MRs waiting on your review — and `Enter` on a result lists every action currently legal for it, each behind a single keystroke: status transitions, tags, notes, AI refine, the MR, the workspace. The board's text filter is a palette command rather than a header input, so there is exactly one search surface in the app. The target it was built against is a full triage session without touching the trackpad.
+
+The product surface is documented in [`.agents/prds/clashboard.md`](.agents/prds/clashboard.md); supplementary PRDs cover the [command palette](.agents/prds/command-palette.md), [GitLab MR review cards](.agents/prds/gitlab-mr-review-cards.md), [GitLab MR status on Code Review cards](.agents/prds/gitlab-mr-status.md), [Quick Create](.agents/prds/quick-create.md), [e2e harness](.agents/prds/e2e-harness.md), [misc improvements](.agents/prds/misc-improvements.md), and the [clean-architecture refactor](.agents/prds/clean-architecture-refactor.md) this README is part of.
 
 ## How to read this codebase
 
@@ -22,8 +26,9 @@ In order:
 1. **[`CONTEXT-MAP.md`](CONTEXT-MAP.md)** — the architectural overview. Contexts, the layer vocabulary, the dependency law, governance, library choices.
 2. **[`docs/tour.md`](docs/tour.md)** — one user action (clicking a status pill, picking a transition) traced through every layer end to end. The manga's first chapter.
 3. **[`docs/layers.md`](docs/layers.md)** — reference: each of the seven layers with one annotated example drawn from the migrated codebase.
-4. **`contexts/<name>/CONTEXT.md`** — per-context glossary, use-cases, and view-model state machine: [Board](src/contexts/board/CONTEXT.md), [Detail](src/contexts/detail/CONTEXT.md), [Capture](src/contexts/capture/CONTEXT.md), [Review](src/contexts/review/CONTEXT.md).
-5. **[`docs/adr/`](docs/adr/)** — the five decisions that shape the architecture: [0001 mock at the network boundary](docs/adr/0001-mock-at-network-boundary-for-e2e.md), [0002 bounded contexts](docs/adr/0002-bounded-contexts-and-layer-vocabulary.md), [0003 framework-free view-models](docs/adr/0003-framework-free-view-models.md), [0004 neverthrow / Effect](docs/adr/0004-neverthrow-client-effect-server.md), [0005 Effect-TS server architecture](docs/adr/0005-effect-server-architecture.md).
+4. **`contexts/<name>/CONTEXT.md`** — per-context glossary, use-cases, and view-model state machine: [Board](src/contexts/board/CONTEXT.md), [Detail](src/contexts/detail/CONTEXT.md), [Capture](src/contexts/capture/CONTEXT.md), [Review](src/contexts/review/CONTEXT.md), [Watchlist](src/contexts/watchlist/CONTEXT.md), [Command Palette](src/contexts/command-palette/CONTEXT.md). Read the palette's last: it is the one context defined by what it is _not_ allowed to touch, so it only makes sense once the others are familiar.
+5. **[`docs/keyboard.md`](docs/keyboard.md)** — every shortcut, and where the map lives.
+6. **[`docs/adr/`](docs/adr/)** — the decisions that shape the architecture: [0001 mock at the network boundary](docs/adr/0001-mock-at-network-boundary-for-e2e.md), [0002 bounded contexts](docs/adr/0002-bounded-contexts-and-layer-vocabulary.md), [0003 framework-free view-models](docs/adr/0003-framework-free-view-models.md), [0004 neverthrow / Effect](docs/adr/0004-neverthrow-client-effect-server.md), [0005 Effect-TS server architecture](docs/adr/0005-effect-server-architecture.md), [0006 binary-stream API routes](docs/adr/0006-binary-stream-api-routes.md), [0007 multi-board app shell](docs/adr/0007-multi-board-app-shell.md), [0008 command-palette action catalogue](docs/adr/0008-command-palette-action-catalogue.md).
 
 ## Folder layout
 
@@ -34,11 +39,16 @@ src/
 │   ├── board/      # the four-column Kanban
 │   ├── detail/     # side-panel ticket view
 │   ├── capture/    # quick-create modal
-│   └── review/     # GitLab MR review cards
+│   ├── review/     # GitLab MR review cards
+│   ├── watchlist/  # curated advisory tickets + the watchlist board
+│   ├── tags/       # local coloured labels
+│   ├── bulk-refine/# one transcript → many refined notes
+│   └── command-palette/  # ⌘K; imports no other context (ADR-0008)
 ├── widgets/        # reusable visual surfaces (status-pill, ticket-card, mr-section, fixasap-ribbon)
 ├── coordinator/    # cross-context workflows + ports (cache, toast, navigate, browser, jira)
 ├── design-system/  # domain-agnostic primitives (skeletons, shadcn pieces)
 ├── routes/         # the only place multiple contexts are wired together
+│   └── -command-palette/  # THE cross-context assembly: work items, actions, commands
 ├── lib/            # framework-level utilities (cn, testids, polling)
 └── server/         # Effect-TS server (gateways, use-case contexts, runtime, wire, server-functions)
     ├── gateways/    # one folder per external system: port + http-adapter + types + errors (Jira, GitLab)

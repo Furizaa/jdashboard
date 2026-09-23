@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/test'
 import { makeIssue } from '../fixtures/factories'
+import { clickCardBody } from '../fixtures/cards'
 
 const KEYS = ['HDR-310', 'HDR-311', 'HDR-312'] as const
 const STATUS = 'In Implementation'
@@ -7,17 +8,14 @@ const STATUS = 'In Implementation'
 // Seed three issues into the same board column, open the panel on the middle one,
 // and verify each navigation entry-point (J/K, ArrowDown/ArrowUp, header arrows)
 // updates `?issue=` in the URL.
-test('panel navigation steps prev/next via keyboard and header arrows', async ({
-  page,
-  world,
-}) => {
+test('panel navigation steps prev/next via keyboard and header arrows', async ({ page, world }) => {
   world.seedIssues(KEYS.map((key) => makeIssue({ key, statusName: STATUS })))
 
   await page.goto('/?e2e=1')
   await expect(page.locator(`[data-issue-key="${KEYS[1]}"]`)).toBeVisible()
 
   // Open the middle issue's panel.
-  await page.locator(`[data-issue-key="${KEYS[1]}"]`).click()
+  await clickCardBody(page, KEYS[1])
   await expect(page).toHaveURL(/[?&]issue=HDR-311/)
   await expect(page.getByRole('dialog')).toBeVisible()
 

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { SlidersHorizontal } from 'lucide-react'
-import { useRegisterCommand, useTagDefinitions } from '~/coordinator'
+import { useTagDefinitions } from '~/coordinator'
+import { useRegisterCommand } from '~/coordinator/adapters/command-bus'
 import type { WatchlistLaneConfig } from '~/kernel'
 import { testIds } from '~/lib/testids'
 import { useSetWatchlistLanes, useWatchlistLanes } from '../presenter'

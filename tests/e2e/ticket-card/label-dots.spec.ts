@@ -33,9 +33,7 @@ test('first three remaining labels render as dots, +N chip covers the rest, filt
   await expect(card.getByTestId(testIds.labelOverflowChip)).toHaveText('+1')
 
   // None of the visible dots correspond to the filter label.
-  const dotTitles = await dots.evaluateAll((els) =>
-    els.map((el) => el.getAttribute('title')),
-  )
+  const dotTitles = await dots.evaluateAll((els) => els.map((el) => el.getAttribute('title')))
   expect(dotTitles).not.toContain(FILTER_LABEL)
 })
 

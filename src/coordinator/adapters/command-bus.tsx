@@ -13,6 +13,13 @@ import type { Commands, CommandTarget } from '../ports'
 // The React adapter behind the `Commands` port. React in `coordinator/adapters/`
 // is exactly what `coordinator-effects-only-in-adapters` permits, and
 // `coordinator/provider.tsx` is the existing precedent.
+//
+// The header buttons import `useRegisterCommand` from **this module**, not from
+// the `~/coordinator` barrel: that barrel re-exports hooks from `contexts/tags`
+// and `contexts/watchlist`, so a button in either of those reaching for it would
+// close an import cycle back onto itself. Same reason
+// `use-watchlist-cards.ts` imports `~/coordinator/adapters/tanstack-cache`
+// directly.
 
 type Openers = Partial<Record<CommandTarget, () => void>>
 

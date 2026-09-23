@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import type { WorkItem } from '~/kernel'
+import { ACTION_LABELS, ACTION_SHORTCUTS, type WorkItem } from '~/kernel'
 import type { PaletteAction, PaletteCommand, PaletteSubItem, PaletteSubList } from '../domain'
 import {
   derivePalette,
+  deriveHelpGroups,
   initialPaletteState,
   paletteActiveItemId,
   paletteQuery,
@@ -567,5 +568,51 @@ describe('derivePalette at a sub-list level', () => {
   it('falls back to the results when the item vanishes under it', () => {
     const display = derivePalette(subList('HDR-GONE', 'status', 'assigned'), inputs())
     expect(display.status).toBe('root')
+  })
+})
+
+describe('the shortcut help view', () => {
+  const help = (query = '', selected = 0): PaletteState => ({ status: 'help', query, selected })
+
+  it('opens from the results, keeping the query and the selected result', () => {
+    expect(reducePalette(open('hdr', 2), { type: 'enteredHelp' })).toEqual(help('hdr', 2))
+  })
+
+  it('pops back to exactly where it was opened from', () => {
+    expect(reducePalette(help('hdr', 2), { type: 'wentBack' })).toEqual(open('hdr', 2))
+  })
+
+  it('closes the whole palette on Escape', () => {
+    expect(reducePalette(help('hdr', 2), { type: 'closed' })).toEqual({ status: 'closed' })
+  })
+
+  it('is not reachable from a deeper level, which has its own meaning for a key', () => {
+    const inActions = actions('HDR-1', 'hdr', 1, 2)
+    expect(reducePalette(inActions, { type: 'enteredHelp' })).toBe(inActions)
+  })
+
+  it('points at no work item — it belongs to none', () => {
+    expect(paletteActiveItemId(help())).toBeNull()
+  })
+
+  it('is generated from the kernel map, covering every action exactly once', () => {
+    const groups = deriveHelpGroups()
+    const rows = groups.flatMap((g) => g.rows)
+    const kinds = Object.keys(ACTION_SHORTCUTS) as (keyof typeof ACTION_SHORTCUTS)[]
+    expect(rows).toHaveLength(kinds.length)
+    for (const kind of kinds) {
+      const row = rows.find((r) => r.kind === kind)
+      expect(row?.shortcut).toBe(ACTION_SHORTCUTS[kind])
+      expect(row?.label).toBe(ACTION_LABELS[kind])
+    }
+  })
+
+  it('groups the table the same way the action list groups itself', () => {
+    expect(deriveHelpGroups().map((g) => g.group)).toEqual(['workflow', 'ai', 'links', 'workspace'])
+  })
+
+  it('renders as the help display, with no list to navigate', () => {
+    const display = derivePalette(help(), inputs())
+    expect(display.status).toBe('help')
   })
 })

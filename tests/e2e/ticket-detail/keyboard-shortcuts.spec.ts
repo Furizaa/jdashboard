@@ -56,9 +56,7 @@ test('O and C have no effect when the panel is closed', async ({ page, context, 
 
   // O on a closed panel must not open a new tab. waitForEvent throws on
   // timeout — catch and assert null.
-  const newPagePromise = context
-    .waitForEvent('page', { timeout: 500 })
-    .catch(() => null)
+  const newPagePromise = context.waitForEvent('page', { timeout: 500 }).catch(() => null)
   await page.keyboard.press('KeyO')
   expect(await newPagePromise).toBeNull()
 

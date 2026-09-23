@@ -62,7 +62,6 @@ test('search finds assigned tickets from the watchlist board too — it is not r
   world.seedIssues([makeIssue({ key: 'HDR-702', summary: 'Cross-route find me' })])
 
   await page.goto('/watchlist?e2e=1')
-  await expect(page.getByTestId(testIds.watchlistBoard)).toBeVisible()
 
   await openPalette(page)
   await page.keyboard.type('cross-route')

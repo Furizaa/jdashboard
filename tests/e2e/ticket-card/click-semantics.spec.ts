@@ -71,9 +71,7 @@ test('Cmd/Ctrl-clicking the card key opens the Jira URL in a new tab', async ({
 
   // The mock sidecar doesn't serve `/browse/<KEY>`, so the new tab will get
   // a 501 — we only care that the navigation target is the Jira URL.
-  await expect.poll(() => newPage.url(), { timeout: 5_000 }).toBe(
-    `${JIRA_BASE_URL}/browse/HDR-803`,
-  )
+  await expect.poll(() => newPage.url(), { timeout: 5_000 }).toBe(`${JIRA_BASE_URL}/browse/HDR-803`)
 
   // The original tab must NOT have navigated to the Jira URL — that would
   // mean the modifier-click was misinterpreted as a same-tab open.

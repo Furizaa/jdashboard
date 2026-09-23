@@ -84,16 +84,12 @@ test('two GitLab 401 events in one session surface a single dedupe-aware toast',
   // Confirm the second 401 actually landed before asserting on the toast —
   // otherwise a green test could just mean "the request never fired".
   await expect
-    .poll(() =>
-      mocks.requests().filter((r) => DISCUSSIONS_PATH_RE.test(r.path)).length,
-    )
+    .poll(() => mocks.requests().filter((r) => DISCUSSIONS_PATH_RE.test(r.path)).length)
     .toBeGreaterThan(discussionsCallsBefore)
 
   // Sanity check: the listMrs request also went out on the poll, proving the
   // refetch reached the listMrs stage where the first 401 originally landed.
-  expect(
-    mocks.requests().filter((r) => LIST_MRS_PATH_RE.test(r.path)).length,
-  ).toBeGreaterThan(0)
+  expect(mocks.requests().filter((r) => LIST_MRS_PATH_RE.test(r.path)).length).toBeGreaterThan(0)
 
   await expect(gitlabToast).toHaveCount(0)
 })

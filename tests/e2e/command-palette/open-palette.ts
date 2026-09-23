@@ -2,14 +2,26 @@ import { expect, type Locator, type Page } from '@playwright/test'
 import { testIds } from '~/lib/testids'
 
 /**
- * Press ⌘K and wait for the palette. The keypress is only honoured once React
- * has hydrated and attached the window listener, so a test that fires it
- * straight after `goto` races the hydration — wait for something the board
- * rendered first, then call this.
+ * Press ⌘K and wait for the palette.
+ *
+ * The keypress is only honoured once React has hydrated and attached the window
+ * listener, so it has to wait for that first. The header's sync indicator is the
+ * signal: it reads "Not synced" from the server and only changes once the
+ * *client-side* board query has resolved, which is strictly after hydration —
+ * and it is on both board routes, where the boards themselves are not always
+ * rendered (an empty watchlist has no lanes to show).
  */
 export async function openPalette(page: Page): Promise<void> {
-  await page.keyboard.press('ControlOrMeta+KeyK')
-  await expect(page.getByTestId(testIds.commandPalette)).toBeVisible()
+  const palette = page.getByTestId(testIds.commandPalette)
+  await expect(page.getByTestId(testIds.syncIndicator)).toContainText(/Synced|Sync failed/u)
+  // Retried, because a press can also land on a route component that is about to
+  // unmount: `/` and `/watchlist` are separate routes, so switching boards
+  // remounts the shell and resets the palette. Only pressed while the palette is
+  // closed, so a retry can never toggle an open one shut.
+  await expect(async () => {
+    if ((await palette.count()) === 0) await page.keyboard.press('ControlOrMeta+KeyK')
+    await expect(palette).toBeVisible({ timeout: 500 })
+  }).toPass({ timeout: 15_000 })
   await expect(page.getByTestId(testIds.commandPaletteInput)).toBeFocused()
 }
 

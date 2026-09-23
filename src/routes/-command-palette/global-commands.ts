@@ -48,24 +48,6 @@ export const COMMAND_TARGETS: Partial<Record<CommandId, CommandTarget>> = {
 
 export function globalCommands(context: GlobalCommandContext): readonly GlobalCommandDescriptor[] {
   const commands: GlobalCommandDescriptor[] = []
-  const trimmed = context.query.trim()
-
-  // The board filter. Whatever is typed *is* the filter text, so the label
-  // embeds it — which also means the command always matches what was typed.
-  if (trimmed !== '' && trimmed !== context.filter) {
-    commands.push({
-      id: 'filter-board',
-      label: `Filter board by '${trimmed}'`,
-      synonyms: ['narrow', 'search'],
-    })
-  }
-  if (context.filter !== '') {
-    commands.push({
-      id: 'clear-board-filter',
-      label: `Clear board filter '${context.filter}'`,
-      synonyms: ['reset', 'unfilter', 'show all'],
-    })
-  }
 
   // The five header modals, each legal only while its button is mounted and has
   // registered an opener. An unregistered target is **not offered** rather than
@@ -101,6 +83,27 @@ export function globalCommands(context: GlobalCommandContext): readonly GlobalCo
         ? 'Show all tickets (Only Workspace is on)'
         : 'Show only tickets with an open workspace',
       synonyms: ['workspace', 'worktree', 'cmux', 'filter'],
+    })
+  }
+
+  // The board filter goes **last**, for a reason worth keeping: its label embeds
+  // whatever was typed, so it matches every query and would otherwise always be
+  // the first command offered. Typing "go to watchlist" and pressing ↵ would
+  // then filter the board instead of switching to it. It is the fallback — "none
+  // of the above, narrow the board instead" — so it belongs at the bottom.
+  const trimmed = context.query.trim()
+  if (trimmed !== '' && trimmed !== context.filter) {
+    commands.push({
+      id: 'filter-board',
+      label: `Filter board by '${trimmed}'`,
+      synonyms: ['narrow', 'search'],
+    })
+  }
+  if (context.filter !== '') {
+    commands.push({
+      id: 'clear-board-filter',
+      label: `Clear board filter '${context.filter}'`,
+      synonyms: ['reset', 'unfilter', 'show all'],
     })
   }
 

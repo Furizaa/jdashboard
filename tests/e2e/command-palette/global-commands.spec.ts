@@ -11,7 +11,7 @@ test('"New Ticket" opens quick-create through the command bus', async ({ page, w
   await openPalette(page)
   await page.keyboard.type('new ticket')
   await expect(commandRow(page, 'new-ticket')).toHaveCount(1)
-  await page.keyboard.press('ArrowDown')
+  // ↵ runs the command it names, not the filter fallback below it.
   await page.keyboard.press('Enter')
 
   await expect(page.getByTestId(testIds.commandPalette)).toHaveCount(0)
@@ -66,7 +66,6 @@ test('"Configure Lanes" is offered on the watchlist board and absent on the main
   await page.keyboard.press('Escape')
 
   await page.goto('/watchlist?e2e=1')
-  await expect(page.getByTestId(testIds.watchlistBoard)).toBeVisible()
   await openPalette(page)
   await page.keyboard.type('lanes')
   await commandRow(page, 'configure-lanes').click()
@@ -88,7 +87,6 @@ test('board navigation commands leave out the board you are already on', async (
 
   await commandRow(page, 'go-to-watchlist').click()
   await expect(page).toHaveURL(/\/watchlist/u)
-  await expect(page.getByTestId(testIds.watchlistBoard)).toBeVisible()
 
   await openPalette(page)
   await page.keyboard.type('go to')
@@ -121,7 +119,6 @@ test('"Only Workspace" is main-board only and its label reflects the current sta
   await page.keyboard.press('Escape')
 
   await page.goto('/watchlist?e2e=1')
-  await expect(page.getByTestId(testIds.watchlistBoard)).toBeVisible()
   await openPalette(page)
   await page.keyboard.type('workspace')
   await expect(commandRow(page, 'toggle-only-workspace')).toHaveCount(0)

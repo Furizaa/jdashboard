@@ -1,6 +1,6 @@
 import { Eye } from 'lucide-react'
 import { testIds } from '~/lib/testids'
-import { useRegisterCommand } from '~/coordinator'
+import { useRegisterCommand } from '~/coordinator/adapters/command-bus'
 import { useWatchlistModal } from '../presenter'
 import { WatchlistModal } from './WatchlistModal'
 

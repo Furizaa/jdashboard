@@ -3,6 +3,7 @@ export const testIds = Object.freeze({
   labelDot: 'label-dot',
   labelOverflowChip: 'label-overflow-chip',
   epicChip: 'epic-chip',
+  cardSummary: 'card-summary',
   syncIndicator: 'sync-indicator',
   refreshButton: 'refresh-button',
   onlyWorkspaceToggle: 'only-workspace-toggle',
@@ -105,6 +106,8 @@ export const testIds = Object.freeze({
   commandPaletteSubLoading: 'command-palette-sub-loading',
   commandPaletteSubFailed: 'command-palette-sub-failed',
   commandPaletteSubEmpty: 'command-palette-sub-empty',
+  commandPaletteHelp: 'command-palette-help',
+  commandPaletteHelpKey: 'command-palette-help-key',
   boardFilterChip: 'board-filter-chip',
   boardFilterClear: 'board-filter-clear',
 } as const)

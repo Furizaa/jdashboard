@@ -29,7 +29,11 @@ test('author-mode warning rows render the correct kind for each scenario', async
     // 1. In Code Review with no MR — "no-mr" warning.
     makeIssue({ key: ISSUE_NO_MR, summary: `${ISSUE_NO_MR}: no MR`, statusName: 'In Code Review' }),
     // 2. In Code Review, MR is a draft.
-    makeIssue({ key: ISSUE_DRAFT, summary: `${ISSUE_DRAFT}: draft MR`, statusName: 'In Code Review' }),
+    makeIssue({
+      key: ISSUE_DRAFT,
+      summary: `${ISSUE_DRAFT}: draft MR`,
+      statusName: 'In Code Review',
+    }),
     // 3. In Code Review, MR has zero reviewers.
     makeIssue({
       key: ISSUE_NO_REVIEWERS,

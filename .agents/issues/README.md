@@ -1,6 +1,6 @@
 # clashboard issues
 
-Tracer-bullet vertical slices derived from [the clashboard PRD](../prds/clashboard.md), [the GitLab MR status PRD](../prds/gitlab-mr-status.md), [the misc improvements PRD](../prds/misc-improvements.md), [the Quick Create PRD](../prds/quick-create.md), [the GitLab MR review cards PRD](../prds/gitlab-mr-review-cards.md), [the e2e harness PRD](../prds/e2e-harness.md), [the clean architecture refactor PRD](../prds/clean-architecture-refactor.md), [the Effect server refactor PRD](../prds/effect-server-refactor.md), and [the ADF rendering extensions PRD](../prds/adf-rendering-extensions.md). Each slice cuts through all layers (server function → query hook → UI → tests where applicable) and is demoable on its own.
+Tracer-bullet vertical slices derived from [the clashboard PRD](../prds/clashboard.md), [the GitLab MR status PRD](../prds/gitlab-mr-status.md), [the misc improvements PRD](../prds/misc-improvements.md), [the Quick Create PRD](../prds/quick-create.md), [the GitLab MR review cards PRD](../prds/gitlab-mr-review-cards.md), [the e2e harness PRD](../prds/e2e-harness.md), [the clean architecture refactor PRD](../prds/clean-architecture-refactor.md), [the Effect server refactor PRD](../prds/effect-server-refactor.md), [the ADF rendering extensions PRD](../prds/adf-rendering-extensions.md), and [the Command Palette PRD](../prds/command-palette.md). Each slice cuts through all layers (server function → query hook → UI → tests where applicable) and is demoable on its own.
 
 ## Order & dependencies
 
@@ -48,6 +48,9 @@ Tracer-bullet vertical slices derived from [the clashboard PRD](../prds/clashboa
 70
 71 ─┬─→ 72
    └─→ 73
+
+84 → 85 → 86 ─┬─→ 87 ─┬─→ 89
+              └─→ 88 ─┘
 ```
 
 ## Index
@@ -152,3 +155,14 @@ Tracer-bullet vertical slices derived from [the clashboard PRD](../prds/clashboa
 | 71  | [Server-side Jira media proxy + ADF media enrichment (lands ADR-0006)](./71-server-jira-media-proxy.md)               | AFK  | —          |
 | 72  | [Media lightbox + shadcn Dialog adoption](./72-media-lightbox-and-dialog-adoption.md)                                 | AFK  | 71         |
 | 73  | [Jira media gateway: real attachment endpoints (fixes the placeholder regression)](./73-jira-media-real-endpoints.md) | AFK  | 71         |
+
+### Command Palette (PRD: [command-palette.md](../prds/command-palette.md))
+
+| #   | File                                                                              | Type | Blocked by |
+| --- | --------------------------------------------------------------------------------- | ---- | ---------- |
+| 84  | [Kernel: `WorkItem`, shortcut map, ADR-0008](./84-palette-kernel-work-item.md)    | AFK  | —          |
+| 85  | [Palette spine: ⌘K, cross-source search, filter migration](./85-palette-spine.md) | HITL | 84         |
+| 86  | [Action list: the synchronous actions](./86-palette-static-actions.md)            | AFK  | 85         |
+| 87  | [Sub-lists: status transitions and tags](./87-palette-nested-sublists.md)         | AFK  | 86         |
+| 88  | [Hand-offs and global commands](./88-palette-handoffs-global-commands.md)         | AFK  | 86         |
+| 89  | [Documentation refresh and e2e coverage](./89-palette-docs-and-e2e.md)            | HITL | 87, 88     |

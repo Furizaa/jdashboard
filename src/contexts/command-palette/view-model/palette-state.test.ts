@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import type { WorkItem } from '~/kernel'
-import type { PaletteAction, PaletteCommand } from '../domain'
+import type { PaletteAction, PaletteCommand, PaletteSubItem, PaletteSubList } from '../domain'
 import {
   derivePalette,
   initialPaletteState,
+  paletteActiveItemId,
   paletteQuery,
   reducePalette,
   type PaletteInputs,
   type PaletteState,
-} from './palette-view-model'
+} from '.'
 
 function jira(key: string, summary: string): WorkItem {
   return {
@@ -67,11 +68,18 @@ const action = (kind: PaletteAction['kind'], label = kind, enabled = true): Pale
   kind,
   label,
   enabled,
-  run: () => {},
+  perform: { effect: 'run', run: () => {} },
 })
 
 function inputs(overrides: Partial<PaletteInputs> = {}): PaletteInputs {
-  return { items: ITEMS, commands: [], sources: [], actionsFor: () => [], ...overrides }
+  return {
+    items: ITEMS,
+    commands: [],
+    sources: [],
+    actionsFor: () => [],
+    subListFor: () => ({ kind: 'tags', items: [] }),
+    ...overrides,
+  }
 }
 
 const open = (query = '', selected = 0): PaletteState => ({ status: 'open', query, selected })
@@ -84,6 +92,30 @@ const actions = (itemId: string, query = '', selected = 0, actionIndex = 0): Pal
   actionIndex,
 })
 
+const subList = (
+  itemId: string,
+  kind: 'status' | 'tags',
+  query = '',
+  selected = 0,
+  actionIndex = 0,
+  subIndex = 0,
+): PaletteState => ({
+  status: 'sub-list',
+  query,
+  selected,
+  itemId,
+  actionIndex,
+  subList: kind,
+  subIndex,
+})
+
+const subItem = (id: string, label = id, checked?: boolean): PaletteSubItem => ({
+  id,
+  label,
+  checked,
+  run: () => {},
+})
+
 function root(state: PaletteState, given: PaletteInputs = inputs()) {
   const display = derivePalette(state, given)
   if (display.status !== 'root') throw new Error(`expected root, got ${display.status}`)
@@ -93,6 +125,12 @@ function root(state: PaletteState, given: PaletteInputs = inputs()) {
 function actionsView(state: PaletteState, given: PaletteInputs) {
   const display = derivePalette(state, given)
   if (display.status !== 'actions') throw new Error(`expected actions, got ${display.status}`)
+  return display
+}
+
+function subListView(state: PaletteState, given: PaletteInputs) {
+  const display = derivePalette(state, given)
+  if (display.status !== 'sub-list') throw new Error(`expected sub-list, got ${display.status}`)
   return display
 }
 
@@ -340,7 +378,12 @@ describe('derivePalette at the action level', () => {
       actions('HDR-1'),
       inputs({
         actionsFor: () => [
-          { kind: 'change-status', label: 'Change Status…', enabled: false, run: () => {} },
+          {
+            kind: 'change-status',
+            label: 'Change Status…',
+            enabled: false,
+            perform: { effect: 'sub-list', subList: 'status' },
+          },
         ],
       }),
     )
@@ -350,6 +393,179 @@ describe('derivePalette at the action level', () => {
   it('falls back to the results when the item vanishes under it', () => {
     // A board refresh drops a Done ticket, or a watchlist removal lands.
     const display = derivePalette(actions('HDR-GONE', 'assigned', 0), catalogue)
+    expect(display.status).toBe('root')
+  })
+})
+
+describe('the three-deep navigation stack', () => {
+  it('steps results → actions → sub-list, each level keeping the last', () => {
+    const atActions = reducePalette(open('hdr', 2), {
+      type: 'enteredActions',
+      itemId: 'HDR-2',
+    })
+    const atSubList = reducePalette(atActions, { type: 'enteredSubList', subList: 'status' })
+    expect(atSubList).toEqual(subList('HDR-2', 'status', 'hdr', 2, 0, 0))
+  })
+
+  it('pops exactly one level per press, all the way back out', () => {
+    const deep = subList('HDR-2', 'status', 'hdr', 2, 3, 5)
+    const backToActions = reducePalette(deep, { type: 'wentBack' })
+    expect(backToActions).toEqual(actions('HDR-2', 'hdr', 2, 3))
+    const backToResults = reducePalette(backToActions, { type: 'wentBack' })
+    expect(backToResults).toEqual(open('hdr', 2))
+    // Root has nothing above it; another press changes nothing.
+    expect(reducePalette(backToResults, { type: 'wentBack' })).toBe(backToResults)
+  })
+
+  it('closes the whole palette from the deepest level, not one step', () => {
+    expect(reducePalette(subList('HDR-2', 'tags', 'hdr', 2, 3, 5), { type: 'closed' })).toEqual({
+      status: 'closed',
+    })
+  })
+
+  it('keeps the query readable from the deepest level', () => {
+    expect(paletteQuery(subList('HDR-2', 'tags', 'hdr'))).toBe('hdr')
+  })
+
+  it('moves the sub-list highlight, leaving the two above it alone', () => {
+    const moved = reducePalette(subList('HDR-2', 'status', 'hdr', 2, 3, 0), {
+      type: 'moved',
+      delta: 1,
+      count: 3,
+    })
+    expect(moved).toEqual(subList('HDR-2', 'status', 'hdr', 2, 3, 1))
+  })
+
+  it('reports which item is active at the two deep levels and nothing at root', () => {
+    expect(paletteActiveItemId(initialPaletteState)).toBeNull()
+    expect(paletteActiveItemId(open('hdr', 1))).toBeNull()
+    expect(paletteActiveItemId(actions('HDR-2'))).toBe('HDR-2')
+    expect(paletteActiveItemId(subList('HDR-2', 'status'))).toBe('HDR-2')
+  })
+})
+
+describe('derivePalette at a sub-list level', () => {
+  const withStatus = (list: PaletteSubList) => inputs({ subListFor: () => list })
+
+  it('names the item and the list, so the breadcrumb reads end to end', () => {
+    const display = subListView(
+      subList('HDR-1', 'status'),
+      withStatus({ kind: 'status', state: 'ready', items: [subItem('11', 'In Code Review')] }),
+    )
+    expect(display.itemBadge).toBe('HDR-1')
+    expect(display.itemTitle).toBe('Assigned one')
+    expect(display.title).toBe('Change Status')
+  })
+
+  it('renders the loading arm while the transitions fetch is in flight', () => {
+    const display = subListView(
+      subList('HDR-1', 'status'),
+      withStatus({ kind: 'status', state: 'loading' }),
+    )
+    expect(display.content).toEqual({ state: 'loading' })
+    expect(display.rowCount).toBe(0)
+    expect(display.selectedRow).toBeNull()
+  })
+
+  it('renders the failed arm with its message — not an empty list', () => {
+    const display = subListView(
+      subList('HDR-1', 'status'),
+      withStatus({ kind: 'status', state: 'failed', message: 'Jira said no' }),
+    )
+    // A broken request and "no transitions exist" must not look the same.
+    expect(display.content).toEqual({ state: 'failed', message: 'Jira said no' })
+  })
+
+  it('renders an empty ready list distinctly from both', () => {
+    const display = subListView(
+      subList('HDR-1', 'status'),
+      withStatus({ kind: 'status', state: 'ready', items: [] }),
+    )
+    expect(display.content).toEqual({ state: 'ready', rows: [] })
+  })
+
+  it('numbers and digit-keys the first nine rows only', () => {
+    const items = Array.from({ length: 11 }, (_, i) => subItem(`t${i}`))
+    const display = subListView(
+      subList('HDR-1', 'status'),
+      withStatus({ kind: 'status', state: 'ready', items }),
+    )
+    if (display.content.state !== 'ready') throw new Error('expected ready')
+    expect(display.content.rows.map((r) => r.digit)).toEqual([
+      '1',
+      '2',
+      '3',
+      '4',
+      '5',
+      '6',
+      '7',
+      '8',
+      '9',
+      null,
+      null,
+    ])
+    expect(display.content.rows.map((r) => r.index)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+  })
+
+  it('clamps a sub-list highlight that the list shrank out from under', () => {
+    const display = subListView(
+      subList('HDR-1', 'status', '', 0, 0, 9),
+      withStatus({ kind: 'status', state: 'ready', items: [subItem('a')] }),
+    )
+    expect(display.subIndex).toBe(0)
+    expect(display.selectedRow?.id).toBe('a')
+  })
+
+  it("carries each tag row's attached state and colour through untouched", () => {
+    const display = subListView(
+      subList('HDR-1', 'tags'),
+      inputs({
+        subListFor: () => ({
+          kind: 'tags',
+          items: [
+            {
+              id: 'red',
+              label: 'Red',
+              checked: true,
+              swatch: { bg: '#f00', fg: '#fff' },
+              run: () => {},
+            },
+            {
+              id: 'blue',
+              label: 'Blue',
+              checked: false,
+              swatch: { bg: '#00f', fg: '#fff' },
+              run: () => {},
+            },
+          ],
+        }),
+      }),
+    )
+    expect(display.title).toBe('Tags')
+    if (display.content.state !== 'ready') throw new Error('expected ready')
+    expect(display.content.rows.map((r) => [r.id, r.checked])).toEqual([
+      ['red', true],
+      ['blue', false],
+    ])
+    expect(display.content.rows[0]?.swatch).toEqual({ bg: '#f00', fg: '#fff' })
+  })
+
+  it('keeps the tag list open after a toggle, and closes the transition list', () => {
+    // Several tags usually get set in one visit; picking a status is the errand.
+    expect(
+      subListView(
+        subList('HDR-1', 'tags'),
+        inputs({ subListFor: () => ({ kind: 'tags', items: [] }) }),
+      ).staysOpen,
+    ).toBe(true)
+    expect(
+      subListView(subList('HDR-1', 'status'), withStatus({ kind: 'status', state: 'loading' }))
+        .staysOpen,
+    ).toBe(false)
+  })
+
+  it('falls back to the results when the item vanishes under it', () => {
+    const display = derivePalette(subList('HDR-GONE', 'status', 'assigned'), inputs())
     expect(display.status).toBe('root')
   })
 })

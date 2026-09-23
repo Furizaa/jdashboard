@@ -3,10 +3,15 @@ export {
   PALETTE_SECTION_ORDER,
   paletteSection,
   type PaletteAction,
+  type PaletteActionPerform,
   type PaletteCommand,
   type PaletteCommandSource,
   type PaletteSection,
   type PaletteSourceNote,
+  type PaletteSubItem,
+  type PaletteSubList,
+  type PaletteSubListSource,
+  type SubListKind,
 } from './palette-descriptors'
 export {
   isPaletteHotkey,

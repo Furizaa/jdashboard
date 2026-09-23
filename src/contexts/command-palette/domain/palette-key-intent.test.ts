@@ -35,28 +35,34 @@ describe('paletteKeyIntent at the root level', () => {
   })
 })
 
-describe('paletteKeyIntent at a list level', () => {
+describe('paletteKeyIntent at the action level', () => {
   it('adds j / k navigation where there is no text input to steal them from', () => {
-    expect(paletteKeyIntent(key('j'), 'list')).toEqual({ kind: 'next' })
-    expect(paletteKeyIntent(key('K'), 'list')).toEqual({ kind: 'prev' })
+    expect(paletteKeyIntent(key('j'), 'actions')).toEqual({ kind: 'next' })
+    expect(paletteKeyIntent(key('K'), 'actions')).toEqual({ kind: 'prev' })
   })
 
   it('pops one level on Backspace or ArrowLeft', () => {
-    expect(paletteKeyIntent(key('Backspace'), 'list')).toEqual({ kind: 'back' })
-    expect(paletteKeyIntent(key('ArrowLeft'), 'list')).toEqual({ kind: 'back' })
+    expect(paletteKeyIntent(key('Backspace'), 'actions')).toEqual({ kind: 'back' })
+    expect(paletteKeyIntent(key('ArrowLeft'), 'actions')).toEqual({ kind: 'back' })
   })
 
   it('keeps the shared arrow / Enter / Escape meanings', () => {
-    expect(paletteKeyIntent(key('ArrowDown'), 'list')).toEqual({ kind: 'next' })
-    expect(paletteKeyIntent(key('Escape'), 'list')).toEqual({ kind: 'close' })
+    expect(paletteKeyIntent(key('ArrowDown'), 'actions')).toEqual({ kind: 'next' })
+    expect(paletteKeyIntent(key('Escape'), 'actions')).toEqual({ kind: 'close' })
   })
 })
 
 describe('paletteKeyIntent action shortcuts', () => {
   it('resolves a curated letter to its action, at a list level only', () => {
-    expect(paletteKeyIntent(key('s'), 'list')).toEqual({ kind: 'action', action: 'change-status' })
-    expect(paletteKeyIntent(key('y'), 'list')).toEqual({ kind: 'action', action: 'copy-issue-key' })
-    expect(paletteKeyIntent(key('W'), 'list')).toEqual({
+    expect(paletteKeyIntent(key('s'), 'actions')).toEqual({
+      kind: 'action',
+      action: 'change-status',
+    })
+    expect(paletteKeyIntent(key('y'), 'actions')).toEqual({
+      kind: 'action',
+      action: 'copy-issue-key',
+    })
+    expect(paletteKeyIntent(key('W'), 'actions')).toEqual({
       kind: 'action',
       action: 'watchlist-toggle',
     })
@@ -68,24 +74,57 @@ describe('paletteKeyIntent action shortcuts', () => {
   it('lets list navigation win over the shortcut map', () => {
     // The map is asserted never to claim j/k, so this can only ever confirm the
     // precedence rather than mask a real action.
-    expect(paletteKeyIntent(key('j'), 'list')).toEqual({ kind: 'next' })
-    expect(paletteKeyIntent(key('k'), 'list')).toEqual({ kind: 'prev' })
+    expect(paletteKeyIntent(key('j'), 'actions')).toEqual({ kind: 'next' })
+    expect(paletteKeyIntent(key('k'), 'actions')).toEqual({ kind: 'prev' })
   })
 
   it('yields nothing for a letter no action claims', () => {
-    expect(paletteKeyIntent(key('q'), 'list')).toBeNull()
-    expect(paletteKeyIntent(key('z'), 'list')).toBeNull()
+    expect(paletteKeyIntent(key('q'), 'actions')).toBeNull()
+    expect(paletteKeyIntent(key('z'), 'actions')).toBeNull()
   })
 })
 
 describe('paletteKeyIntent modifiers', () => {
   it('yields nothing for a modified keypress at any level', () => {
-    for (const level of ['root', 'list'] as const) {
+    for (const level of ['root', 'actions', 'sub-list'] as const) {
       expect(paletteKeyIntent(key('ArrowDown', { metaKey: true }), level)).toBeNull()
       expect(paletteKeyIntent(key('ArrowLeft', { altKey: true }), level)).toBeNull()
       expect(paletteKeyIntent(key('j', { ctrlKey: true }), level)).toBeNull()
       expect(paletteKeyIntent(key('s', { metaKey: true }), level)).toBeNull()
     }
+  })
+})
+
+describe('paletteKeyIntent at a sub-list level', () => {
+  it('takes digits 1-9 as a positional pick', () => {
+    expect(paletteKeyIntent(key('1'), 'sub-list')).toEqual({ kind: 'pick', index: 0 })
+    expect(paletteKeyIntent(key('9'), 'sub-list')).toEqual({ kind: 'pick', index: 8 })
+  })
+
+  it('ignores 0 — a tenth slot keyed "0" reads as the first', () => {
+    expect(paletteKeyIntent(key('0'), 'sub-list')).toBeNull()
+  })
+
+  it('takes no action letters — a nested list is a pick, not a menu of actions', () => {
+    expect(paletteKeyIntent(key('s'), 'sub-list')).toBeNull()
+    expect(paletteKeyIntent(key('w'), 'sub-list')).toBeNull()
+  })
+
+  it('navigates and pops a level like any list-only level', () => {
+    expect(paletteKeyIntent(key('j'), 'sub-list')).toEqual({ kind: 'next' })
+    expect(paletteKeyIntent(key('Backspace'), 'sub-list')).toEqual({ kind: 'back' })
+    expect(paletteKeyIntent(key('Escape'), 'sub-list')).toEqual({ kind: 'close' })
+  })
+})
+
+describe('digits outside a sub-list', () => {
+  it('are ignored in the action list — positional keys were rejected there', () => {
+    expect(paletteKeyIntent(key('1'), 'actions')).toBeNull()
+    expect(paletteKeyIntent(key('3'), 'actions')).toBeNull()
+  })
+
+  it('are ordinary typing at root', () => {
+    expect(paletteKeyIntent(key('1'), 'root')).toBeNull()
   })
 })
 

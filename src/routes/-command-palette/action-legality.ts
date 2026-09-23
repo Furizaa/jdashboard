@@ -17,6 +17,16 @@ export type ActionContext = {
   readonly openWorkspaceKeys: readonly string[]
   /** The MR for this item, if one resolves (authored, or one we review). */
   readonly mr: MrRef | null
+  /**
+   * Whether this ticket has any legal transitions. `unknown` covers "the fetch
+   * has not resolved" — and it has to, because Jira decides per ticket. `s` is
+   * therefore offered optimistically and the sub-list says what happened; the
+   * alternative would be never offering it until a fetch the palette has no
+   * reason to have made yet.
+   */
+  readonly transitions: 'unknown' | 'none' | 'some'
+  /** How many tags are defined at all. `t` against none is a dead end. */
+  readonly tagCount: number
 }
 
 export type ActionDescriptor = {
@@ -29,8 +39,12 @@ export function legalActions(item: WorkItem, context: ActionContext): readonly A
   const descriptors: ActionDescriptor[] = []
 
   if (key !== null) {
+    descriptors.push({ kind: 'open-detail', label: 'Open detail' })
+    // Offered unless we positively know there is nowhere to go. See `transitions`.
+    if (context.transitions !== 'none') {
+      descriptors.push({ kind: 'change-status', label: 'Change Status…' })
+    }
     descriptors.push(
-      { kind: 'open-detail', label: 'Open detail' },
       { kind: 'open-notes', label: 'Open Notes' },
       {
         kind: 'watchlist-toggle',
@@ -38,6 +52,9 @@ export function legalActions(item: WorkItem, context: ActionContext): readonly A
         label: context.watchlistKeys.includes(key) ? 'Remove from Watchlist' : 'Add to Watchlist',
       },
     )
+    // `t` against no definitions would open an empty list; the Manage Tags
+    // command (slice 88) is where you go instead, and it is one level up.
+    if (context.tagCount > 0) descriptors.push({ kind: 'tags', label: 'Tags…' })
     if (context.jiraBaseUrl !== null) {
       descriptors.push(
         { kind: 'open-in-jira', label: 'Open in Jira' },

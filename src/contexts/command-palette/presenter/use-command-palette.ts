@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer } from 'react'
+import { useCallback, useEffect, useReducer, useRef } from 'react'
 import { match } from 'ts-pattern'
 import { workItemId, type WorkItem } from '~/kernel'
 import {
@@ -8,17 +8,21 @@ import {
   type PaletteAction,
   type PaletteCommandSource,
   type PaletteIntent,
+  type PaletteLevel,
   type PaletteSourceNote,
+  type PaletteSubListSource,
 } from '../domain'
 import {
   derivePalette,
   initialPaletteState,
+  paletteActiveItemId,
   paletteQuery,
   reducePalette,
   type PaletteActionRow,
   type PaletteDisplay,
   type PaletteEvent,
   type PaletteRow,
+  type PaletteSubItemRow,
 } from '../view-model'
 
 export type CommandPaletteDeps = {
@@ -29,6 +33,13 @@ export type CommandPaletteDeps = {
   readonly commands: PaletteCommandSource
   /** The legal actions for one item — the cross-context assembly, injected. */
   readonly actionsFor: (item: WorkItem) => readonly PaletteAction[]
+  readonly subListFor: PaletteSubListSource
+  /**
+   * Fired when the palette points at a work item, and again with `null` when it
+   * stops. The host uses it to fetch that ticket's transitions — on entering the
+   * item, never per search result, so typing cannot fan out a request per row.
+   */
+  readonly onActiveItemChange: (item: WorkItem | null) => void
 }
 
 export type CommandPaletteApi = {
@@ -39,23 +50,23 @@ export type CommandPaletteApi = {
   readonly highlight: (index: number) => void
   readonly choose: (row: PaletteRow) => void
   readonly runAction: (row: PaletteActionRow) => void
+  readonly runSubItem: (row: PaletteSubItemRow) => void
   readonly onKeyDown: (event: React.KeyboardEvent) => void
 }
 
-/**
- * The only React-bound module in the palette: the global ⌘K listener, focus
- * handoff to the query field, and the reducer binding. Every decision it makes
- * is made by `palette-key-intent` and `palette-view-model`, which are plain
- * functions with no React import.
- */
-export function useCommandPalette(deps: CommandPaletteDeps): CommandPaletteApi {
-  const [state, dispatch] = useReducer(reducePalette, initialPaletteState)
-  const isOpen = state.status !== 'closed'
+const LEVEL_FOR_STATUS: Record<Exclude<PaletteDisplay['status'], 'closed'>, PaletteLevel> = {
+  root: 'root',
+  actions: 'actions',
+  'sub-list': 'sub-list',
+}
 
-  // ⌘K toggles from anywhere. Opening never yanks focus out of another text
-  // input mid-sentence — the guard inherited from the deleted header search box.
-  // Closing ignores that guard, since the input it would be stealing from is the
-  // palette's own query field.
+/**
+ * ⌘K toggles from anywhere. Opening never yanks focus out of another text input
+ * mid-sentence — the guard inherited from the deleted header search box. Closing
+ * ignores that guard, since the input it would be stealing from is the palette's
+ * own query field.
+ */
+function usePaletteHotkey(isOpen: boolean, dispatch: (event: PaletteEvent) => void): void {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (!isPaletteHotkey(event)) return
@@ -70,12 +81,48 @@ export function useCommandPalette(deps: CommandPaletteDeps): CommandPaletteApi {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [isOpen])
+  }, [isOpen, dispatch])
+}
+
+/**
+ * Tell the host which item the palette points at, so it can fetch that ticket's
+ * transitions — on entering the item, never per search result.
+ *
+ * Keyed on the id rather than the item object: a query refetch that returns an
+ * equal-but-new array must not re-announce the same item.
+ */
+function useAnnounceActiveItem(
+  activeItemId: string | null,
+  items: readonly WorkItem[],
+  onActiveItemChange: (item: WorkItem | null) => void,
+): void {
+  const itemsRef = useRef(items)
+  itemsRef.current = items
+  useEffect(() => {
+    onActiveItemChange(
+      activeItemId === null
+        ? null
+        : (itemsRef.current.find((candidate) => workItemId(candidate) === activeItemId) ?? null),
+    )
+  }, [activeItemId, onActiveItemChange])
+}
+
+/**
+ * The only React-bound module in the palette: the global ⌘K listener, focus
+ * handoff to the query field, and the reducer binding. Every decision it makes
+ * is made by `palette-key-intent` and `palette-view-model`, which are plain
+ * functions with no React import.
+ */
+export function useCommandPalette(deps: CommandPaletteDeps): CommandPaletteApi {
+  const [state, dispatch] = useReducer(reducePalette, initialPaletteState)
+  usePaletteHotkey(state.status !== 'closed', dispatch)
+  useAnnounceActiveItem(paletteActiveItemId(state), deps.items, deps.onActiveItemChange)
 
   const display = derivePalette(state, {
     items: deps.items,
     commands: deps.commands(paletteQuery(state)),
     actionsFor: deps.actionsFor,
+    subListFor: deps.subListFor,
     sources: deps.sources,
   })
 
@@ -99,23 +146,43 @@ export function useCommandPalette(deps: CommandPaletteDeps): CommandPaletteApi {
 
   const runAction = useCallback((row: PaletteActionRow) => {
     if (!row.enabled) return
-    // The palette closes on a successful action; where an action's own UI takes
-    // over instead, that is the action's business — `run` is a closure the
-    // assembly built, and the assembly knows which of its actions do that.
-    dispatch({ type: 'closed' })
-    row.run()
+    match(row.perform)
+      .with({ effect: 'sub-list' }, ({ subList }) => {
+        dispatch({ type: 'enteredSubList', subList })
+      })
+      .with({ effect: 'run' }, ({ run }) => {
+        // The palette closes on a successful action; where an action's own UI
+        // takes over instead, that is the action's business — `run` is a closure
+        // the assembly built, and the assembly knows which of its actions do that.
+        dispatch({ type: 'closed' })
+        run()
+      })
+      .exhaustive()
   }, [])
+
+  const staysOpen = display.status === 'sub-list' && display.staysOpen
+  const runSubItem = useCallback(
+    (row: PaletteSubItemRow) => {
+      // The tag list stays open so several tags can be set in one visit; the
+      // transition list closes, because picking a status is the whole errand.
+      if (!staysOpen) dispatch({ type: 'closed' })
+      row.run()
+    },
+    [staysOpen],
+  )
 
   const onKeyDown = useCallback(
     (event: React.KeyboardEvent) => {
       if (display.status === 'closed') return
-      const intent = paletteKeyIntent(event, display.status === 'root' ? 'root' : 'list')
+      const intent = paletteKeyIntent(event, LEVEL_FOR_STATUS[display.status])
       if (intent === null) return
-      if (dispatchIntent(intent, display, { dispatch, close, back, choose, runAction })) {
+      if (
+        dispatchIntent(intent, display, { dispatch, close, back, choose, runAction, runSubItem })
+      ) {
         event.preventDefault()
       }
     },
-    [display, close, back, choose, runAction],
+    [display, close, back, choose, runAction, runSubItem],
   )
 
   return {
@@ -126,6 +193,7 @@ export function useCommandPalette(deps: CommandPaletteDeps): CommandPaletteApi {
     highlight: useCallback((index: number) => dispatch({ type: 'highlighted', index }), []),
     choose,
     runAction,
+    runSubItem,
     onKeyDown,
   }
 }
@@ -136,22 +204,32 @@ type IntentTargets = {
   readonly back: () => void
   readonly choose: (row: PaletteRow) => void
   readonly runAction: (row: PaletteActionRow) => void
+  readonly runSubItem: (row: PaletteSubItemRow) => void
+}
+
+type OpenDisplay = Exclude<PaletteDisplay, { status: 'closed' }>
+
+function listLength(display: OpenDisplay): number {
+  return match(display)
+    .with({ status: 'root' }, (d) => d.rowCount)
+    .with({ status: 'actions' }, (d) => d.actionCount)
+    .with({ status: 'sub-list' }, (d) => d.rowCount)
+    .exhaustive()
 }
 
 /** Returns whether the intent was handled, so the caller can `preventDefault`. */
 function dispatchIntent(
   intent: PaletteIntent,
-  display: Exclude<PaletteDisplay, { status: 'closed' }>,
+  display: OpenDisplay,
   targets: IntentTargets,
 ): boolean {
-  const count = display.status === 'root' ? display.rowCount : display.actionCount
   return match(intent)
     .with({ kind: 'next' }, () => {
-      targets.dispatch({ type: 'moved', delta: 1, count })
+      targets.dispatch({ type: 'moved', delta: 1, count: listLength(display) })
       return true
     })
     .with({ kind: 'prev' }, () => {
-      targets.dispatch({ type: 'moved', delta: -1, count })
+      targets.dispatch({ type: 'moved', delta: -1, count: listLength(display) })
       return true
     })
     .with({ kind: 'enter' }, () =>
@@ -164,6 +242,11 @@ function dispatchIntent(
         .with({ status: 'actions' }, (d) => {
           if (d.selectedAction === null) return false
           targets.runAction(d.selectedAction)
+          return true
+        })
+        .with({ status: 'sub-list' }, (d) => {
+          if (d.selectedRow === null) return false
+          targets.runSubItem(d.selectedRow)
           return true
         })
         .exhaustive(),
@@ -180,12 +263,21 @@ function dispatchIntent(
       return true
     })
     .with({ kind: 'action' }, ({ action }) => {
-      if (display.status === 'root') return false
+      if (display.status !== 'actions') return false
       const row = display.byKind.get(action)
       if (row !== undefined) targets.runAction(row)
       // Handled either way. A letter bound to an action that is not currently
       // legal must be a **no-op** — not a fall-through to another handler, and
       // not a close. Swallowing it here is what makes that true.
+      return true
+    })
+    .with({ kind: 'pick' }, ({ index }) => {
+      if (display.status !== 'sub-list') return false
+      if (display.content.state !== 'ready') return true
+      const row = display.content.rows[index]
+      if (row !== undefined) targets.runSubItem(row)
+      // Swallowed for the same reason as an illegal letter: a digit past the end
+      // of a short list must do nothing rather than leak somewhere else.
       return true
     })
     .exhaustive()

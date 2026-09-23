@@ -7,6 +7,7 @@ import { PaletteActions } from './PaletteActions'
 import { PaletteEmpty } from './PaletteEmpty'
 import { PaletteFooter } from './PaletteFooter'
 import { PaletteResults } from './PaletteResults'
+import { PaletteSubList } from './PaletteSubList'
 
 // The ⌘K surface. All state lives in the presenter's reducer and the pure
 // view-model; this file only renders `display` and forwards keystrokes.
@@ -21,7 +22,8 @@ export function CommandPalette(deps: CommandPaletteDeps) {
   const contentRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const inActions = display.status === 'actions'
+  // Both deep levels list an item's own things; only the root owns the query.
+  const inItem = display.status === 'actions' || display.status === 'sub-list'
 
   // The query field only exists at the root level — the action list has no text
   // filter, because typing a letter there *runs* an action. So focus moves to
@@ -29,9 +31,9 @@ export function CommandPalette(deps: CommandPaletteDeps) {
   // Keystrokes are handled on the dialog either way, which is where they bubble.
   useEffect(() => {
     if (display.status === 'closed') return
-    if (inActions) contentRef.current?.focus()
+    if (inItem) contentRef.current?.focus()
     else inputRef.current?.focus()
-  }, [display.status, inActions])
+  }, [display.status, inItem])
 
   if (display.status === 'closed') return null
 
@@ -50,11 +52,11 @@ export function CommandPalette(deps: CommandPaletteDeps) {
       >
         <DialogTitle className="sr-only">Command palette</DialogTitle>
         <div className="border-border flex h-12 items-center gap-2.5 border-b px-4">
-          {inActions ? (
+          {inItem ? (
             <button
               type="button"
               onClick={palette.back}
-              aria-label="Back to results"
+              aria-label="Back one level"
               className="text-ink-tertiary hover:text-foreground focus-visible:ring-ring -ml-1 inline-flex size-6 shrink-0 items-center justify-center rounded focus-visible:ring-2 focus-visible:outline-none"
             >
               <ChevronLeft size={16} />
@@ -62,9 +64,10 @@ export function CommandPalette(deps: CommandPaletteDeps) {
           ) : (
             <Search size={15} className="text-ink-tertiary shrink-0" aria-hidden />
           )}
-          {display.status === 'actions' ? (
-            // At this level the header reads as a breadcrumb for the item whose
-            // actions are listed, so it is obvious what the next keypress acts on.
+          {display.status === 'actions' || display.status === 'sub-list' ? (
+            // At a deep level the header reads as a breadcrumb for the item
+            // whose things are listed, so it is obvious what the next keypress
+            // acts on — and one level deeper, which list you are in.
             <div
               data-testid={testIds.commandPaletteItemHeader}
               className="flex min-w-0 flex-1 items-center gap-2.5 text-sm"
@@ -75,6 +78,14 @@ export function CommandPalette(deps: CommandPaletteDeps) {
                 </span>
               )}
               <span className="text-foreground min-w-0 truncate">{display.itemTitle}</span>
+              {display.status === 'sub-list' && (
+                <>
+                  <span className="text-ink-tertiary shrink-0" aria-hidden>
+                    ›
+                  </span>
+                  <span className="text-ink-subtle shrink-0">{display.title}</span>
+                </>
+              )}
             </div>
           ) : (
             <input
@@ -92,7 +103,19 @@ export function CommandPalette(deps: CommandPaletteDeps) {
           )}
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto py-1.5">
-          {display.status === 'actions' ? (
+          {display.status === 'sub-list' ? (
+            <PaletteSubList
+              content={display.content}
+              subIndex={display.subIndex}
+              emptyMessage={
+                display.subList === 'status'
+                  ? 'No transitions available for this ticket.'
+                  : 'No tags defined.'
+              }
+              onHighlight={palette.highlight}
+              onRun={palette.runSubItem}
+            />
+          ) : display.status === 'actions' ? (
             <PaletteActions
               groups={display.groups}
               actionIndex={display.actionIndex}
@@ -111,7 +134,7 @@ export function CommandPalette(deps: CommandPaletteDeps) {
           )}
         </div>
         <PaletteFooter
-          level={inActions ? 'actions' : 'root'}
+          level={display.status}
           sources={display.status === 'root' ? display.sources : []}
         />
       </DialogContent>

@@ -2,7 +2,7 @@ import { useCallback } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { match } from 'ts-pattern'
 import { toast } from 'sonner'
-import type { PaletteAction } from '~/contexts/command-palette'
+import type { PaletteAction, PaletteActionPerform } from '~/contexts/command-palette'
 import type { WorkspaceActionsApi } from '~/contexts/detail'
 import {
   useAddToWatchlist,
@@ -41,6 +41,10 @@ import {
 export type ActionCatalogueDeps = {
   /** Mounted by the host; owns the branch prompt and the discard confirmation. */
   readonly workspace: WorkspaceActionsApi
+  /** What is known about the active ticket's transitions — gates `s`. */
+  readonly transitions: ActionContext['transitions']
+  /** How many tags exist at all — gates `t`. */
+  readonly tagCount: number
 }
 
 type RunnerDeps = {
@@ -64,17 +68,20 @@ function report(
     })
 }
 
+/** Sugar so each arm below reads as one line. */
+const run = (fn: () => void): PaletteActionPerform => ({ effect: 'run', run: fn })
+
 /**
- * The effect behind one action kind, or `null` when the palette cannot run it
- * yet. Matched exhaustively, so adding an `ActionKind` is a compile error until
- * it is handled here — which is the point of the kernel union.
+ * What one action kind does, or `null` when the palette cannot do it yet.
+ * Matched exhaustively, so adding an `ActionKind` is a compile error until it is
+ * handled here — which is the point of the kernel union.
  */
-function runnerFor(
+function performFor(
   kind: ActionKind,
   item: WorkItem,
   context: ActionContext,
   deps: RunnerDeps,
-): (() => void) | null {
+): PaletteActionPerform | null {
   const key = workItemJiraKey(item)
   const jiraUrl =
     key !== null && context.jiraBaseUrl !== null ? `${context.jiraBaseUrl}/browse/${key}` : null
@@ -84,37 +91,48 @@ function runnerFor(
     match(kind)
       // `to: '.'` is applied by the caller's `navigate`, so opening a ticket keeps
       // whichever board you are on rather than throwing you back to the main one.
-      .with('open-detail', () => (key === null ? null : () => deps.navigate({ issue: key })))
+      .with('open-detail', () => (key === null ? null : run(() => deps.navigate({ issue: key }))))
       .with('open-notes', () =>
-        key === null ? null : () => deps.navigate({ issue: key, notes: true }),
+        key === null ? null : run(() => deps.navigate({ issue: key, notes: true })),
+      )
+      // The two nested lists. Their contents come from `useSubLists`; the
+      // descriptor only declares that choosing them navigates rather than acts.
+      .with('change-status', () =>
+        key === null ? null : ({ effect: 'sub-list', subList: 'status' } as const),
+      )
+      .with('tags', () =>
+        key === null ? null : ({ effect: 'sub-list', subList: 'tags' } as const),
       )
       .with('watchlist-toggle', () => {
         if (key === null) return null
         const onWatchlist = context.watchlistKeys.includes(key)
         // A direct mutation, not a trip through `WatchlistModal` — that modal
         // exists to *find* a ticket, which the palette has already done.
-        return () =>
+        return run(() =>
           report(
             onWatchlist ? 'Remove from watchlist' : 'Add to watchlist',
             onWatchlist ? deps.removeFromWatchlist(key) : deps.addToWatchlist(key),
-          )
+          ),
+        )
       })
       .with('open-in-jira', () =>
-        jiraUrl === null ? null : () => deps.browser.openInNewTab(jiraUrl),
+        jiraUrl === null ? null : run(() => deps.browser.openInNewTab(jiraUrl)),
       )
       .with('copy-jira-link', () =>
-        jiraUrl === null ? null : () => deps.browser.copyWithToast(jiraUrl, 'Link'),
+        jiraUrl === null ? null : run(() => deps.browser.copyWithToast(jiraUrl, 'Link')),
       )
       .with('copy-issue-key', () =>
-        key === null ? null : () => deps.browser.copyWithToast(key, 'Issue key'),
+        key === null ? null : run(() => deps.browser.copyWithToast(key, 'Issue key')),
       )
       .with('open-mr', () => {
         const mr = context.mr
-        return mr === null ? null : () => deps.browser.openInNewTab(mr.webUrl)
+        return mr === null ? null : run(() => deps.browser.openInNewTab(mr.webUrl))
       })
       .with('review-mr', () => {
         const mr = context.mr
-        return mr === null ? null : () => report('Review MR', reviewMr({ data: { iid: mr.iid } }))
+        return mr === null
+          ? null
+          : run(() => report('Review MR', reviewMr({ data: { iid: mr.iid } })))
       })
       .with('open-workspace', () => {
         const fields = workspaceTargetFields(item)
@@ -122,29 +140,29 @@ function runnerFor(
         // Opens the panel's existing branch-name prompt. It carries the
         // worktree-already-exists warning and the existing-MR-branch reuse, so
         // skipping it would create a branch the user never saw.
-        return () => deps.workspace.startOpen({ issueKey: workspaceKey, ...fields })
+        return run(() => deps.workspace.startOpen({ issueKey: workspaceKey, ...fields }))
       })
       .with('focus-workspace', () =>
-        workspaceKey === null ? null : () => deps.workspace.focus(workspaceKey),
+        workspaceKey === null ? null : run(() => deps.workspace.focus(workspaceKey)),
       )
+      // Destructive, so it opens the same confirmation the panel shows rather
+      // than force-removing a worktree on one keystroke.
       .with('discard-workspace', () =>
-        workspaceKey === null
-          ? null
-          : // Destructive, so it opens the same confirmation the panel shows rather
-            // than force-removing a worktree on one keystroke.
-            () => deps.workspace.requestDiscard(workspaceKey),
+        workspaceKey === null ? null : run(() => deps.workspace.requestDiscard(workspaceKey)),
       )
-      // Sub-lists (slice 87) and the AI hand-offs (slice 88). `legalActions` does
-      // not offer these yet, so these arms are unreachable today — they exist so
-      // that adding a kind to the kernel union fails the build here until it is
-      // wired, rather than silently going missing from the palette.
-      .with('change-status', 'tags', 'ai-refine', 'ai-ask', () => null)
+      // The AI hand-offs arrive in slice 88. `legalActions` does not offer them
+      // yet, so this arm is unreachable today — it exists so that adding a kind
+      // to the kernel union fails the build here until it is wired, rather than
+      // silently going missing from the palette.
+      .with('ai-refine', 'ai-ask', () => null)
       .exhaustive()
   )
 }
 
 export function useActionCatalogue({
   workspace,
+  transitions,
+  tagCount,
 }: ActionCatalogueDeps): (item: WorkItem) => readonly PaletteAction[] {
   const navigateFn = useNavigate()
   const board = useBoardData()
@@ -175,6 +193,8 @@ export function useActionCatalogue({
         watchlistKeys: watchlistCards?.map((card) => card.key) ?? [],
         openWorkspaceKeys,
         mr: resolveMrForWorkItem(item, { authoredByKey, reviewCards }),
+        transitions,
+        tagCount,
       }
       const deps: RunnerDeps = {
         navigate,
@@ -184,11 +204,14 @@ export function useActionCatalogue({
         workspace,
       }
       return legalActions(item, context).flatMap((descriptor) => {
-        const run = runnerFor(descriptor.kind, item, context, deps)
-        // A legal action with no runner cannot happen — `action-legality.test.ts`
-        // asserts every kind it can emit resolves to one — so dropping it is the
-        // safe way to say "impossible" without rendering a dead row.
-        return run === null ? [] : [{ ...descriptor, enabled: true, run } satisfies PaletteAction]
+        const perform = performFor(descriptor.kind, item, context, deps)
+        // A legal action with nothing to perform cannot happen —
+        // `action-legality.test.ts` asserts every kind it can emit resolves to
+        // one — so dropping it is the safe way to say "impossible" without
+        // rendering a dead row.
+        return perform === null
+          ? []
+          : [{ ...descriptor, enabled: true, perform } satisfies PaletteAction]
       })
     },
     [
@@ -202,6 +225,8 @@ export function useActionCatalogue({
       add,
       remove,
       workspace,
+      transitions,
+      tagCount,
     ],
   )
 }

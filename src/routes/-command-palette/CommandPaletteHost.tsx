@@ -1,8 +1,11 @@
+import { useCallback, useState } from 'react'
 import { CommandPalette } from '~/contexts/command-palette'
 import { useWorkspaceActions, WorkspaceActionModals } from '~/contexts/detail'
+import { workItemJiraKey, type WorkItem } from '~/kernel'
 import { useActionCatalogue } from './use-action-catalogue'
 import { useBoardCommands, type BoardFilterState } from './use-board-commands'
 import { usePaletteItems } from './use-palette-items'
+import { useSubLists } from './use-sub-lists'
 
 // The palette's composition root: it reads every context the palette needs and
 // hands the palette plain values and plain functions. The palette context itself
@@ -15,11 +18,27 @@ export function CommandPaletteHost({ filter, onFilterChange }: BoardFilterState)
   const { items, sources } = usePaletteItems()
   const commands = useBoardCommands({ filter, onFilterChange })
   const workspace = useWorkspaceActions()
-  const actionsFor = useActionCatalogue({ workspace })
+
+  // Which ticket the palette is pointed at, announced by the palette when an
+  // item's action list is entered. This is what keeps the transitions fetch to
+  // one request per item visited rather than one per search result typed.
+  const [activeItem, setActiveItem] = useState<WorkItem | null>(null)
+  const activeKey = activeItem === null ? null : workItemJiraKey(activeItem)
+  const { subListFor, transitions, tagCount } = useSubLists(activeKey)
+  const actionsFor = useActionCatalogue({ workspace, transitions, tagCount })
+
+  const onActiveItemChange = useCallback((item: WorkItem | null) => setActiveItem(item), [])
 
   return (
     <>
-      <CommandPalette items={items} sources={sources} commands={commands} actionsFor={actionsFor} />
+      <CommandPalette
+        items={items}
+        sources={sources}
+        commands={commands}
+        actionsFor={actionsFor}
+        subListFor={subListFor}
+        onActiveItemChange={onActiveItemChange}
+      />
       <WorkspaceActionModals api={workspace} />
     </>
   )

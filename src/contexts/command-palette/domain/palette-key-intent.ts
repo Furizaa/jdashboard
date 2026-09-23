@@ -15,18 +15,24 @@ export type PaletteIntent =
   // letter to type into. That is the whole reason the action list has no text
   // filter: one keypress runs one action.
   | { readonly kind: 'action'; readonly action: ActionKind }
+  // Positional, and only inside a nested list. Digits were rejected for the main
+  // action list because the key for an action would shift as legality changed —
+  // but a transition list is short, dynamic and homogeneous, so there is nothing
+  // stable to memorise there and a digit is the fastest thing available.
+  | { readonly kind: 'pick'; readonly index: number }
 
 /**
- * Which kind of level the keypress arrived at, which changes what a bare letter
- * means:
+ * Which level the keypress arrived at, which changes what a bare character means:
  *
  * - `root` owns the query field, so `j` there types a `j` and arrows are the
  *   only way to move. (`j`/`k` are reserved for list navigation everywhere —
  *   but only where there is no text input to steal them from.)
- * - `list` is a list and nothing else — the per-item action list and its
- *   sub-lists — so `j`/`k` navigate and `Backspace` pops a level.
+ * - `actions` is a list and nothing else, so `j`/`k` navigate, `Backspace` pops
+ *   a level, and a curated letter runs its action.
+ * - `sub-list` navigates the same way but takes **digits** instead of letters:
+ *   a nested list is a pick, not a menu of named actions.
  */
-export type PaletteLevel = 'root' | 'list'
+export type PaletteLevel = 'root' | 'actions' | 'sub-list'
 
 const SHARED: Readonly<Record<string, PaletteIntent>> = {
   ArrowDown: { kind: 'next' },
@@ -61,6 +67,12 @@ export function paletteKeyIntent(
   // which `ACTION_SHORTCUTS` is asserted never to claim.
   const listOnly = LIST_ONLY[lower]
   if (listOnly !== undefined) return listOnly
+
+  if (level === 'sub-list') {
+    // `1`–`9`; `0` is deliberately not a tenth slot, which would read as first.
+    if (/^[1-9]$/u.test(event.key)) return { kind: 'pick', index: Number(event.key) - 1 }
+    return null
+  }
 
   const action = ACTION_FOR_SHORTCUT[lower]
   return action === undefined ? null : { kind: 'action', action }

@@ -57,6 +57,8 @@ function context(overrides: Partial<ActionContext> = {}): ActionContext {
     watchlistKeys: [],
     openWorkspaceKeys: [],
     mr: null,
+    transitions: 'some',
+    tagCount: 2,
     ...overrides,
   }
 }
@@ -71,8 +73,10 @@ describe('legalActions for a Jira-backed item', () => {
   it('offers the ticket actions for an assigned board issue', () => {
     expect(kinds(JIRA)).toEqual([
       'open-detail',
+      'change-status',
       'open-notes',
       'watchlist-toggle',
+      'tags',
       'open-in-jira',
       'copy-jira-link',
       'copy-issue-key',
@@ -135,6 +139,40 @@ describe('watchlist legality', () => {
   })
 })
 
+describe('status sub-list legality', () => {
+  it('offers Change Status while a ticket is known to have transitions', () => {
+    expect(kinds(JIRA, context({ transitions: 'some' }))).toContain('change-status')
+  })
+
+  it('offers it optimistically while the fetch has not resolved', () => {
+    // Jira decides per ticket, and the fetch only fires once the action list is
+    // entered — so "unknown" has to mean "offer it and say what happened".
+    expect(kinds(JIRA, context({ transitions: 'unknown' }))).toContain('change-status')
+  })
+
+  it('withholds it once the ticket is known to have none', () => {
+    expect(kinds(JIRA, context({ transitions: 'none' }))).not.toContain('change-status')
+  })
+
+  it('never offers it for an item with no ticket behind it', () => {
+    expect(kinds(REVIEW_FAKE, context({ transitions: 'some' }))).not.toContain('change-status')
+  })
+})
+
+describe('tag sub-list legality', () => {
+  it('offers Tags when any tag is defined', () => {
+    expect(kinds(JIRA, context({ tagCount: 1 }))).toContain('tags')
+  })
+
+  it('withholds it when none are — an empty list is a dead end', () => {
+    expect(kinds(JIRA, context({ tagCount: 0 }))).not.toContain('tags')
+  })
+
+  it('never offers it for an item with no ticket behind it', () => {
+    expect(kinds(REVIEW_FAKE, context({ tagCount: 5 }))).not.toContain('tags')
+  })
+})
+
 describe('MR legality', () => {
   it('offers nothing MR-shaped when no MR resolves', () => {
     expect(kinds(JIRA)).not.toContain('open-mr')
@@ -175,6 +213,9 @@ describe('legalActions invariants', () => {
     context({ watchlistKeys: ['HDR-1'] }),
     context({ openWorkspaceKeys: ['HDR-1'] }),
     context({ mr: { iid: 1, webUrl: 'https://gitlab/1' } }),
+    context({ transitions: 'none' }),
+    context({ transitions: 'unknown' }),
+    context({ tagCount: 0 }),
     context({
       watchlistKeys: ['HDR-1'],
       openWorkspaceKeys: ['HDR-1'],
@@ -201,10 +242,10 @@ describe('legalActions invariants', () => {
     }
   })
 
-  // The kinds the palette cannot run yet arrive in slices 87 and 88. Until they
-  // do, offering one would render a row that does nothing.
+  // The kinds the palette cannot run yet arrive in slice 88. Until they do,
+  // offering one would render a row that does nothing.
   it('never emits an action kind that has no runner yet', () => {
-    const notYetWired: readonly ActionKind[] = ['change-status', 'tags', 'ai-refine', 'ai-ask']
+    const notYetWired: readonly ActionKind[] = ['ai-refine', 'ai-ask']
     for (const item of everyShape) {
       for (const ctx of everyContext) {
         for (const kind of kinds(item, ctx)) {

@@ -19,102 +19,19 @@ import {
   rankCommands,
   rankItems,
   type PaletteAction,
+  type PaletteActionPerform,
   type PaletteCommand,
   type PaletteSection,
   type PaletteSourceNote,
+  type PaletteSubItem,
+  type PaletteSubList,
+  type PaletteSubListSource,
+  type SubListKind,
 } from '../domain'
+import type { PaletteState } from './palette-state'
 
-// Framework-free state machine for the palette. The status *is* the navigation
-// level, and each deeper level carries the shallower one's fields — so backing
-// out of a level restoring the query and the selected result is structural
-// rather than something the reducer has to remember.
-export type PaletteState =
-  | { readonly status: 'closed' }
-  | { readonly status: 'open'; readonly query: string; readonly selected: number }
-  | {
-      readonly status: 'actions'
-      readonly query: string
-      readonly selected: number
-      /**
-       * Which item's actions — by `workItemId`, not by index, so a board refresh
-       * that reorders the list cannot silently retarget the action.
-       */
-      readonly itemId: string
-      readonly actionIndex: number
-    }
-
-export type PaletteEvent =
-  | { readonly type: 'opened' }
-  | { readonly type: 'closed' }
-  | { readonly type: 'queryChanged'; readonly query: string }
-  | { readonly type: 'moved'; readonly delta: number; readonly count: number }
-  | { readonly type: 'highlighted'; readonly index: number }
-  | { readonly type: 'enteredActions'; readonly itemId: string }
-  | { readonly type: 'wentBack' }
-
-export const initialPaletteState: PaletteState = { status: 'closed' }
-
-// Wrap rather than clamp: a list you can run off the end of feels broken when
-// the whole point is never touching the mouse.
-function wrap(index: number, count: number): number {
-  if (count <= 0) return 0
-  return ((index % count) + count) % count
-}
-
-export function reducePalette(state: PaletteState, event: PaletteEvent): PaletteState {
-  return (
-    match([state, event] as const)
-      .with([{ status: 'closed' }, { type: 'opened' }], () => ({
-        status: 'open' as const,
-        query: '',
-        selected: 0,
-      }))
-      // Closing resets to the top from any depth. Escape is the one gesture that
-      // does not care how deep you are — `wentBack` is the one that does.
-      .with([{ status: 'open' }, { type: 'closed' }], () => initialPaletteState)
-      .with([{ status: 'actions' }, { type: 'closed' }], () => initialPaletteState)
-      // A fresh query means a fresh list, so the highlight goes back to the top.
-      .with([{ status: 'open' }, { type: 'queryChanged' }], ([, e]) => ({
-        status: 'open' as const,
-        query: e.query,
-        selected: 0,
-      }))
-      .with([{ status: 'open' }, { type: 'moved' }], ([s, e]) => ({
-        ...s,
-        selected: wrap(s.selected + e.delta, e.count),
-      }))
-      .with([{ status: 'actions' }, { type: 'moved' }], ([s, e]) => ({
-        ...s,
-        actionIndex: wrap(s.actionIndex + e.delta, e.count),
-      }))
-      .with([{ status: 'open' }, { type: 'highlighted' }], ([s, e]) => ({
-        ...s,
-        selected: Math.max(0, e.index),
-      }))
-      .with([{ status: 'actions' }, { type: 'highlighted' }], ([s, e]) => ({
-        ...s,
-        actionIndex: Math.max(0, e.index),
-      }))
-      .with([{ status: 'open' }, { type: 'enteredActions' }], ([s, e]) => ({
-        status: 'actions' as const,
-        query: s.query,
-        selected: s.selected,
-        itemId: e.itemId,
-        actionIndex: 0,
-      }))
-      // Popping a level keeps `query` and `selected`, so stepping in and out of an
-      // item is lossless. Losing your query because you backed out of an action
-      // list would be infuriating.
-      .with([{ status: 'actions' }, { type: 'wentBack' }], ([s]) => ({
-        status: 'open' as const,
-        query: s.query,
-        selected: s.selected,
-      }))
-      // Events that do not apply to the current status are dropped, not errors:
-      // a keypress can always race a close.
-      .otherwise(() => state)
-  )
-}
+// The pure projection from state + injected data to what the view renders. The
+// state machine itself lives in `palette-state.ts`; nothing here mutates.
 
 /** A row's payload — a found work item, or a board-level command. */
 export type PaletteRowTarget =
@@ -145,8 +62,19 @@ export type PaletteActionRow = {
   readonly label: string
   readonly shortcut: string
   readonly enabled: boolean
-  readonly run: () => void
+  readonly perform: PaletteActionPerform
 }
+
+export type PaletteSubItemRow = PaletteSubItem & {
+  readonly index: number
+  /** `1`–`9` for the first nine rows, `null` beyond — see `palette-key-intent`. */
+  readonly digit: string | null
+}
+
+export type PaletteSubListContent =
+  | { readonly state: 'loading' }
+  | { readonly state: 'failed'; readonly message: string }
+  | { readonly state: 'ready'; readonly rows: readonly PaletteSubItemRow[] }
 
 export type PaletteActionGroupView = {
   readonly group: ActionGroup
@@ -163,6 +91,8 @@ export type PaletteInputs = {
    * groups without judging legality itself.
    */
   readonly actionsFor: (item: WorkItem) => readonly PaletteAction[]
+  /** The injected contents of a nested list, read only for the one that is open. */
+  readonly subListFor: PaletteSubListSource
   /**
    * Sources that are not contributing yet. The palette shows what it has and
    * says what is missing rather than blocking on the slowest source — a slow
@@ -194,6 +124,25 @@ export type PaletteDisplay =
       readonly selectedAction: PaletteActionRow | null
       /** Shortcut dispatch: a letter resolves to an action kind, then to this. */
       readonly byKind: ReadonlyMap<ActionKind, PaletteActionRow>
+    }
+  | {
+      readonly status: 'sub-list'
+      readonly query: string
+      readonly item: WorkItem
+      readonly itemBadge: string | null
+      readonly itemTitle: string
+      readonly subList: SubListKind
+      readonly title: string
+      readonly content: PaletteSubListContent
+      readonly rowCount: number
+      readonly subIndex: number
+      readonly selectedRow: PaletteSubItemRow | null
+      /**
+       * Whether running a row leaves the list open. The tag list does — several
+       * tags usually get set in one visit — where the main action list and the
+       * transition list both close on success. An intentional difference.
+       */
+      readonly staysOpen: boolean
     }
 
 function itemBadge(item: WorkItem): string {
@@ -278,7 +227,7 @@ function buildActionRows(actions: readonly PaletteAction[]): readonly PaletteAct
         label: action.label,
         shortcut: ACTION_SHORTCUTS[action.kind],
         enabled: action.enabled,
-        run: action.run,
+        perform: action.perform,
       })
     }
   }
@@ -293,12 +242,35 @@ function groupActionRows(rows: readonly PaletteActionRow[]): readonly PaletteAct
   })).filter((view) => view.rows.length > 0)
 }
 
-/** The query at any level — `''` while closed. */
-export function paletteQuery(state: PaletteState): string {
-  return match(state)
-    .with({ status: 'closed' }, () => '')
-    .with({ status: 'open' }, { status: 'actions' }, (s) => s.query)
-    .exhaustive()
+const SUB_LIST_TITLE: Record<SubListKind, string> = {
+  status: 'Change Status',
+  tags: 'Tags',
+}
+
+function subItemRows(items: readonly PaletteSubItem[]): readonly PaletteSubItemRow[] {
+  return items.map((item, index) => ({
+    ...item,
+    index,
+    digit: index < 9 ? String(index + 1) : null,
+  }))
+}
+
+function subListContent(list: PaletteSubList): PaletteSubListContent {
+  return (
+    match(list)
+      .with({ kind: 'status', state: 'loading' }, () => ({ state: 'loading' as const }))
+      .with({ kind: 'status', state: 'failed' }, (l) => ({
+        state: 'failed' as const,
+        message: l.message,
+      }))
+      .with({ kind: 'status', state: 'ready' }, (l) => ({
+        state: 'ready' as const,
+        rows: subItemRows(l.items),
+      }))
+      // Tags are already in the cache, so there is no loading arm to forget.
+      .with({ kind: 'tags' }, (l) => ({ state: 'ready' as const, rows: subItemRows(l.items) }))
+      .exhaustive()
+  )
 }
 
 function deriveRoot(
@@ -321,12 +293,16 @@ function deriveRoot(
   }
 }
 
+function findItem(state: { itemId: string }, inputs: PaletteInputs): WorkItem | undefined {
+  return inputs.items.find((candidate) => workItemId(candidate) === state.itemId)
+}
+
 export function derivePalette(state: PaletteState, inputs: PaletteInputs): PaletteDisplay {
   return match(state)
     .with({ status: 'closed' }, () => ({ status: 'closed' as const }))
     .with({ status: 'open' }, (s) => deriveRoot(s, inputs))
     .with({ status: 'actions' }, (s) => {
-      const item = inputs.items.find((candidate) => workItemId(candidate) === s.itemId)
+      const item = findItem(s, inputs)
       // The item can vanish under us — a board refresh drops a Done ticket, a
       // watchlist removal lands. Falling back to the results list is honest;
       // rendering an action list for nothing is not.
@@ -346,6 +322,29 @@ export function derivePalette(state: PaletteState, inputs: PaletteInputs): Palet
         actionIndex,
         selectedAction: rows[actionIndex] ?? null,
         byKind: new Map(rows.map((row) => [row.kind, row])),
+      }
+    })
+    .with({ status: 'sub-list' }, (s) => {
+      const item = findItem(s, inputs)
+      if (item === undefined) {
+        return deriveRoot({ status: 'open', query: s.query, selected: s.selected }, inputs)
+      }
+      const content = subListContent(inputs.subListFor(item, s.subList))
+      const rows = content.state === 'ready' ? content.rows : []
+      const subIndex = rows.length === 0 ? 0 : Math.min(s.subIndex, rows.length - 1)
+      return {
+        status: 'sub-list' as const,
+        query: s.query,
+        item,
+        itemBadge: itemBadge(item),
+        itemTitle: workItemTitle(item),
+        subList: s.subList,
+        title: SUB_LIST_TITLE[s.subList],
+        content,
+        rowCount: rows.length,
+        subIndex,
+        selectedRow: rows[subIndex] ?? null,
+        staysOpen: s.subList === 'tags',
       }
     })
     .exhaustive()

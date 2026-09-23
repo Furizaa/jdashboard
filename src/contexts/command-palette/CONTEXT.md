@@ -38,6 +38,12 @@ There is **no `application/` layer**, and its absence is the design: the palette
 
 **Legality**: whether an action is offered at all, derived from item state and never hardcoded per surface. Illegal actions are **absent**, not disabled — `PaletteAction.enabled` is reserved for the transient case, an action that exists but whose data is still in flight. There is no `if (isReviewFake)` anywhere: a fake review card simply has no Jira key, so every ticket-shaped action falls away and only `m` / `v` survive.
 
+**Sub-list** (`PaletteSubList`): a nested list opened by an action instead of running it — `s` for status transitions, `t` for tags. The two are shaped differently on purpose: **transitions are asynchronous and per-ticket** (Jira decides what a ticket can become, so the list has loading and _failed_ arms, and a failure must not look like "no transitions exist"), where **tags come from the cache** and have neither. Forcing one shape would mean pretending a tag list can be loading.
+
+The transition fetch fires when an item's **action list** is entered, not per search result — the palette announces its active item to the host for exactly that reason, so typing never fans out a request per row. A ticket with no transitions loses `s` entirely; because that is only knowable after the fetch, `s` is offered while the answer is unknown and the sub-list says what happened.
+
+The tag list **stays open** after a toggle, because several tags usually get set in one visit. The action list and the transition list both close on success. That difference is intentional.
+
 **Section**: a root-level result group — Assigned to me · Watchlist · Review · Commands. Grouping by source is what makes it obvious whether a hit is your own work, something you only advise on, or an MR waiting on your review.
 
 **Source note** (`PaletteSourceNote`): a source that is not contributing yet, `loading` or `unavailable`. Kept distinct because "empty because GitLab is still answering" and "empty because GitLab returned 401" are different claims about the same empty list.
@@ -47,15 +53,21 @@ _Avoid_: "filter" for what the palette does to its own list (that is **ranking**
 ## View-model state machine
 
 ```
-closed ──(⌘K)──▶ open { query, selected } ──(↵ on a result)──▶ actions { query, selected, itemId, actionIndex }
-   ▲                    │        ▲                                   │
-   └──(Esc / ⌘K)────────┘        └────────────(← / ⌫)────────────────┘
-   └──────────────────────(Esc from any depth)──────────────────────────┘
+closed ─(⌘K)─▶ open ─(↵ on a result)─▶ actions ─(s / t)─▶ sub-list
+   ▲            │  ▲                      │  ▲              │
+   └─(Esc/⌘K)───┘  └───────(← / ⌫)────────┘  └───(← / ⌫)────┘
+   └────────────────(Esc, from any depth)───────────────────┘
+
+open     { query, selected }
+actions  { query, selected, itemId, actionIndex }
+sub-list { query, selected, itemId, actionIndex, subList, subIndex }
 ```
 
 The status **is** the navigation level, and each deeper level carries the shallower one's fields, so backing out of a level with the query and the selected result intact is structural rather than something the reducer has to remember. `Esc` closes from any depth; `← / ⌫` pops exactly one — conflating them would mean losing your query because you backed out of an action list.
 
-The action level holds the item by `workItemId`, not by index, so a board refresh that reorders the results cannot silently retarget an action. If the item disappears entirely (a Done ticket drops off, a watchlist removal lands) `derive` falls back to the results list rather than rendering an action list for nothing.
+The deep levels hold the item by `workItemId`, not by index, so a board refresh that reorders the results cannot silently retarget an action. If the item disappears entirely (a Done ticket drops off, a watchlist removal lands) `derive` falls back to the results list rather than rendering an action list for nothing.
+
+The reducer is one small function per level dispatched on the level, with an `exhaustive()` over the union — so adding a level is a compile error until it has rules of its own.
 
 Two deliberate splits of responsibility:
 

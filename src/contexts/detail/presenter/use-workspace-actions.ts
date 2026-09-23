@@ -68,11 +68,18 @@ function reportFailure(verb: string, error: unknown): void {
   toast.error(`${verb} failed: ${error instanceof Error ? error.message : String(error)}`)
 }
 
-export function useWorkspaceActions(): WorkspaceActionsApi {
+type OpenFlow = {
+  readonly phase: OpenPhase
+  readonly startOpen: (target: WorkspaceTarget) => void
+  readonly confirmOpen: (confirm: WorkspaceModalConfirm) => void
+  readonly cancelOpen: () => void
+}
+
+// The open flow, which is the only one with a prompt: check for an existing
+// worktree, look up the MR's branch if there is one, then hand both to the
+// modal. Split out so the composite below reads as three flows, not one.
+function useOpenFlow(invalidateWorkspaces: () => void): OpenFlow {
   const [open, setOpen] = useState<OpenPhase>({ phase: 'idle' })
-  const [busy, setBusy] = useState<Busy>('idle')
-  const [confirmDiscardFor, setConfirmDiscardFor] = useState<string | null>(null)
-  const invalidateWorkspaces = useInvalidateWorkspaces()
 
   // Read both MR sources here and resolve at start time, since the target ticket
   // is only known when the flow begins — the panel's `useMrRef(key)` cannot be
@@ -152,6 +159,15 @@ export function useWorkspaceActions(): WorkspaceActionsApi {
 
   const cancelOpen = useCallback(() => setOpen({ phase: 'idle' }), [])
 
+  return { phase: open, startOpen, confirmOpen, cancelOpen }
+}
+
+export function useWorkspaceActions(): WorkspaceActionsApi {
+  const invalidateWorkspaces = useInvalidateWorkspaces()
+  const open = useOpenFlow(invalidateWorkspaces)
+  const [busy, setBusy] = useState<Busy>('idle')
+  const [confirmDiscardFor, setConfirmDiscardFor] = useState<string | null>(null)
+
   const focus = useCallback(
     (issueKey: string) => {
       setBusy('focusing')
@@ -196,18 +212,19 @@ export function useWorkspaceActions(): WorkspaceActionsApi {
     })()
   }, [confirmDiscardFor, invalidateWorkspaces])
 
-  const prompt = open.phase === 'prompting' || open.phase === 'creating' ? open : null
+  const { phase } = open
+  const prompt = phase.phase === 'prompting' || phase.phase === 'creating' ? phase : null
 
   return {
-    busy: (open.phase !== 'idle' && open.phase !== 'prompting') || busy !== 'idle',
+    busy: (phase.phase !== 'idle' && phase.phase !== 'prompting') || busy !== 'idle',
     prompt,
-    promptPending: open.phase === 'creating',
+    promptPending: phase.phase === 'creating',
     focusing: busy === 'focusing',
     discarding: busy === 'discarding',
     confirmDiscardFor,
-    startOpen,
-    confirmOpen,
-    cancelOpen,
+    startOpen: open.startOpen,
+    confirmOpen: open.confirmOpen,
+    cancelOpen: open.cancelOpen,
     focus,
     requestDiscard,
     confirmDiscard,

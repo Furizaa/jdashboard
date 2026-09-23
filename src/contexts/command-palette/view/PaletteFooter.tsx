@@ -10,7 +10,7 @@ export function PaletteFooter({
   level,
   sources,
 }: {
-  level: 'root' | 'actions'
+  level: 'root' | 'actions' | 'sub-list'
   sources: readonly PaletteSourceNote[]
 }) {
   const loading = sources.filter((s) => s.state === 'loading')
@@ -21,18 +21,25 @@ export function PaletteFooter({
       data-testid={testIds.commandPaletteFooter}
       className="border-border bg-surface-1 text-ink-tertiary flex h-9 shrink-0 items-center gap-3 border-t px-4 text-[11px]"
     >
-      {level === 'root' ? (
+      <Hint keys={['↑', '↓']}>Navigate</Hint>
+      {level === 'root' && (
         <>
-          <Hint keys={['↑', '↓']}>Navigate</Hint>
           <Hint keys={['↵']}>Actions</Hint>
           <Hint keys={['esc']}>Close</Hint>
         </>
-      ) : (
+      )}
+      {level === 'actions' && (
         <>
-          <Hint keys={['↑', '↓']}>Navigate</Hint>
           <Hint keys={['↵']}>Run</Hint>
           <Hint keys={['⌫']}>Back</Hint>
           <span>or press an action&apos;s key</span>
+        </>
+      )}
+      {level === 'sub-list' && (
+        <>
+          <Hint keys={['↵']}>Pick</Hint>
+          <Hint keys={['1', '9']}>Jump</Hint>
+          <Hint keys={['⌫']}>Back</Hint>
         </>
       )}
       <span className="ml-auto flex items-center gap-3">

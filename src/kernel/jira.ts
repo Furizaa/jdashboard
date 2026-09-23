@@ -1,5 +1,6 @@
 export type {
   AdfNode,
+  AllowedTransition,
   BoardIssue,
   DetailIssue,
   EpicRef,

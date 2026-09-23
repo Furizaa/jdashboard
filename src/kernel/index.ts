@@ -10,6 +10,7 @@ export {
 } from './mr'
 export type {
   AdfNode,
+  AllowedTransition,
   BoardIssue,
   CreateIssueResult,
   DetailIssue,

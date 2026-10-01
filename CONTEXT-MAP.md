@@ -4,15 +4,16 @@ clashboard is organised as **bounded contexts**, each with its own internal hexa
 
 ## Contexts
 
-| Context             | Lives in                        | Purpose                                             | Key concepts                                                                                        |
-| ------------------- | ------------------------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| **Board**           | `src/contexts/board/`           | Renders my work as columns                          | `BoardView`, `Column`, status-mapping, deemphasis, sort, filter                                     |
-| **Detail**          | `src/contexts/detail/`          | Renders a single ticket in a side panel             | `IssuePanelState`, ADF rendering, sibling navigation, keyboard shortcuts                            |
-| **Review**          | `src/contexts/review/`          | Surfaces MRs waiting on me as fake cards            | `ReviewCard`, review-state buckets                                                                  |
-| **Capture**         | `src/contexts/capture/`         | Quick-create modal                                  | `QuickCreateInput`, parent selection, type segmentation                                             |
-| **Command Palette** | `src/contexts/command-palette/` | ⌘K: find any work item, run any action legal for it | `WorkItem` ranking, `PaletteAction` / `PaletteCommand` descriptors, the three-deep navigation stack |
+| Context             | Lives in                        | Purpose                                             | Key concepts                                                                                                        |
+| ------------------- | ------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| **Board**           | `src/contexts/board/`           | Renders my work as columns                          | `BoardView`, `Column`, status-mapping, deemphasis, sort, filter                                                     |
+| **Detail**          | `src/contexts/detail/`          | Renders a single ticket in a side panel             | `IssuePanelState`, ADF rendering, sibling navigation, keyboard shortcuts                                            |
+| **Review**          | `src/contexts/review/`          | Surfaces MRs waiting on me as fake cards            | `ReviewCard`, review-state buckets                                                                                  |
+| **Capture**         | `src/contexts/capture/`         | Quick-create modal                                  | `QuickCreateInput`, parent selection, type segmentation                                                             |
+| **Command Palette** | `src/contexts/command-palette/` | ⌘K: find any work item, run any action legal for it | `WorkItem` ranking, `PaletteAction` / `PaletteCommand` descriptors, the three-deep navigation stack                 |
+| **Explain**         | `src/contexts/explain/`         | Reviews one merge request at architect altitude     | `ExplainTab` (keyed by MR iid), per-run `ExplainPhase`, the typed `ExplainBlock` report, altitude + freshness rules |
 
-The **Board** and **Review** contexts both place items on the same column grid, so they share _Column_ as kernel terminology. **Detail** and **Capture** are independent surfaces that compose with Board. **Command Palette** is the odd one out: it drives all of them and imports none of them — see [the dependency law](#the-dependency-law) and [ADR-0008](docs/adr/0008-command-palette-action-catalogue.md).
+The **Board** and **Review** contexts both place items on the same column grid, so they share _Column_ as kernel terminology. **Detail** and **Capture** are independent surfaces that compose with Board. **Command Palette** is the odd one out: it drives all of them and imports none of them — see [the dependency law](#the-dependency-law) and [ADR-0008](docs/adr/0008-command-palette-action-catalogue.md). **Explain** is the second odd one: it owns a nav-rail surface that is _not a board_, and the only way into it is a URL, so Detail and the palette hand merge requests to it without importing it ([ADR-0009](docs/adr/0009-explain-surface-and-long-running-agent-runs.md)).
 
 There is no top-level "domain layer" above the contexts. clashboard's domain _is_ the set of contexts; cross-cutting concepts (`IssueKey`, status-name strings) are kernel types, not entities.
 
@@ -24,6 +25,8 @@ Some workflows span contexts and don't belong inside any one of them:
 - **Handle MR merged** — Detail/Review surface the action; Board needs the resulting transition reflected. Touches Review + Board (+ Detail).
 - **Create issue** — Capture submits; Board invalidates so the new card appears.
 - **Open a header modal from the palette** — the palette asks for `new-ticket` / `manage-tags` / `bulk-refine` / `add-to-watchlist` / `configure-lanes`; whichever header button owns that modal has registered an opener. Touches Capture + Tags + Bulk Refine + Watchlist.
+
+Two hand-offs deliberately are **not** coordinator workflows, because a URL already expresses them: the palette's `?ai=` into Detail's note editor, and Detail's (and the palette's) `/explain?mr=<iid>` into the Explain surface. Neither needs a shared object, so neither gets one.
 
 These live in a **cross-context coordinator** (`src/coordinator/`). The coordinator depends on per-context application services; contexts never depend on the coordinator.
 
@@ -77,6 +80,7 @@ src/kernel/
 ├── commands.ts # ActionKind / ACTION_SHORTCUTS / ActionGroup — the palette's curated key map
 ├── mr-for-key.ts # resolveMrForKey / resolveMrForWorkItem — the MR for a ticket (authored, or reviewed)
 ├── mr/         # REVIEWER_STATE_LABEL / REVIEWER_BADGE_LABEL / CiVisualState / ReviewerVisualState
+├── explain.ts  # ExplainBlock union + ExplainTab / ExplainPhase / ExplainRunEvent + the explain RPC result types
 └── index.ts
 ```
 
@@ -96,6 +100,8 @@ Kernel types are the lingua franca of cross-context dependencies (e.g. both Boar
 | Toasts                   | sonner                                | Adapter behind a `Toast` port owned by the coordinator. View-models and application services do not import `sonner`.                                                                                                                                                   |
 | Command palette          | none (hand-rolled)                    | `cmdk` deliberately skipped: it would own the query, selection, and navigation state ADR-0003 assigns to the view-model. Radix Dialog is already in via `design-system/dialog.tsx`, which is the only primitive the palette needs.                                     |
 | Design-system primitives | Shadcn/ui (already configured)        | **Adopt-on-second-use** rule: when a primitive (button, dialog, popover, ...) is needed in 2+ places, pull in the shadcn version into `design-system/`. Single-use primitives stay inline at first.                                                                    |
+| Code highlighting        | `shiki` (core + lazy grammars)        | One highlighter singleton, one theme (`catppuccin-mocha`), one grammar cache, in `design-system/code-highlight.ts`. Extracted from Detail's ADF code block on its second consumer (Explain's diff hunks), per adopt-on-second-use.                                     |
+| Diagrams                 | `mermaid`                             | `import()`-ed per diagram block, never from the initial chunk. `securityLevel: 'strict'` always — the source is untrusted agent output. Themed to Catppuccin through `initialize({ themeVariables })` (ADR-0009 §8).                                                   |
 | Architecture analysis    | `fallow`                              | Local-only `npx fallow`; reads `.fallow/` cache. Used for unused-code, duplication, complexity, and architecture-drift signal.                                                                                                                                         |
 | Dependency rules         | `dependency-cruiser`                  | Codifies the dependency law as `forbidden` rules — one rule per edge in `.dependency-cruiser.cjs`. All rules are `error` post-lockdown.                                                                                                                                |
 
@@ -114,11 +120,12 @@ src/
 ├── kernel/                # types from server, plus cross-context domain logic
 ├── contexts/              # one folder per bounded context, each an internal hexagon
 │   └── <name>/{domain, application, view-model, presenter, view}
+│                           # `explain/` has no application/ — both halves are coordinator hooks
 ├── widgets/               # reusable visual surfaces with domain meaning
 ├── coordinator/           # cross-context workflows
 ├── design-system/         # domain-agnostic primitives
 ├── routes/                # the only place multiple contexts are wired together
-│   └── api/                 # HTTP-shaped server entry points (binary streams, etc.) — see ADR-0006
+│   └── api/                 # HTTP-shaped server entry points (binary streams, SSE) — see ADR-0006
 ├── lib/                   # framework-level utilities
 └── server/                # Effect-TS server (see "Server architecture" below)
     ├── gateways/<system>/   # one folder per external system: port + adapter + types + errors
@@ -198,6 +205,18 @@ Added at `error` severity from inception, alongside the per-context rules:
 | `command-palette-view-model-only-imports-kernel-and-domain` | The state machine and its projection add only the palette's own `domain/`.      |
 
 Together with the generic `no-cross-context` rule, these are what make "a context that drives six others and imports none of them" a checked claim rather than a good intention. `no-cross-context` was observed to fail against a deliberate violation before being relied on.
+
+### Explain's rules
+
+The same three per-context rules every context gets, added at `error` from inception ([ADR-0009](docs/adr/0009-explain-surface-and-long-running-agent-runs.md)):
+
+| Rule                                                | What it says                                                                                               |
+| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `explain-domain-only-imports-kernel`                | The altitude rules and the freshness rule see `~/kernel` and each other.                                   |
+| `explain-application-only-imports-kernel-and-self`  | Declared although there is no `application/` — so one cannot appear without the boundary already enforced. |
+| `explain-view-model-only-imports-kernel-and-domain` | The tab set + per-run machine add only Explain's own `domain/`. Its data arrives as plain values.          |
+
+`explain-view-model-only-imports-kernel-and-domain` was likewise observed to fail against a deliberate violation (an import of `~/lib/testids`) before being relied on.
 
 ### Architectural rules: graduated
 

@@ -70,7 +70,9 @@ export function legalActions(item: WorkItem, context: ActionContext): readonly A
   if (context.mr !== null) {
     descriptors.push(
       { kind: 'open-mr', label: 'Open MR in GitLab' },
-      { kind: 'review-mr', label: 'Review MR' },
+      // Legality is unchanged from Review MR's — `resolveMrForWorkItem(item) !==
+      // null` — so this was a rename, not new logic (ADR-0009 §3).
+      { kind: 'explain-mr', label: 'Explain MR' },
     )
   }
 

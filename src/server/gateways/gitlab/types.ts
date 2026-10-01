@@ -22,6 +22,14 @@ export type RawReviewer = {
 
 export type RawMrDetail = RawMrSummary & {
   sourceBranch: string
+  // The branch this MR merges *into*. Needed to express "the change" as a diff
+  // range, which not every MR takes against `develop` (ADR-0009 §5).
+  targetBranch: string
+  // The source branch's head commit. The commit an Explain report describes, and
+  // what makes it reproducible rather than "whatever the branch said at the time".
+  headSha: string
+  // The author's own account of what the change does — review context no diff carries.
+  description: string
   reviewers: RawReviewer[]
   headPipelineStatus: string | null
   hasConflicts: boolean
@@ -30,6 +38,8 @@ export type RawMrDetail = RawMrSummary & {
 
 export type RawNote = {
   authorUsername: string
+  // The comment text. Empty for most system notes, which callers filter out anyway.
+  body: string
   resolvable: boolean
   resolved: boolean
   system: boolean

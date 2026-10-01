@@ -72,12 +72,12 @@ test('only legal actions are listed — a ticket with no MR offers neither MR ac
   await expect(actionRow(page, 'open-workspace')).toBeVisible()
   // Absent, not rendered disabled.
   await expect(actionRow(page, 'open-mr')).toHaveCount(0)
-  await expect(actionRow(page, 'review-mr')).toHaveCount(0)
+  await expect(actionRow(page, 'explain-mr')).toHaveCount(0)
   await expect(actionRow(page, 'focus-workspace')).toHaveCount(0)
   await expect(actionRow(page, 'discard-workspace')).toHaveCount(0)
 })
 
-test('a fake review card offers exactly Open MR and Review MR', async ({ page, world }) => {
+test('a fake review card offers exactly Open MR and Explain MR', async ({ page, world }) => {
   world.seedGitlabCurrentUser({ username: ME, displayName: 'Me' })
   world.seedIssues([makeIssue({ key: 'HDR-904', summary: 'board seed' })])
   world.seedMrs([
@@ -96,7 +96,7 @@ test('a fake review card offers exactly Open MR and Review MR', async ({ page, w
 
   await expect(actionRows(page)).toHaveCount(2)
   await expect(actionRow(page, 'open-mr')).toBeVisible()
-  await expect(actionRow(page, 'review-mr')).toBeVisible()
+  await expect(actionRow(page, 'explain-mr')).toBeVisible()
   await expect(actionRow(page, 'open-detail')).toHaveCount(0)
 })
 

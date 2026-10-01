@@ -64,6 +64,9 @@ function detail(overrides: Partial<RawMrDetail> & { iid: number; title: string }
     title: overrides.title,
     webUrl: overrides.webUrl ?? `https://gitlab/p/-/merge_requests/${overrides.iid}`,
     sourceBranch: overrides.sourceBranch ?? `feat/mr-${overrides.iid}`,
+    targetBranch: overrides.targetBranch ?? 'develop',
+    headSha: overrides.headSha ?? `sha-${overrides.iid}`,
+    description: overrides.description ?? '',
     state: overrides.state ?? 'opened',
     draft: overrides.draft ?? false,
     updatedAt: overrides.updatedAt ?? '2026-05-01T00:00:00Z',
@@ -187,7 +190,15 @@ describe('loadMrStatuses', () => {
       const discussions: RawDiscussion[] = [
         {
           id: 'd1',
-          notes: [{ authorUsername: 'bob', resolvable: true, resolved: false, system: false }],
+          notes: [
+            {
+              authorUsername: 'bob',
+              body: 'nit',
+              resolvable: true,
+              resolved: false,
+              system: false,
+            },
+          ],
         },
       ]
       const gitlab = fakeGitlabGateway({

@@ -1,5 +1,5 @@
 import type { CommandTarget } from '~/coordinator'
-import type { BoardVariant } from '../-app-shell'
+import type { ShellVariant } from '../-app-chrome'
 
 // Which board-level commands the palette offers, and what each is called. Pure
 // over a snapshot of route + board state, so route-scoped legality is exercised
@@ -16,6 +16,7 @@ export type CommandId =
   | 'configure-lanes'
   | 'go-to-board'
   | 'go-to-watchlist'
+  | 'go-to-explain'
   | 'refresh'
   | 'toggle-only-workspace'
 
@@ -27,7 +28,8 @@ export type GlobalCommandDescriptor = {
 }
 
 export type GlobalCommandContext = {
-  readonly variant: BoardVariant
+  /** Which surface the palette was opened on — not necessarily a board. */
+  readonly variant: ShellVariant
   /** What is typed into the palette right now — the filter command's argument. */
   readonly query: string
   /** The filter currently applied to this board; `''` for none. */
@@ -58,7 +60,7 @@ export function globalCommands(context: GlobalCommandContext): readonly GlobalCo
     if (target !== undefined && context.registered.includes(target)) commands.push(modal)
   }
 
-  // Board navigation: the board you are already on is left out rather than
+  // Surface navigation: the surface you are already on is left out rather than
   // offered as a no-op.
   if (context.variant !== 'main') {
     commands.push({ id: 'go-to-board', label: 'Go to Board', synonyms: ['main', 'switch'] })
@@ -68,6 +70,13 @@ export function globalCommands(context: GlobalCommandContext): readonly GlobalCo
       id: 'go-to-watchlist',
       label: 'Go to Watchlist',
       synonyms: ['advise', 'switch'],
+    })
+  }
+  if (context.variant !== 'explain') {
+    commands.push({
+      id: 'go-to-explain',
+      label: 'Go to Explain',
+      synonyms: ['review', 'mr', 'merge request', 'switch'],
     })
   }
 
@@ -91,7 +100,11 @@ export function globalCommands(context: GlobalCommandContext): readonly GlobalCo
   // the first command offered. Typing "go to watchlist" and pressing ↵ would
   // then filter the board instead of switching to it. It is the fallback — "none
   // of the above, narrow the board instead" — so it belongs at the bottom.
+  //
+  // Both are board-only: Explain has no card grid to narrow, so offering to
+  // filter it would be offering to do nothing.
   const trimmed = context.query.trim()
+  if (context.variant === 'explain') return commands
   if (trimmed !== '' && trimmed !== context.filter) {
     commands.push({
       id: 'filter-board',

@@ -19,6 +19,9 @@ function detail(overrides: Partial<RawMrDetail> = {}): RawMrDetail {
     title: overrides.title ?? 'HDR-1: do thing',
     webUrl: overrides.webUrl ?? 'https://gitlab/p/-/merge_requests/1',
     sourceBranch: overrides.sourceBranch ?? 'feat/HDR-1-do-thing',
+    targetBranch: overrides.targetBranch ?? 'develop',
+    headSha: overrides.headSha ?? 'sha-1',
+    description: overrides.description ?? '',
     state: overrides.state ?? 'opened',
     draft: overrides.draft ?? false,
     updatedAt: overrides.updatedAt ?? '2026-01-01T00:00:00Z',
@@ -101,6 +104,7 @@ describe('summarizeMr', () => {
         notes: [
           {
             authorUsername: 'carol',
+            body: 'needs a second look',
             resolvable: true,
             resolved: false,
             system: false,

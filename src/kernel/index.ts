@@ -53,6 +53,23 @@ export type {
 export type { GetNoteResult, ListNotesKeysResult, NoteMutationResult } from './notes'
 export type { RefineNoteResult, GetChangelogResult, ChangelogEntry } from './notes'
 export type { AskTicketResult } from './ask'
+export type {
+  CloseExplainResult,
+  ExplainActivityKind,
+  ExplainActivityLine,
+  ExplainBlock,
+  ExplainBlockOf,
+  ExplainPhase,
+  ExplainReport,
+  ExplainRunEvent,
+  ExplainSeverity,
+  ExplainSystemChange,
+  ExplainTab,
+  ExplainVerdict,
+  GetExplainRunResult,
+  ListExplainRunsResult,
+  StartExplainResult,
+} from './explain'
 export {
   resolveRefineAnswers,
   type RefineAnswer,

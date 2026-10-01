@@ -3,7 +3,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { match } from 'ts-pattern'
 import type { PaletteCommand, PaletteCommandSource } from '~/contexts/command-palette'
 import { useCommands, useRefreshAll } from '~/coordinator'
-import type { BoardVariant } from '../-app-shell'
+import type { ShellVariant } from '../-app-chrome'
 import { COMMAND_TARGETS, globalCommands, type CommandId } from './global-commands'
 
 // The board-level commands: everything the palette can do that is not attached
@@ -14,21 +14,32 @@ import { COMMAND_TARGETS, globalCommands, type CommandId } from './global-comman
 // letter there types rather than runs; per-item actions get letters precisely
 // because the action list has no query field (ADR-0008).
 
+// The four board controls are **optional**, for the same reason the header's
+// are: `/explain` is a surface with no board behind it, so there is no filter to
+// set and no workspace filter to toggle (ADR-0009 §1). `globalCommands` never
+// offers a command whose control is absent, and the no-op fallbacks below exist
+// only so this module has no partial function to explain.
 export type BoardCommandsState = {
-  readonly variant: BoardVariant
-  /** The current board filter — `''` when none is applied. */
-  readonly filter: string
-  readonly onFilterChange: (next: string) => void
-  readonly onlyWorkspace: boolean
-  readonly onToggleOnlyWorkspace: () => void
+  readonly variant: ShellVariant
+  /** The current board filter — `''` when none is applied, absent off a board. */
+  readonly filter?: string
+  readonly onFilterChange?: (next: string) => void
+  readonly onlyWorkspace?: boolean
+  readonly onToggleOnlyWorkspace?: () => void
 }
+
+const noop = () => {}
 
 export function useBoardCommands(state: BoardCommandsState): PaletteCommandSource {
   const navigate = useNavigate()
   const refresh = useRefreshAll()
   const commands = useCommands()
   const { registered, open } = commands
-  const { variant, filter, onFilterChange, onlyWorkspace, onToggleOnlyWorkspace } = state
+  const { variant } = state
+  const filter = state.filter ?? ''
+  const onlyWorkspace = state.onlyWorkspace ?? false
+  const onFilterChange = state.onFilterChange ?? noop
+  const onToggleOnlyWorkspace = state.onToggleOnlyWorkspace ?? noop
 
   const runFor = useCallback(
     (id: CommandId, query: string): (() => void) =>
@@ -37,6 +48,7 @@ export function useBoardCommands(state: BoardCommandsState): PaletteCommandSourc
         .with('clear-board-filter', () => () => onFilterChange(''))
         .with('go-to-board', () => () => navigate({ to: '/' }))
         .with('go-to-watchlist', () => () => navigate({ to: '/watchlist' }))
+        .with('go-to-explain', () => () => navigate({ to: '/explain' }))
         .with('refresh', () => refresh)
         .with('toggle-only-workspace', () => onToggleOnlyWorkspace)
         // The five header modals go through the bus. `globalCommands` only

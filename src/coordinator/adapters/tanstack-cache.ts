@@ -24,6 +24,9 @@ const KEY_NOTE = (k: string) => ['notes', k] as const
 const KEY_NOTE_KEYS = ['note-keys'] as const
 // The automated changelog beside a note; own prefix, not under `['notes']`.
 const KEY_CHANGELOG = (k: string) => ['note-changelog', k] as const
+// The open Explain tabs. One query for the whole set — the strip, every tab's
+// phase, and each MR's current head all come from it.
+const KEY_EXPLAIN_TABS = ['explain-tabs'] as const
 
 export const DASHBOARD_QUERY_KEYS = {
   board: KEY_BOARD,
@@ -38,6 +41,7 @@ export const DASHBOARD_QUERY_KEYS = {
   note: KEY_NOTE,
   noteKeys: KEY_NOTE_KEYS,
   changelog: KEY_CHANGELOG,
+  explainTabs: KEY_EXPLAIN_TABS,
 } as const
 
 export const DASHBOARD_STALE_TIMES = {
@@ -54,6 +58,10 @@ export const DASHBOARD_STALE_TIMES = {
   noteKeys: 30_000,
   changelog: 30_000,
   myself: 60_000,
+  // Short: the set changes on start and on close, and each read also refreshes
+  // every tab's current head SHA for the stale-report warning. Live progress
+  // comes over SSE, not from this query, so it does not need to be shorter.
+  explainTabs: 10_000,
 } as const
 
 export function createTanstackCacheAdapter(queryClient: QueryClient): Cache {

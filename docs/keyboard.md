@@ -22,8 +22,11 @@ clashboard is built to be driven from the keyboard. ⌘K opens the [command pale
 | `1`–`9`             | a nested list          | Pick that row                                     |
 | `c`                 | board                  | New ticket (quick-create's own shortcut)          |
 | `j` / `k`, `o`, `c` | detail panel           | Sibling navigation, open in Jira, copy link       |
+| `+` / `-` / `0`     | diagram overlay        | Zoom in, zoom out, fit (`Esc` closes it)          |
 
 `j` / `k` move the highlight only below the palette's root level. The root owns the query field, so a letter there types — a palette you cannot type "kod" into is not a search box. For the same reason board-level commands are `Enter`-only rather than keyed.
+
+The palette also navigates between the three nav-rail surfaces — `Go to Board`, `Go to Watchlist`, `Go to Explain` — each offered only when you are not already there. Those are board-level commands too, so they are `Enter`-only rather than keyed.
 
 ## Per-item actions
 
@@ -42,12 +45,14 @@ Pressing a letter in an item's action list runs that action. Only the actions **
 | `c`       | Copy Jira Link                 | the board has loaded a base URL         |
 | `y`       | Copy Issue Key                 | there is a ticket                       |
 | `m`       | Open MR in GitLab              | an MR resolves for the item             |
-| `v`       | Review MR                      | an MR resolves for the item             |
+| `v`       | Explain MR                     | an MR resolves for the item             |
 | `e`       | Open in Workspace              | no workspace is open for the ticket     |
 | `f`       | Focus Workspace                | a workspace is open for the ticket      |
 | `x`       | Discard Workspace              | a workspace is open for the ticket      |
 
 "There is a ticket behind the item" is `workItemJiraKey(item) !== null`. A **fake review card** — an MR whose title carries no resolvable Jira key — has none, so it is offered exactly `m` and `v`. That falls out of the rule rather than being a special case: see [`action-legality.ts`](../src/routes/-command-palette/action-legality.ts).
+
+`v` kept the letter **Review MR** used to have. Explain replaced it ([ADR-0009](adr/0009-explain-surface-and-long-running-agent-runs.md)) and _is_ the review action, so muscle memory carries over rather than being invalidated — which is also why `v` now sits in the Workflow group rather than Links.
 
 `e` opens the detail panel's real branch-name prompt, and `x` its real confirmation. Neither is a shortcut past the dialog: the prompt carries the worktree-already-exists warning and reuses an existing MR branch, and discarding force-removes a worktree.
 

@@ -348,11 +348,13 @@ describe('derivePalette at the action level', () => {
   it('offers exactly what the catalogue deems legal — a fake review card gets the MR pair', () => {
     const display = actionsView(
       actions('review:77'),
-      inputs({ actionsFor: () => [action('open-mr'), action('review-mr')] }),
+      inputs({ actionsFor: () => [action('open-mr'), action('explain-mr')] }),
     )
+    // Explain first: it sits in the Workflow group (it *is* the review action),
+    // which `ACTION_GROUP_ORDER` puts ahead of Links.
     expect(display.groups.flatMap((g) => g.rows.map((r) => r.kind))).toEqual([
+      'explain-mr',
       'open-mr',
-      'review-mr',
     ])
     expect(display.byKind.has('open-detail')).toBe(false)
     expect(display.byKind.has('change-status')).toBe(false)

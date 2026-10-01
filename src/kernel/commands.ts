@@ -17,7 +17,7 @@ export type ActionKind =
   | 'copy-jira-link'
   | 'copy-issue-key'
   | 'open-mr'
-  | 'review-mr'
+  | 'explain-mr'
   | 'open-workspace'
   | 'focus-workspace'
   | 'discard-workspace'
@@ -47,7 +47,7 @@ export const ACTION_SHORTCUTS: Record<ActionKind, string> = {
   'copy-jira-link': 'c',
   'copy-issue-key': 'y',
   'open-mr': 'm',
-  'review-mr': 'v',
+  'explain-mr': 'v',
   'open-workspace': 'e',
   'focus-workspace': 'f',
   'discard-workspace': 'x',
@@ -79,6 +79,7 @@ export const ACTION_GROUP_LABEL: Record<ActionGroup, string> = {
 export const ACTION_GROUPS: Record<ActionKind, ActionGroup> = {
   'open-detail': 'workflow',
   'change-status': 'workflow',
+  'explain-mr': 'workflow',
   'open-notes': 'workflow',
   tags: 'workflow',
   'watchlist-toggle': 'workflow',
@@ -88,7 +89,6 @@ export const ACTION_GROUPS: Record<ActionKind, ActionGroup> = {
   'copy-jira-link': 'links',
   'copy-issue-key': 'links',
   'open-mr': 'links',
-  'review-mr': 'links',
   'open-workspace': 'workspace',
   'focus-workspace': 'workspace',
   'discard-workspace': 'workspace',
@@ -107,7 +107,7 @@ export const ACTION_LABELS: Record<ActionKind, string> = {
   'copy-jira-link': 'Copy Jira Link',
   'copy-issue-key': 'Copy Issue Key',
   'open-mr': 'Open MR in GitLab',
-  'review-mr': 'Review MR',
+  'explain-mr': 'Explain MR',
   'open-workspace': 'Open in Workspace',
   'focus-workspace': 'Focus Workspace',
   'discard-workspace': 'Discard Workspace',

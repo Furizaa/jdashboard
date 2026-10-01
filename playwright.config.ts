@@ -21,6 +21,11 @@ mkdirSync(E2E_HOME, { recursive: true })
 // Surfaced to the runner process so fixtures write where the server reads.
 process.env.CLASHBOARD_E2E_HOME = E2E_HOME
 
+// Explain shells out to the local `claude` CLI. Point it at a stub that emits
+// canned `stream-json` instead: the agent is a subprocess, so the process is the
+// boundary to mock, exactly as ADR-0001 mocks the network boundary.
+const CLAUDE_STUB = join(import.meta.dirname, 'tests', 'e2e', 'stubs', 'claude-explain.mjs')
+
 const JIRA_LABEL_FILTER = 'Frontend'
 // Surface the configured filter to the runner process so specs can read it
 // via `process.env.JIRA_LABEL_FILTER` instead of hardcoding the literal.
@@ -46,6 +51,7 @@ const baseEnv: Record<string, string> = {
   GITLAB_PROJECT_PATH: 'e2e/test-project',
   NODE_ENV: 'production',
   HOME: E2E_HOME,
+  CLASHBOARD_CLAUDE_BIN: CLAUDE_STUB,
 }
 
 export default defineConfig({

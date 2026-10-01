@@ -122,7 +122,7 @@ describe('legalActions for a fake review card', () => {
   it('offers exactly the MR pair — there is no ticket to act on', () => {
     expect(kinds(REVIEW_FAKE, context({ mr: { iid: 77, webUrl: fakeCard.webUrl } }))).toEqual([
       'open-mr',
-      'review-mr',
+      'explain-mr',
     ])
   })
 
@@ -193,13 +193,13 @@ describe('tag sub-list legality', () => {
 describe('MR legality', () => {
   it('offers nothing MR-shaped when no MR resolves', () => {
     expect(kinds(JIRA)).not.toContain('open-mr')
-    expect(kinds(JIRA)).not.toContain('review-mr')
+    expect(kinds(JIRA)).not.toContain('explain-mr')
   })
 
   it('offers both when one does', () => {
     const withMr = kinds(JIRA, context({ mr: { iid: 9, webUrl: 'https://gitlab/9' } }))
     expect(withMr).toContain('open-mr')
-    expect(withMr).toContain('review-mr')
+    expect(withMr).toContain('explain-mr')
   })
 })
 

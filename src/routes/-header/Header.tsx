@@ -8,12 +8,19 @@ import { TagManagerButton } from '~/contexts/tags'
 import { BulkRefineButton } from '~/contexts/bulk-refine'
 import { cn } from '~/lib/cn'
 import { testIds } from '~/lib/testids'
-import type { BoardVariant } from '../-app-shell'
+import type { ShellVariant } from '../-app-chrome'
 import { ActiveFilterChip } from './ActiveFilterChip'
 import { GitlabIndicator } from './GitlabIndicator'
 
 const TICK_INTERVAL_MS = 5_000
 
+/**
+ * The one header, variant-aware. It takes a `ShellVariant` — which *surface* it
+ * is serving — rather than a `BoardVariant`, because Explain is a surface and
+ * not a board (ADR-0009 §1). The four board props are therefore **optional**:
+ * on `'explain'` there is no filter to clear and no workspace filter to toggle,
+ * so those controls are absent rather than inert.
+ */
 export function Header({
   variant,
   filter,
@@ -21,16 +28,18 @@ export function Header({
   onlyWorkspace,
   onToggleOnlyWorkspace,
 }: {
-  variant: BoardVariant
-  filter: string
-  onClearFilter: () => void
-  onlyWorkspace: boolean
-  onToggleOnlyWorkspace: () => void
+  variant: ShellVariant
+  filter?: string
+  onClearFilter?: () => void
+  onlyWorkspace?: boolean
+  onToggleOnlyWorkspace?: () => void
 }) {
   // The watchlist board drops "New" (you don't create tickets you only advise on)
   // and "Only Workspace" (workspace focus is a main-board concern), and adds the
-  // lane-config control instead.
+  // lane-config control instead. Explain keeps only the global tools: refresh,
+  // the tag manager, and the two cross-cutting modals.
   const isWatchlist = variant === 'watchlist'
+  const isBoard = variant !== 'explain'
   const refresh = useRefreshAll()
   const query = useBoardData()
 
@@ -46,23 +55,25 @@ export function Header({
         clashboard
       </span>
       <span className="bg-border mx-1 h-4 w-px" aria-hidden />
-      {!isWatchlist && <QuickCreateButton />}
+      {isBoard && !isWatchlist && <QuickCreateButton />}
       <WatchlistButton />
       {isWatchlist && <LaneConfigButton />}
       <TagManagerButton />
       <BulkRefineButton />
-      <ActiveFilterChip filter={filter} onClear={onClearFilter} />
-      {!isWatchlist && (
+      {filter !== undefined && onClearFilter !== undefined && (
+        <ActiveFilterChip filter={filter} onClear={onClearFilter} />
+      )}
+      {isBoard && !isWatchlist && onToggleOnlyWorkspace !== undefined && (
         <button
           type="button"
           onClick={onToggleOnlyWorkspace}
-          aria-pressed={onlyWorkspace}
+          aria-pressed={onlyWorkspace === true}
           aria-label="Only show tickets with an open workspace"
           title="Only show tickets with an open workspace"
           data-testid={testIds.onlyWorkspaceToggle}
           className={cn(
             'focus-visible:ring-ring inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none',
-            onlyWorkspace
+            onlyWorkspace === true
               ? 'border-blue-500/40 bg-blue-500/15 text-blue-400'
               : 'border-border text-ink-subtle hover:text-foreground hover:bg-surface-2',
           )}

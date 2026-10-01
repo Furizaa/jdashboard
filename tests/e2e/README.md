@@ -7,6 +7,18 @@ at it, so every Atlassian and GitLab call funnels through MSW handlers.
 
 No real upstream traffic ever leaves your machine during a run.
 
+Two boundaries other than HTTP are stubbed the same way:
+
+- **The local `claude` CLI.** Explain shells out to it, so `CLASHBOARD_CLAUDE_BIN`
+  points at `stubs/claude-explain.mjs`, which emits canned `--output-format
+stream-json` lines. The agent is a subprocess, so the process is its boundary.
+- **`~/.clashboard` and `~/projects`.** `HOME` points at a throwaway temp
+  directory, so the suite never reads or writes the developer's real board,
+  notes, or worktrees. `fixtures/local-store.ts` seeds the first; the Explain
+  specs build a real tiny `dr-web` git repository in the second via
+  `fixtures/git-repo.ts` — Explain's checkout step is genuine `git fetch` +
+  `git worktree add`, and stubbing git would stop the e2e covering it.
+
 ## Prerequisites
 
 A `.env` at the repo root with the keys listed in `.env.example`. The values
@@ -32,8 +44,12 @@ listener. `workers: 1` keeps the per-test World deterministic.
 ```
 tests/e2e/
   fixtures/
-    test.ts          ← Playwright `test` extended with `world` and `mocks`
+    test.ts          ← Playwright `test` extended with `world`, `mocks` and `local`
     factories.ts     ← makeIssue, makeUser — synthetic Atlassian-shaped JSON
+    local-store.ts   ← seeds ~/.clashboard (tags, watchlist) on the e2e server's disk
+    git-repo.ts      ← a real tiny dr-web repo under the throwaway HOME, for Explain
+  stubs/
+    claude-explain.mjs ← stands in for the `claude` CLI; emits canned stream-json
   mocks/
     handlers.ts      ← MSW http handlers, dispatch into the World
     server.ts        ← Node http listener invoking handlers via msw's getResponse

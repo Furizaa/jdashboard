@@ -36,6 +36,12 @@ export type GitlabMr = {
   labels: readonly string[]
   /** The MR's source branch; `Open in Workspace` reuses it for an existing MR. */
   sourceBranch: string
+  /** The branch the MR merges into; Explain's diff range is taken from it. */
+  targetBranch: string
+  /** The source branch's head commit — the commit an Explain report describes. */
+  headSha: string
+  /** The author's own account of the change; review context for Explain. */
+  description: string
 }
 
 export type GitlabMrReviewer = {
@@ -47,6 +53,8 @@ export type GitlabMrReviewer = {
 
 export type GitlabDiscussionNote = {
   authorUsername: string
+  /** The comment text — Explain feeds the thread to the agent. */
+  body: string
   resolvable: boolean
   resolved: boolean
   system: boolean

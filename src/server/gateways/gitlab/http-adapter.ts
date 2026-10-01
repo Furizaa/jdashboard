@@ -49,6 +49,11 @@ const WireReviewerSchema = Schema.Struct({
 const WireMrDetailSchema = Schema.Struct({
   ...WireMrSummarySchema.fields,
   source_branch: Schema.String,
+  target_branch: Schema.String,
+  // GitLab's `sha` on a merge-request detail is the source branch's head commit.
+  sha: Schema.String,
+  // Nullable on an MR whose author wrote no description.
+  description: Schema.optionalWith(Schema.NullOr(Schema.String), { default: () => null }),
   reviewers: Schema.Array(WireReviewerSchema),
   head_pipeline: Schema.NullOr(Schema.Struct({ status: Schema.String })),
   has_conflicts: Schema.Boolean,
@@ -61,6 +66,9 @@ type WireMrDetail = Schema.Schema.Type<typeof WireMrDetailSchema>
 // true, so defaulting the missing case to `false` is safe.
 const WireNoteSchema = Schema.Struct({
   author: Schema.Struct({ username: Schema.String }),
+  // Present on every real note; defaulted so a shape we have not seen cannot
+  // drop the whole MR fan-out, as with `resolved` above.
+  body: Schema.optionalWith(Schema.String, { default: () => '' }),
   resolvable: Schema.Boolean,
   resolved: Schema.optionalWith(Schema.Boolean, { default: () => false }),
   system: Schema.Boolean,
@@ -110,6 +118,9 @@ function toRawMrDetail(wire: WireMrDetail): RawMrDetail {
   return {
     ...toRawMrSummary(wire),
     sourceBranch: wire.source_branch,
+    targetBranch: wire.target_branch,
+    headSha: wire.sha,
+    description: wire.description ?? '',
     reviewers: wire.reviewers.map((r) => ({
       username: r.username,
       displayName: r.name,
@@ -126,6 +137,7 @@ function toRawDiscussion(wire: WireDiscussion): RawDiscussion {
     id: wire.id,
     notes: wire.notes.map((n) => ({
       authorUsername: n.author.username,
+      body: n.body,
       resolvable: n.resolvable,
       resolved: n.resolved,
       system: n.system,

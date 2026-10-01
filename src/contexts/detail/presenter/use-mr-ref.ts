@@ -4,7 +4,7 @@ import { resolveMrForKey, type MrRef } from '~/kernel'
 /**
  * The MR for a ticket — one we authored, or one we are a reviewer on.
  *
- * Three views in this context needed it (`OpenMrLink`, `ReviewMrButton`,
+ * Three views in this context needed it (`OpenMrLink`, `ExplainMrButton`,
  * `OpenInWorkspaceButton`) and each had grown its own `findReviewMrIid` /
  * `findReviewMrUrl`. The *rule* now lives in `kernel/mr-for-key.ts`; this hook is
  * detail's binding of it to the two queries. The command palette binds the same

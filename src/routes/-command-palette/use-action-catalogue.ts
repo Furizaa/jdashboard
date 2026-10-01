@@ -16,7 +16,6 @@ import {
   type BrowserActions,
 } from '~/coordinator'
 import { resolveMrForWorkItem, workItemJiraKey, type ActionKind, type WorkItem } from '~/kernel'
-import { reviewMr } from '~/server/server-functions/detail'
 import {
   legalActions,
   workspaceTargetFields,
@@ -49,6 +48,8 @@ export type ActionCatalogueDeps = {
 
 type RunnerDeps = {
   readonly navigate: (search: { issue: string; notes?: true; ai?: 'refine' | 'ask' }) => void
+  /** The Explain hand-off: `/explain?mr=<iid>`, a surface rather than a modal. */
+  readonly navigateExplain: (iid: number) => void
   readonly browser: BrowserActions
   readonly addToWatchlist: (key: string) => Promise<{ ok: boolean }>
   readonly removeFromWatchlist: (key: string) => Promise<{ ok: boolean }>
@@ -128,11 +129,13 @@ function performFor(
         const mr = context.mr
         return mr === null ? null : run(() => deps.browser.openInNewTab(mr.webUrl))
       })
-      .with('review-mr', () => {
+      // Explain is a surface, not a mutation: the palette hands the MR off
+      // through the URL exactly as Detail's button does, and the surface starts
+      // the run on arrival (ADR-0009 §3). Nothing to report here — there is no
+      // call to fail.
+      .with('explain-mr', () => {
         const mr = context.mr
-        return mr === null
-          ? null
-          : run(() => report('Review MR', reviewMr({ data: { iid: mr.iid } })))
+        return mr === null ? null : run(() => deps.navigateExplain(mr.iid))
       })
       .with('open-workspace', () => {
         const fields = workspaceTargetFields(item)
@@ -192,6 +195,12 @@ export function useActionCatalogue({
       navigateFn({ to: '.', search }),
     [navigateFn],
   )
+  // Absolute, unlike the others: Explain is its own surface, so this one leaves
+  // the board rather than deep-linking into it.
+  const navigateExplain = useCallback(
+    (iid: number) => navigateFn({ to: '/explain', search: { mr: iid } }),
+    [navigateFn],
+  )
 
   return useCallback(
     (item: WorkItem): readonly PaletteAction[] => {
@@ -205,6 +214,7 @@ export function useActionCatalogue({
       }
       const deps: RunnerDeps = {
         navigate,
+        navigateExplain,
         browser,
         addToWatchlist: add,
         removeFromWatchlist: remove,
@@ -228,6 +238,7 @@ export function useActionCatalogue({
       authoredByKey,
       reviewCards,
       navigate,
+      navigateExplain,
       browser,
       add,
       remove,

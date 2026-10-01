@@ -1,10 +1,23 @@
-import type { SpawnSyncReturns } from 'node:child_process'
+import {
+  addBranchWorktree,
+  describeFailure,
+  fetchRef,
+  repoPath,
+  runStep,
+  type ExistsFn,
+  type RemoveWorktreeInBackground,
+  type SpawnFn,
+  type WorktreeError,
+} from './git-worktree'
 
-export type SpawnFn = (command: string, args: ReadonlyArray<string>) => SpawnSyncReturns<string>
+// The git half of this module — the repo path, failure description, and the
+// `fetch` / `worktree add` invocations — moved to `git-worktree.ts` when Explain
+// needed a detached worktree of its own (ADR-0009 §5). What stays here is the
+// cmux half plus the branch-worktree *recipe*: behaviour is unchanged, which is
+// what `open-workspace.test.ts` passing untouched attests.
 
-export type ExistsFn = (path: string) => boolean
-
-export type WorkspaceError = { readonly message: string }
+/** Kept as this module's name for the shared git failure shape. */
+export type WorkspaceError = WorktreeError
 
 export type OpenInWorkspaceOk = { readonly ok: true }
 export type OpenInWorkspaceErr = { readonly ok: false; readonly error: WorkspaceError }
@@ -16,10 +29,6 @@ export type ListWorkspacesResult = { readonly openIssueKeys: readonly string[] }
 
 export function worktreePathFor(issueKey: string, homeDir: string): string {
   return `${homeDir}/projects/worktrees/dr-web/${issueKey}`
-}
-
-export function repoPath(homeDir: string): string {
-  return `${homeDir}/projects/dr-web`
 }
 
 export function workspaceNameFor(issueKey: string): string {
@@ -111,24 +120,6 @@ export function findWorkspaceRefByIssueKey(listOutput: string, issueKey: string)
   return null
 }
 
-function describeFailure(result: SpawnSyncReturns<string>, fallback: string): WorkspaceError {
-  if (result.error !== undefined) return { message: result.error.message }
-  const stderr = result.stderr?.toString().trim()
-  if (stderr !== undefined && stderr.length > 0) return { message: stderr }
-  return { message: `${fallback} exited with code ${result.status ?? 'unknown'}` }
-}
-
-function runStep(
-  spawn: SpawnFn,
-  command: string,
-  args: ReadonlyArray<string>,
-  label: string,
-): WorkspaceError | null {
-  const result = spawn(command, args)
-  if (result.error !== undefined || result.status !== 0) return describeFailure(result, label)
-  return null
-}
-
 type WorktreeDeps = { homeDir: string; exists: ExistsFn; spawn: SpawnFn }
 
 function ensureWorktree(
@@ -146,20 +137,10 @@ function ensureWorktree(
   // For an issue that already has an MR, base the worktree on that MR's
   // existing remote branch; otherwise branch fresh off origin/develop.
   const startPoint = fromExistingBranch ? `origin/${branchName}` : 'origin/develop'
-  const fetchRef = fromExistingBranch ? branchName : 'develop'
-  const fetchErr = runStep(
-    deps.spawn,
-    'git',
-    ['-C', repo, 'fetch', 'origin', fetchRef],
-    'git fetch',
-  )
+  const fetchTarget = fromExistingBranch ? branchName : 'develop'
+  const fetchErr = fetchRef(deps.spawn, repo, fetchTarget)
   if (fetchErr !== null) return fetchErr
-  const addErr = runStep(
-    deps.spawn,
-    'git',
-    ['-C', repo, 'worktree', 'add', worktreePath, '-b', branchName, startPoint],
-    'git worktree add',
-  )
+  const addErr = addBranchWorktree(deps.spawn, repo, worktreePath, branchName, startPoint)
   if (addErr !== null) return addErr
   // Configure upstream so `git push` (no flags) creates and pushes to
   // origin/<branchName> on first push. Equivalent to `git push --set-upstream`
@@ -282,7 +263,7 @@ export function runFocusWorkspace(
 
 export type DiscardDeps = WorktreeDeps & {
   // Detached, fire-and-forget removal of the worktree directory (see below).
-  removeWorktreeInBackground: (repoPath: string, worktreePath: string) => void
+  removeWorktreeInBackground: RemoveWorktreeInBackground
 }
 
 // Tear down both halves of an open workspace: the cmux workspace and the git

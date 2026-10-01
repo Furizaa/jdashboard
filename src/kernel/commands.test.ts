@@ -22,7 +22,7 @@ const PRD_TABLE: Record<ActionKind, string> = {
   'copy-jira-link': 'c',
   'copy-issue-key': 'y',
   'open-mr': 'm',
-  'review-mr': 'v',
+  'explain-mr': 'v',
   'open-workspace': 'e',
   'focus-workspace': 'f',
   'discard-workspace': 'x',

@@ -28,6 +28,14 @@ import {
   type RefineNoteResult,
 } from '~/server/server-functions/refine'
 import { askTicket, type AskTicketResult } from '~/server/server-functions/ask'
+import {
+  closeExplain,
+  listExplainRuns,
+  startExplain,
+  type CloseExplainResult,
+  type ListExplainRunsResult,
+  type StartExplainResult,
+} from '~/server/server-functions/explain'
 import { routeTranscript, type RouteTranscriptResult } from '~/server/server-functions/bulk-refine'
 import type { RefineClarification } from '~/server/lib/refine-grilling'
 import type { QuickCreateInput } from '~/server/contexts/capture/application/quick-create-schema'
@@ -381,6 +389,58 @@ export function useHasNote(issueKey: string): boolean {
     select: (data) => (issueKey === '' ? false : data.keys.includes(issueKey)),
   })
   return query.data ?? false
+}
+
+// The open Explain tabs: one query for the whole set, which is derived from
+// `~/.clashboard/explain/` rather than from client state — so a ten-minute agent
+// run survives a reload (ADR-0009 §2). Live progress does **not** come through
+// here; it arrives on the SSE channel the Explain presenter subscribes to. This
+// query is the open set, each tab's persisted report, and each MR's current head
+// for the stale-report warning.
+export function useExplainRuns(): UseQueryResult<ListExplainRunsResult> {
+  return useQuery({
+    queryKey: DASHBOARD_QUERY_KEYS.explainTabs,
+    queryFn: () => listExplainRuns(),
+    retry: false,
+    staleTime: DASHBOARD_STALE_TIMES.explainTabs,
+  })
+}
+
+// Starting a run creates the tab, so the open set is invalidated. The returned
+// tab is also handed straight to the view-model, which appends it rather than
+// waiting for the refetch: a run that takes ten minutes must not start
+// invisibly.
+export function useStartExplain(): {
+  start: (iid: number, issueKey?: string) => Promise<StartExplainResult>
+  isPending: boolean
+} {
+  const queryClient = useQueryClient()
+  const mutation = useMutation<StartExplainResult, Error, { iid: number; issueKey?: string }>({
+    mutationFn: (data) => startExplain({ data }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: DASHBOARD_QUERY_KEYS.explainTabs })
+    },
+  })
+  return {
+    start: (iid, issueKey) => mutation.mutateAsync({ iid, issueKey }),
+    isPending: mutation.isPending,
+  }
+}
+
+// Closing a tab deletes its report, aborts any run in flight, and removes the
+// worktree — all three server-side (ADR-0009 §9). Here it is just an invalidation.
+export function useCloseExplain(): {
+  close: (iid: number) => Promise<CloseExplainResult>
+  isPending: boolean
+} {
+  const queryClient = useQueryClient()
+  const mutation = useMutation<CloseExplainResult, Error, { iid: number }>({
+    mutationFn: (data) => closeExplain({ data }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: DASHBOARD_QUERY_KEYS.explainTabs })
+    },
+  })
+  return { close: (iid) => mutation.mutateAsync({ iid }), isPending: mutation.isPending }
 }
 
 // Opening a URL and copying text with a toast were inlined in `use-issue-panel`

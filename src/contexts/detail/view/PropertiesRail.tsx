@@ -16,7 +16,7 @@ import { Field } from './Field'
 import { TagControls } from './TagControls'
 import { OpenInWorkspaceButton } from './OpenInWorkspaceButton'
 import { WorkspaceControls } from './WorkspaceControls'
-import { ReviewMrButton } from './ReviewMrButton'
+import { ExplainMrButton } from './ExplainMrButton'
 
 export function PropertiesRail({ issue }: { issue: DetailIssue }) {
   return (
@@ -24,7 +24,7 @@ export function PropertiesRail({ issue }: { issue: DetailIssue }) {
       <Field label="Actions">
         <div className="flex flex-col gap-1.5">
           <WorkspaceAction issueKey={issue.key} typeName={issue.typeName} title={issue.summary} />
-          <ReviewMrButton issueKey={issue.key} />
+          <ExplainMrButton issueKey={issue.key} />
           <WatchlistAction issueKey={issue.key} />
         </div>
       </Field>

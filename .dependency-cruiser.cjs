@@ -66,8 +66,7 @@ module.exports = {
     },
     {
       name: 'board-domain-only-imports-kernel',
-      comment:
-        "board's domain layer is pure: it may only import from ~/kernel and its own peers.",
+      comment: "board's domain layer is pure: it may only import from ~/kernel and its own peers.",
       severity: 'error',
       from: { path: '^src/contexts/board/domain/' },
       to: {
@@ -97,14 +96,12 @@ module.exports = {
       from: { path: '^src/contexts/board/view-model/' },
       to: {
         path: '^src/',
-        pathNot:
-          '^(src/contexts/board/view-model/|src/contexts/board/domain/|src/kernel/)',
+        pathNot: '^(src/contexts/board/view-model/|src/contexts/board/domain/|src/kernel/)',
       },
     },
     {
       name: 'detail-domain-only-imports-kernel',
-      comment:
-        "detail's domain layer is pure: it may only import from ~/kernel and its own peers",
+      comment: "detail's domain layer is pure: it may only import from ~/kernel and its own peers",
       severity: 'error',
       from: { path: '^src/contexts/detail/domain/' },
       to: {
@@ -134,14 +131,12 @@ module.exports = {
       from: { path: '^src/contexts/detail/view-model/' },
       to: {
         path: '^src/',
-        pathNot:
-          '^(src/contexts/detail/view-model/|src/contexts/detail/domain/|src/kernel/)',
+        pathNot: '^(src/contexts/detail/view-model/|src/contexts/detail/domain/|src/kernel/)',
       },
     },
     {
       name: 'capture-domain-only-imports-kernel',
-      comment:
-        "capture's domain layer is pure: it may only import from ~/kernel and its own peers",
+      comment: "capture's domain layer is pure: it may only import from ~/kernel and its own peers",
       severity: 'error',
       from: { path: '^src/contexts/capture/domain/' },
       to: {
@@ -171,8 +166,7 @@ module.exports = {
       from: { path: '^src/contexts/capture/view-model/' },
       to: {
         path: '^src/',
-        pathNot:
-          '^(src/contexts/capture/view-model/|src/contexts/capture/domain/|src/kernel/)',
+        pathNot: '^(src/contexts/capture/view-model/|src/contexts/capture/domain/|src/kernel/)',
       },
     },
     {
@@ -222,8 +216,43 @@ module.exports = {
       from: { path: '^src/contexts/watchlist/view-model/' },
       to: {
         path: '^src/',
-        pathNot:
-          '^(src/contexts/watchlist/view-model/|src/contexts/watchlist/domain/|src/kernel/)',
+        pathNot: '^(src/contexts/watchlist/view-model/|src/contexts/watchlist/domain/|src/kernel/)',
+      },
+    },
+    {
+      name: 'explain-domain-only-imports-kernel',
+      comment:
+        "explain's domain layer is pure: the altitude rules (severity ordering, group-by-system) and the staleness rule may only import ~/kernel and its own peers.",
+      severity: 'error',
+      from: { path: '^src/contexts/explain/domain/' },
+      to: {
+        path: '^src/',
+        pathNot: '^(src/contexts/explain/domain/|src/kernel/)',
+      },
+    },
+    {
+      name: 'explain-application-only-imports-kernel-and-self',
+      comment:
+        'explain has no context-local application service (as in bulk-refine, both halves are coordinator hooks over server functions) — but the rule is declared from inception so one cannot appear without the boundary already enforced.',
+      severity: 'error',
+      from: {
+        path: '^src/contexts/explain/application/',
+        pathNot: '/__fixtures__/',
+      },
+      to: {
+        path: '^src/',
+        pathNot: '^(src/contexts/explain/application/|src/kernel/)',
+      },
+    },
+    {
+      name: 'explain-view-model-only-imports-kernel-and-domain',
+      comment:
+        "explain's view-model is framework-free; it may only import ~/kernel, its own domain, and its own peers. The tab set arrives as a plain value and the SSE messages as plain events.",
+      severity: 'error',
+      from: { path: '^src/contexts/explain/view-model/' },
+      to: {
+        path: '^src/',
+        pathNot: '^(src/contexts/explain/view-model/|src/contexts/explain/domain/|src/kernel/)',
       },
     },
     {
@@ -286,7 +315,7 @@ module.exports = {
     {
       name: 'context-inner-layers-cant-import-coordinator-adapters-or-provider',
       comment:
-        'a context\'s domain / application / view-model layers can only see coordinator ports + the useCoordinator hook (via presenter). They must not depend on the runtime adapters or the provider composition root.',
+        "a context's domain / application / view-model layers can only see coordinator ports + the useCoordinator hook (via presenter). They must not depend on the runtime adapters or the provider composition root.",
       severity: 'error',
       from: { path: '^src/contexts/[^/]+/(domain|application|view-model)/' },
       to: { path: '^src/coordinator/(adapters/|provider\\.tsx$)' },

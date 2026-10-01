@@ -3,7 +3,7 @@ import type { MrSummary, ReviewCard } from './gitlab'
 import type { WorkItem } from './work-item'
 
 // Resolving "the MR for this ticket" was inlined identically in three detail
-// views (`OpenMrLink`, `ReviewMrButton`, `OpenInWorkspaceButton`), each with its
+// views (`OpenMrLink`, `ExplainMrButton`, `OpenInWorkspaceButton`), each with its
 // own `findReviewMrIid` / `findReviewMrUrl`. The palette needs a fourth caller,
 // and one keyed by a ticket it is handed rather than one it renders — so the
 // rule lives here, pure over the two kernel shapes it reads.

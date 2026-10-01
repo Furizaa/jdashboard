@@ -115,6 +115,9 @@ export function buildHandlers(getWorld: () => World): HttpHandler[] {
         // MR-priority work added `labels`, and a detail response without them
         // fails to decode, which silently kills the whole review-card fan-out.
         source_branch: mr.sourceBranch,
+        target_branch: mr.targetBranch,
+        sha: mr.headSha,
+        description: mr.description,
         labels: [...mr.labels],
         reviewers: reviewers.map((r) => ({
           username: r.username,
@@ -134,6 +137,7 @@ export function buildHandlers(getWorld: () => World): HttpHandler[] {
           id: d.id,
           notes: d.notes.map((n) => ({
             author: { username: n.authorUsername },
+            body: n.body,
             resolvable: n.resolvable,
             resolved: n.resolved,
             system: n.system,

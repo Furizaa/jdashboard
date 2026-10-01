@@ -21,6 +21,9 @@ export {
   useRefineNote,
   useAskTicket,
   useRouteTranscript,
+  useExplainRuns,
+  useStartExplain,
+  useCloseExplain,
   useBrowserActions,
   type BrowserActions,
 } from './hooks'

@@ -17,6 +17,8 @@ clashboard is a personal Jira / GitLab dashboard: a Kanban board of my tickets w
 
 Its **primary interaction is a ⌘K command palette**, not the mouse. One popup searches every work item at once — assigned tickets, watchlist cards, and MRs waiting on your review — and `Enter` on a result lists every action currently legal for it, each behind a single keystroke: status transitions, tags, notes, AI refine, the MR, the workspace. The board's text filter is a palette command rather than a header input, so there is exactly one search surface in the app. The target it was built against is a full triage session without touching the trackpad.
 
+Code review has a surface of its own. **Explain** (`v`, or the button in the detail panel) checks a merge request's head commit out into a throwaway worktree, runs a read-only agent in it, streams what it is doing into a tab, and renders a typed report: verdict, systems touched, blast radius, architect-altitude findings with their diff hunks, open questions, and an explicit list of what it could not verify. It answers the questions a diff viewer cannot — see [ADR 0009](docs/adr/0009-explain-surface-and-long-running-agent-runs.md).
+
 The product surface is documented in [`.agents/prds/clashboard.md`](.agents/prds/clashboard.md); supplementary PRDs cover the [command palette](.agents/prds/command-palette.md), [GitLab MR review cards](.agents/prds/gitlab-mr-review-cards.md), [GitLab MR status on Code Review cards](.agents/prds/gitlab-mr-status.md), [Quick Create](.agents/prds/quick-create.md), [e2e harness](.agents/prds/e2e-harness.md), [misc improvements](.agents/prds/misc-improvements.md), and the [clean-architecture refactor](.agents/prds/clean-architecture-refactor.md) this README is part of.
 
 ## How to read this codebase
@@ -26,9 +28,9 @@ In order:
 1. **[`CONTEXT-MAP.md`](CONTEXT-MAP.md)** — the architectural overview. Contexts, the layer vocabulary, the dependency law, governance, library choices.
 2. **[`docs/tour.md`](docs/tour.md)** — one user action (clicking a status pill, picking a transition) traced through every layer end to end. The manga's first chapter.
 3. **[`docs/layers.md`](docs/layers.md)** — reference: each of the seven layers with one annotated example drawn from the migrated codebase.
-4. **`contexts/<name>/CONTEXT.md`** — per-context glossary, use-cases, and view-model state machine: [Board](src/contexts/board/CONTEXT.md), [Detail](src/contexts/detail/CONTEXT.md), [Capture](src/contexts/capture/CONTEXT.md), [Review](src/contexts/review/CONTEXT.md), [Watchlist](src/contexts/watchlist/CONTEXT.md), [Command Palette](src/contexts/command-palette/CONTEXT.md). Read the palette's last: it is the one context defined by what it is _not_ allowed to touch, so it only makes sense once the others are familiar.
+4. **`contexts/<name>/CONTEXT.md`** — per-context glossary, use-cases, and view-model state machine: [Board](src/contexts/board/CONTEXT.md), [Detail](src/contexts/detail/CONTEXT.md), [Capture](src/contexts/capture/CONTEXT.md), [Review](src/contexts/review/CONTEXT.md), [Watchlist](src/contexts/watchlist/CONTEXT.md), [Explain](src/contexts/explain/CONTEXT.md), [Command Palette](src/contexts/command-palette/CONTEXT.md). Read the palette's last: it is the one context defined by what it is _not_ allowed to touch, so it only makes sense once the others are familiar.
 5. **[`docs/keyboard.md`](docs/keyboard.md)** — every shortcut, and where the map lives.
-6. **[`docs/adr/`](docs/adr/)** — the decisions that shape the architecture: [0001 mock at the network boundary](docs/adr/0001-mock-at-network-boundary-for-e2e.md), [0002 bounded contexts](docs/adr/0002-bounded-contexts-and-layer-vocabulary.md), [0003 framework-free view-models](docs/adr/0003-framework-free-view-models.md), [0004 neverthrow / Effect](docs/adr/0004-neverthrow-client-effect-server.md), [0005 Effect-TS server architecture](docs/adr/0005-effect-server-architecture.md), [0006 binary-stream API routes](docs/adr/0006-binary-stream-api-routes.md), [0007 multi-board app shell](docs/adr/0007-multi-board-app-shell.md), [0008 command-palette action catalogue](docs/adr/0008-command-palette-action-catalogue.md).
+6. **[`docs/adr/`](docs/adr/)** — the decisions that shape the architecture: [0001 mock at the network boundary](docs/adr/0001-mock-at-network-boundary-for-e2e.md), [0002 bounded contexts](docs/adr/0002-bounded-contexts-and-layer-vocabulary.md), [0003 framework-free view-models](docs/adr/0003-framework-free-view-models.md), [0004 neverthrow / Effect](docs/adr/0004-neverthrow-client-effect-server.md), [0005 Effect-TS server architecture](docs/adr/0005-effect-server-architecture.md), [0006 binary-stream API routes](docs/adr/0006-binary-stream-api-routes.md), [0007 multi-board app shell](docs/adr/0007-multi-board-app-shell.md), [0008 command-palette action catalogue](docs/adr/0008-command-palette-action-catalogue.md), [0009 the Explain surface and long-running agent runs](docs/adr/0009-explain-surface-and-long-running-agent-runs.md).
 
 ## Folder layout
 
@@ -43,11 +45,14 @@ src/
 │   ├── watchlist/  # curated advisory tickets + the watchlist board
 │   ├── tags/       # local coloured labels
 │   ├── bulk-refine/# one transcript → many refined notes
+│   ├── explain/    # /explain: an architect's review of one MR, by agent (ADR-0009)
 │   └── command-palette/  # ⌘K; imports no other context (ADR-0008)
 ├── widgets/        # reusable visual surfaces (status-pill, ticket-card, mr-section, fixasap-ribbon)
 ├── coordinator/    # cross-context workflows + ports (cache, toast, navigate, browser, jira)
 ├── design-system/  # domain-agnostic primitives (skeletons, shadcn pieces)
 ├── routes/         # the only place multiple contexts are wired together
+│   ├── -app-chrome.tsx    # logo + header + nav rail + palette host, shared by every surface
+│   ├── -explain/          # the Explain surface's shell
 │   └── -command-palette/  # THE cross-context assembly: work items, actions, commands
 ├── lib/            # framework-level utilities (cn, testids, polling)
 └── server/         # Effect-TS server (gateways, use-case contexts, runtime, wire, server-functions)
@@ -55,6 +60,7 @@ src/
     ├── contexts/    # one folder per use-case cluster: application/, domain/, errors, config (Board, Detail, Capture, Review)
     ├── runtime/     # ServerEnv Tag + Layer, appLayer, appRuntime (process-scoped ManagedRuntime)
     ├── wire/        # toWire(program, errorSchema) — the only Effect→JSON boundary
+    ├── lib/         # local-machine plumbing: file stores, the worktree/cmux helpers, headless Claude, the Explain run registry
     └── server-functions/  # createServerFn handlers — appRuntime.runPromise(toWire(...))
 ```
 

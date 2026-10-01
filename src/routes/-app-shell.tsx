@@ -3,13 +3,13 @@ import { useNavigate } from '@tanstack/react-router'
 import { Board } from '~/contexts/board'
 import { WatchlistBoard } from '~/contexts/watchlist'
 import { IssueDetailPanel } from '~/contexts/detail'
-import { AuthGate } from './-auth-gate'
-import { CommandPaletteHost } from './-command-palette/CommandPaletteHost'
-import { Header } from './-header'
-import { Logo } from './-header/Logo'
-import { NavRail } from './-nav/NavRail'
+import { AppChrome } from './-app-chrome'
 
-/** Which board the shell is showing. Also selects the header's tool set. */
+/**
+ * Which board the shell is showing. Keeps its one job: a board `AppShell`
+ * renders. The chrome's own question — which *surface* has chrome — is
+ * `ShellVariant`, and the two are deliberately distinct types (ADR-0009 §1).
+ */
 export type BoardVariant = 'main' | 'watchlist'
 
 /** Which AI modal to open on arrival — the palette's `r` / `a` hand-off. */
@@ -40,11 +40,11 @@ export function validateBoardSearch(search: Record<string, unknown>): BoardSearc
   return { issue, notes, ai }
 }
 
-// The app shell shared by both board routes: the left nav rail, a variant-aware
-// header, the board itself, the detail panel, and the command palette.
+// The shell shared by both board routes: `AppChrome` (logo, header, nav rail,
+// palette) composed with the board itself and the detail panel.
 // `searchQuery` / `onlyWorkspace` are per-route local state — switching boards is
 // switching routes, so each board keeps its own transient filter state. The
-// filter text now arrives from a palette command rather than a header input; the
+// filter text arrives from a palette command rather than a header input; the
 // header shows it as a chip.
 export function AppShell({
   variant,
@@ -73,50 +73,28 @@ export function AppShell({
     })
   }, [navigate, issue, notes])
   return (
-    <AuthGate>
-      <div className="flex h-dvh flex-col">
-        <div className="flex h-14 shrink-0">
-          {/* The logo sits in the corner where the top bar and left rail meet;
-              its right/bottom borders continue the rail and header lines. */}
-          <div className="bg-background border-border flex w-14 shrink-0 items-center justify-center border-r border-b">
-            <Logo />
-          </div>
-          <div className="min-w-0 flex-1">
-            <Header
-              variant={variant}
-              filter={searchQuery}
-              onClearFilter={() => setSearchQuery('')}
-              onlyWorkspace={onlyWorkspace}
-              onToggleOnlyWorkspace={() => setOnlyWorkspace((v) => !v)}
-            />
-          </div>
-        </div>
-        <div className="flex min-h-0 flex-1">
-          <NavRail />
-          <main className="min-h-0 min-w-0 flex-1">
-            {variant === 'main' ? (
-              <Board searchQuery={searchQuery} onlyWorkspace={onlyWorkspace} />
-            ) : (
-              <WatchlistBoard searchQuery={searchQuery} />
-            )}
-          </main>
-        </div>
-      </div>
-      <IssueDetailPanel
-        issueKey={issue ?? null}
-        notesOpen={notes ?? false}
-        aiModal={ai ?? null}
-        onAiModalConsumed={clearAi}
-      />
-      {/* Mounted once per board route, above the panel: ⌘K must work wherever
-          you are, including with the detail panel open. */}
-      <CommandPaletteHost
-        variant={variant}
-        filter={searchQuery}
-        onFilterChange={setSearchQuery}
-        onlyWorkspace={onlyWorkspace}
-        onToggleOnlyWorkspace={() => setOnlyWorkspace((v) => !v)}
-      />
-    </AuthGate>
+    <AppChrome
+      variant={variant}
+      board={{
+        filter: searchQuery,
+        onFilterChange: setSearchQuery,
+        onlyWorkspace,
+        onToggleOnlyWorkspace: () => setOnlyWorkspace((v) => !v),
+      }}
+      overlay={
+        <IssueDetailPanel
+          issueKey={issue ?? null}
+          notesOpen={notes ?? false}
+          aiModal={ai ?? null}
+          onAiModalConsumed={clearAi}
+        />
+      }
+    >
+      {variant === 'main' ? (
+        <Board searchQuery={searchQuery} onlyWorkspace={onlyWorkspace} />
+      ) : (
+        <WatchlistBoard searchQuery={searchQuery} />
+      )}
+    </AppChrome>
   )
 }

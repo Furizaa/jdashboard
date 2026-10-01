@@ -84,6 +84,9 @@ type MrOverrides = {
   authorUsername?: string
   labels?: readonly string[]
   sourceBranch?: string
+  targetBranch?: string
+  headSha?: string
+  description?: string
 }
 
 export function makeMr(overrides: MrOverrides = {}): GitlabMr {
@@ -100,6 +103,9 @@ export function makeMr(overrides: MrOverrides = {}): GitlabMr {
     authorUsername: overrides.authorUsername ?? 'e2e-gitlab',
     labels: overrides.labels ?? [],
     sourceBranch: overrides.sourceBranch ?? `feat/${jiraKey.toLowerCase()}`,
+    targetBranch: overrides.targetBranch ?? 'develop',
+    headSha: overrides.headSha ?? `${iid}aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`,
+    description: overrides.description ?? '',
   }
 }
 
@@ -121,6 +127,7 @@ type DiscussionOverrides = {
 function note(overrides: Partial<GitlabDiscussionNote>): GitlabDiscussionNote {
   return {
     authorUsername: overrides.authorUsername ?? 'someone-else',
+    body: overrides.body ?? 'a review comment',
     resolvable: overrides.resolvable ?? true,
     resolved: overrides.resolved ?? false,
     system: overrides.system ?? false,

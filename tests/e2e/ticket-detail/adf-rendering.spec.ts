@@ -109,6 +109,60 @@ const description: AdfNode = {
         { type: 'text', text: '.' },
       ],
     },
+    {
+      type: 'table',
+      attrs: { isNumberColumnEnabled: false, layout: 'default' },
+      content: [
+        {
+          type: 'tableRow',
+          content: [
+            {
+              type: 'tableHeader',
+              content: [{ type: 'paragraph', content: [{ type: 'text', text: 'header-cell' }] }],
+            },
+            {
+              type: 'tableHeader',
+              content: [{ type: 'paragraph', content: [{ type: 'text', text: 'header-two' }] }],
+            },
+          ],
+        },
+        {
+          type: 'tableRow',
+          content: [
+            {
+              type: 'tableCell',
+              attrs: { colspan: 2 },
+              content: [{ type: 'paragraph', content: [{ type: 'text', text: 'spanned-cell' }] }],
+            },
+          ],
+        },
+        {
+          type: 'tableRow',
+          content: [
+            {
+              type: 'tableCell',
+              content: [{ type: 'paragraph', content: [{ type: 'text', text: 'body-cell' }] }],
+            },
+            {
+              type: 'tableCell',
+              content: [
+                {
+                  type: 'bulletList',
+                  content: [
+                    {
+                      type: 'listItem',
+                      content: [
+                        { type: 'paragraph', content: [{ type: 'text', text: 'cell-bullet' }] },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
     // Unsupported fallback — surfaces as `[unsupported: <type>]`.
     { type: 'mysteryNode' },
   ],
@@ -178,8 +232,21 @@ test('description renders every supported ADF node and an unsupported placeholde
   await expect(plainChip).toHaveAttribute('target', '_blank')
   await expect(plainChip).toHaveAttribute('rel', 'noopener noreferrer')
 
-  // The unsupported placeholder no longer appears for inlineCard nodes.
+  // table → header cells as <th>, body cells as <td>, colspan honoured, and
+  // block content nested inside a cell renders as itself.
+  const table = dialog.locator('table')
+  await expect(table).toBeVisible()
+  await expect(table.locator('th')).toHaveCount(2)
+  await expect(table.locator('th').first()).toHaveText('header-cell')
+  await expect(table.locator('td')).toHaveCount(3)
+  await expect(table.locator('td').first()).toHaveAttribute('colspan', '2')
+  await expect(table.getByText('spanned-cell')).toBeVisible()
+  await expect(table.getByText('body-cell')).toBeVisible()
+  await expect(table.locator('td ul li')).toHaveText('cell-bullet')
+
+  // The unsupported placeholder no longer appears for inlineCard or table nodes.
   await expect(dialog.getByText('[unsupported: inlineCard]')).toHaveCount(0)
+  await expect(dialog.getByText('[unsupported: table]')).toHaveCount(0)
 
   // Unsupported fallback
   await expect(dialog.getByText('[unsupported: mysteryNode]')).toBeVisible()

@@ -17,6 +17,9 @@ import {
   Paragraph,
   Rule,
   Status,
+  Table,
+  TableCell,
+  TableRow,
   TaskItem,
   TaskList,
   Text,
@@ -65,6 +68,20 @@ function renderNode(node: AdfNode, key: number, jiraBaseUrl: string | undefined)
     .with({ type: 'blockquote' }, (n) => (
       <Blockquote key={key}>{renderChildren(n, jiraBaseUrl)}</Blockquote>
     ))
+    .with({ type: 'table' }, (n) => <Table key={key}>{renderChildren(n, jiraBaseUrl)}</Table>)
+    .with({ type: 'tableRow' }, (n) => (
+      <TableRow key={key}>{renderChildren(n, jiraBaseUrl)}</TableRow>
+    ))
+    .with({ type: 'tableHeader' }, (n) => (
+      <TableCell key={key} header colSpan={span(n, 'colspan')} rowSpan={span(n, 'rowspan')}>
+        {renderChildren(n, jiraBaseUrl)}
+      </TableCell>
+    ))
+    .with({ type: 'tableCell' }, (n) => (
+      <TableCell key={key} header={false} colSpan={span(n, 'colspan')} rowSpan={span(n, 'rowspan')}>
+        {renderChildren(n, jiraBaseUrl)}
+      </TableCell>
+    ))
     .with({ type: 'hardBreak' }, () => <HardBreak key={key} />)
     .with({ type: 'rule' }, () => <Rule key={key} />)
     .with({ type: 'mention' }, (n) => (
@@ -102,6 +119,13 @@ function renderNode(node: AdfNode, key: number, jiraBaseUrl: string | undefined)
     ))
     .with({ type: P.string }, (n) => <Unsupported key={key} type={n.type} />)
     .otherwise(() => <Unsupported key={key} type="unknown" />)
+}
+
+// Jira writes `colspan`/`rowspan` on every cell, including the 1s; only a real
+// span is passed through, so unspanned cells stay attribute-free in the DOM.
+function span(node: AdfNode, name: 'colspan' | 'rowspan'): number | undefined {
+  const value = node.attrs?.[name]
+  return typeof value === 'number' && value > 1 ? value : undefined
 }
 
 // `mediaSingle` / `mediaGroup` siblings are flattened into a single

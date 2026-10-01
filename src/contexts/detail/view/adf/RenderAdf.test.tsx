@@ -632,6 +632,154 @@ describe('RenderAdf', () => {
     })
   })
 
+  describe('table', () => {
+    function cellText(text: string): AdfNode {
+      return { type: 'paragraph', content: [{ type: 'text', text }] }
+    }
+
+    it('renders a header row and a body row as th/td inside one scrollable table', () => {
+      expect(
+        html(
+          wrap({
+            type: 'table',
+            attrs: { isNumberColumnEnabled: false, layout: 'default' },
+            content: [
+              {
+                type: 'tableRow',
+                content: [
+                  { type: 'tableHeader', content: [cellText('Env')] },
+                  { type: 'tableHeader', content: [cellText('Result')] },
+                ],
+              },
+              {
+                type: 'tableRow',
+                content: [
+                  { type: 'tableCell', content: [cellText('staging')] },
+                  { type: 'tableCell', content: [cellText('pass')] },
+                ],
+              },
+            ],
+          }),
+        ),
+      ).toMatchSnapshot()
+    })
+
+    it('renders one row per tableRow and one cell per tableHeader/tableCell', () => {
+      const doc: AdfNode = wrap({
+        type: 'table',
+        content: [
+          {
+            type: 'tableRow',
+            content: [
+              { type: 'tableHeader', content: [cellText('A')] },
+              { type: 'tableHeader', content: [cellText('B')] },
+            ],
+          },
+          {
+            type: 'tableRow',
+            content: [
+              { type: 'tableCell', content: [cellText('1')] },
+              { type: 'tableCell', content: [cellText('2')] },
+            ],
+          },
+        ],
+      })
+      const { container } = render(<RenderAdf doc={doc} />)
+      expect(container.querySelectorAll('table')).toHaveLength(1)
+      expect(container.querySelectorAll('tr')).toHaveLength(2)
+      expect(container.querySelectorAll('th')).toHaveLength(2)
+      expect(container.querySelectorAll('td')).toHaveLength(2)
+    })
+
+    it('honours colspan and rowspan, and omits the attributes for unspanned cells', () => {
+      const doc: AdfNode = wrap({
+        type: 'table',
+        content: [
+          {
+            type: 'tableRow',
+            content: [
+              { type: 'tableCell', attrs: { colspan: 2, rowspan: 1 }, content: [cellText('wide')] },
+              { type: 'tableCell', attrs: { colspan: 1, rowspan: 3 }, content: [cellText('tall')] },
+              {
+                type: 'tableCell',
+                attrs: { colspan: 1, rowspan: 1 },
+                content: [cellText('plain')],
+              },
+            ],
+          },
+        ],
+      })
+      const cells = render(<RenderAdf doc={doc} />).container.querySelectorAll('td')
+      expect(cells[0]).toHaveAttribute('colspan', '2')
+      expect(cells[0]).not.toHaveAttribute('rowspan')
+      expect(cells[1]).toHaveAttribute('rowspan', '3')
+      expect(cells[1]).not.toHaveAttribute('colspan')
+      expect(cells[2]).not.toHaveAttribute('colspan')
+      expect(cells[2]).not.toHaveAttribute('rowspan')
+    })
+
+    it('renders block content nested inside a cell', () => {
+      const doc: AdfNode = wrap({
+        type: 'table',
+        content: [
+          {
+            type: 'tableRow',
+            content: [
+              {
+                type: 'tableCell',
+                content: [
+                  cellText('intro'),
+                  {
+                    type: 'bulletList',
+                    content: [{ type: 'listItem', content: [cellText('nested-bullet')] }],
+                  },
+                  { type: 'codeBlock', content: [{ type: 'text', text: 'nested-code' }] },
+                ],
+              },
+            ],
+          },
+        ],
+      })
+      const { container, getByText } = render(<RenderAdf doc={doc} />)
+      expect(getByText('intro')).toBeInTheDocument()
+      expect(container.querySelector('td ul li')).toHaveTextContent('nested-bullet')
+      expect(container.querySelector('td pre')).toHaveTextContent('nested-code')
+    })
+
+    it('ignores the per-cell background attr rather than inlining a Jira colour', () => {
+      const doc: AdfNode = wrap({
+        type: 'table',
+        content: [
+          {
+            type: 'tableRow',
+            content: [
+              {
+                type: 'tableCell',
+                attrs: { background: '#deebff' },
+                content: [cellText('tinted')],
+              },
+            ],
+          },
+        ],
+      })
+      const cell = render(<RenderAdf doc={doc} />).container.querySelector('td')
+      expect(cell).not.toHaveAttribute('style')
+      expect(cell).toHaveTextContent('tinted')
+    })
+
+    it('no longer renders the unsupported placeholder for table nodes', () => {
+      const html_ = html(
+        wrap({
+          type: 'table',
+          content: [
+            { type: 'tableRow', content: [{ type: 'tableCell', content: [cellText('x')] }] },
+          ],
+        }),
+      )
+      expect(html_).not.toContain('[unsupported:')
+    })
+  })
+
   describe('fallback', () => {
     it('renders unsupported node types as a faint placeholder', () => {
       expect(

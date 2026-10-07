@@ -80,29 +80,30 @@ export function findingsOf(blocks: readonly ExplainBlock[]): readonly Finding[] 
 }
 
 /**
- * The report as the pane renders it: the findings lifted out, **grouped by
- * system** with the worst-hit system first, and every other block left exactly
- * where the agent put it.
+ * The page as the pane renders it: every explanatory cell first, in the agent's
+ * own order, then the findings **grouped by system** with the worst-hit system
+ * first, and the unverified list last of all.
  *
- * Replacing the findings *in place* — at the position of the first one — is what
- * keeps a narrative that introduces them, or a blast-radius table that follows
- * them, in the right place. Re-sorting the whole document would be the view
- * second-guessing the report's structure, which it has no business doing.
+ * The findings **sink** (ADR-0011 §4). They used to be lifted in place, at the
+ * position of the first one, which let a move page open with a warning — and a
+ * page that opens with a warning is a code review, whatever the cells above it
+ * were going to say. The explanation is what this surface is for; a finding is a
+ * footnote on it. So the one thing the view re-orders is where the footnotes go.
+ *
+ * `unverified` stays at the bottom because it is the report's caveat, not part of
+ * what it found, and it is the only cell the skill already pins to a position.
+ * Everything else keeps the order the agent wrote it in: re-sorting the argument
+ * itself would be the view second-guessing the report's structure, which it has
+ * no business doing.
  */
 export function layOutReport(blocks: readonly ExplainBlock[]): readonly ExplainBlock[] {
-  const findings = findingsOf(blocks)
-  if (findings.length < 2) return blocks
-  const ordered = groupFindingsBySystem(findings).flatMap((group) => group.findings)
-  let placed = false
-  const laidOut: ExplainBlock[] = []
-  for (const block of blocks) {
-    if (block.type !== 'finding') {
-      laidOut.push(block)
-      continue
-    }
-    if (placed) continue
-    placed = true
-    laidOut.push(...ordered)
-  }
-  return laidOut
+  const explanation = blocks.filter(
+    (block) => block.type !== 'finding' && block.type !== 'unverified',
+  )
+  const findings = groupFindingsBySystem(findingsOf(blocks)).flatMap((group) => group.findings)
+  const caveats = blocks.filter((block) => block.type === 'unverified')
+  const laidOut = [...explanation, ...findings, ...caveats]
+  // A page the agent already laid out this way is returned as it came, so an
+  // unchanged report is identical rather than merely equal.
+  return laidOut.every((block, index) => block === blocks[index]) ? blocks : laidOut
 }

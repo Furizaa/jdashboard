@@ -60,6 +60,16 @@ export type GitlabDiscussionNote = {
   system: boolean
 }
 
+/** One file's diff, as `/merge_requests/:iid/diffs` returns it. */
+export type GitlabMrDiff = {
+  oldPath: string
+  newPath: string
+  newFile?: boolean
+  renamedFile?: boolean
+  deletedFile?: boolean
+  diff: string
+}
+
 export type GitlabDiscussion = {
   id: string
   notes: GitlabDiscussionNote[]
@@ -130,6 +140,7 @@ export class World {
   private readonly mrs: GitlabMr[] = []
   private readonly mrReviewers = new Map<number, GitlabMrReviewer[]>()
   private readonly mrDiscussions = new Map<number, GitlabDiscussion[]>()
+  private readonly mrDiffs = new Map<number, GitlabMrDiff[]>()
   private readonly mrApprovals = new Map<number, GitlabApprovals>()
   private readonly mrPipelines = new Map<number, GitlabPipeline>()
   private gitlabUser: GitlabUser = {
@@ -293,6 +304,13 @@ export class World {
     )
   }
 
+  seedMrDiffs(iid: number, diffs: readonly GitlabMrDiff[]): void {
+    this.mrDiffs.set(
+      iid,
+      diffs.map((d) => ({ ...d })),
+    )
+  }
+
   seedMrApprovals(iid: number, approvals: GitlabApprovals): void {
     this.mrApprovals.set(iid, { approvedUsernames: [...approvals.approvedUsernames] })
   }
@@ -307,6 +325,10 @@ export class World {
 
   getMrReviewers(iid: number): GitlabMrReviewer[] {
     return this.mrReviewers.get(iid) ?? []
+  }
+
+  getMrDiffs(iid: number): GitlabMrDiff[] {
+    return this.mrDiffs.get(iid) ?? []
   }
 
   getMrDiscussions(iid: number): GitlabDiscussion[] {

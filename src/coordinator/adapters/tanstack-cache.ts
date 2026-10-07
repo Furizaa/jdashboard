@@ -27,6 +27,10 @@ const KEY_CHANGELOG = (k: string) => ['note-changelog', k] as const
 // The open Explain tabs. One query for the whole set — the strip, every tab's
 // phase, and each MR's current head all come from it.
 const KEY_EXPLAIN_TABS = ['explain-tabs'] as const
+// One merge request's whole diff, read on demand by a move page's expander
+// (ADR-0010 §6). Keyed per MR and shared by every move in that report, since the
+// moves are slices of the same file list.
+const KEY_EXPLAIN_DIFFS = (iid: number) => ['explain-diffs', iid] as const
 
 export const DASHBOARD_QUERY_KEYS = {
   board: KEY_BOARD,
@@ -42,6 +46,7 @@ export const DASHBOARD_QUERY_KEYS = {
   noteKeys: KEY_NOTE_KEYS,
   changelog: KEY_CHANGELOG,
   explainTabs: KEY_EXPLAIN_TABS,
+  explainDiffs: KEY_EXPLAIN_DIFFS,
 } as const
 
 export const DASHBOARD_STALE_TIMES = {
@@ -62,6 +67,10 @@ export const DASHBOARD_STALE_TIMES = {
   // every tab's current head SHA for the stale-report warning. Live progress
   // comes over SSE, not from this query, so it does not need to be shorter.
   explainTabs: 10_000,
+  // Long: a merge request's diff only changes when someone pushes, and the
+  // expander names the commit it is showing — so a stale read is visible rather
+  // than misleading. The fetch is also only ever triggered by a click.
+  explainDiffs: 120_000,
 } as const
 
 export function createTanstackCacheAdapter(queryClient: QueryClient): Cache {

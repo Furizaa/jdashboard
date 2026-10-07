@@ -21,6 +21,7 @@ export {
   useRefineNote,
   useAskTicket,
   useRouteTranscript,
+  useExplainDiffs,
   useExplainRuns,
   useStartExplain,
   useCloseExplain,

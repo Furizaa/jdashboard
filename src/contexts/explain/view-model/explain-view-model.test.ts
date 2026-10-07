@@ -14,6 +14,7 @@ import {
   isTerminalPhase,
   neighbourAfterClose,
   reduce,
+  rememberedMove,
   streamingRun,
   type ExplainEvent,
   type ExplainState,
@@ -23,9 +24,38 @@ import {
 // renders, and the table over event × phase is what makes "a new phase is a
 // compile error until every arm handles it" a checked claim rather than a hope.
 
+// Two moves, because one would not exercise the rail's numbering or the
+// remembered-move rule (ADR-0010).
 const REPORT: ExplainReport = {
-  version: 1,
-  blocks: [{ type: 'verdict', verdict: 'sound', headline: 'Fits the system' }],
+  version: 2,
+  overview: [{ type: 'verdict', verdict: 'sound', headline: 'Fits the system' }],
+  moves: [
+    {
+      id: 'rounding-leaves-pricing',
+      title: 'Rounding leaves the pricing service',
+      summary: 'The service stops rounding and its callers start.',
+      systems: ['pricing', 'checkout'],
+      paths: ['src/pricing/quote.ts', 'src/checkout/total.ts'],
+      blocks: [
+        { type: 'narrative', body: 'It moved.' },
+        {
+          type: 'finding',
+          system: 'pricing',
+          title: 'Two owners of one rule',
+          severity: 'high',
+          whyItMatters: 'They will drift.',
+        },
+      ],
+    },
+    {
+      id: 'legacy-helper-deleted',
+      title: 'The legacy helper is deleted',
+      summary: 'Dead once the service stopped calling it.',
+      systems: ['legacy-quotes'],
+      paths: ['src/legacy-quotes/round.ts'],
+      blocks: [{ type: 'narrative', body: 'Gone.' }],
+    },
+  ],
 }
 
 const ALL_PHASES: readonly ExplainPhase[] = [
@@ -72,6 +102,8 @@ function run(...events: readonly ExplainEvent[]): ExplainState {
 
 const loadedWith = (...tabs: readonly ExplainTab[]) => ({ type: 'tabsLoaded', tabs }) as const
 const select = (iid: number | null) => ({ type: 'selected', iid }) as const
+const openMove = (iid: number | null, moveId: string | null) =>
+  ({ type: 'moveSelected', iid, moveId }) as const
 const streamed = (iid: number, runId: string, event: ExplainRunEvent) =>
   ({ type: 'streamEvent', iid, runId, event }) as const
 const requested = (iid: number) => ({ type: 'runRequested', iid }) as const
@@ -259,7 +291,7 @@ describe('streamEvent × phase', () => {
       streamed(1, 'run-1', { kind: 'report', report: REPORT }),
     )
     expect(state.live[1]).toMatchObject({ phase: 'report', error: null })
-    expect(state.live[1]?.report).toEqual(REPORT.blocks)
+    expect(state.live[1]?.report).toEqual(REPORT)
   })
 
   it('a failed message carries the phase and the reason', () => {
@@ -545,6 +577,10 @@ describe('deriveExplain — the pane', () => {
       generatedAt: '2026-10-01T09:11:00.000Z',
       freshness: null,
     })
+    if (display.pane.kind !== 'report') return
+    // Overview is pinned first and is where the reader lands (ADR-0010 §2).
+    expect(display.pane.page).toMatchObject({ kind: 'overview' })
+    expect(display.pane.rail.map((entry) => entry.kind)).toEqual(['overview', 'move', 'move'])
   })
 
   it('warns on a report whose MR has moved on', () => {
@@ -568,7 +604,7 @@ describe('deriveExplain — the pane', () => {
     expect(display.pane.freshness).toContain('moved on')
   })
 
-  it('reads a report phase with no blocks yet as still working', () => {
+  it('reads a report phase with no report yet as still working', () => {
     // The phase and the payload arrive as two messages, so the in-between state
     // is representable — and must not render as an empty report.
     const display = deriveExplain(
@@ -671,5 +707,164 @@ describe('deriveExplain — the close confirmation', () => {
       run(loadedWith(tab({ iid: 1 })), { type: 'closeRequested', iid: 1 }, loadedWith()),
     )
     expect(display.closing).toBeNull()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Moves: the rail, the page, and the remembered selection (ADR-0010)
+// ---------------------------------------------------------------------------
+
+/** A tab with a finished report, which is the only state a rail exists in. */
+const reported = (iid: number) =>
+  tab({ iid, phase: 'report', runId: null, report: REPORT, generatedAt: '2026-10-01T09:11:00Z' })
+
+function railOf(state: ExplainState) {
+  const { pane } = deriveExplain(state)
+  if (pane.kind !== 'report') throw new Error(`expected a report pane, got ${pane.kind}`)
+  return pane
+}
+
+describe('the move rail', () => {
+  it('lists Overview first, then every move in the agent’s own order', () => {
+    const { rail } = railOf(run(loadedWith(reported(1)), select(1)))
+    expect(rail).toEqual([
+      { kind: 'overview', isSelected: true, verdict: 'sound', moveCount: 2 },
+      {
+        kind: 'move',
+        id: 'rounding-leaves-pricing',
+        position: 1,
+        title: 'Rounding leaves the pricing service',
+        summary: 'The service stops rounding and its callers start.',
+        systems: ['pricing', 'checkout'],
+        fileCount: 2,
+        findingCount: 1,
+        severity: 'high',
+        isSelected: false,
+      },
+      {
+        kind: 'move',
+        id: 'legacy-helper-deleted',
+        position: 2,
+        title: 'The legacy helper is deleted',
+        summary: 'Dead once the service stopped calling it.',
+        systems: ['legacy-quotes'],
+        fileCount: 1,
+        findingCount: 0,
+        // No findings means no dot — not a reassuring green one.
+        severity: null,
+        isSelected: false,
+      },
+    ])
+  })
+
+  it('marks the selected move and deselects Overview', () => {
+    const { rail } = railOf(
+      run(loadedWith(reported(1)), select(1), openMove(1, 'legacy-helper-deleted')),
+    )
+    expect(rail.map((entry) => entry.isSelected)).toEqual([false, false, true])
+  })
+})
+
+describe('the notebook page', () => {
+  it('opens the move the URL names', () => {
+    const { page } = railOf(
+      run(loadedWith(reported(1)), select(1), openMove(1, 'rounding-leaves-pricing')),
+    )
+    expect(page).toMatchObject({
+      kind: 'move',
+      id: 'rounding-leaves-pricing',
+      position: 1,
+      total: 2,
+      paths: ['src/pricing/quote.ts', 'src/checkout/total.ts'],
+      severity: 'high',
+    })
+  })
+
+  it('falls back to Overview for a move the report does not contain', () => {
+    // A shared link can outlive the report it was written against, and a re-run
+    // has no obligation to find the same moves.
+    const { page, rail } = railOf(run(loadedWith(reported(1)), select(1), openMove(1, 'long-gone')))
+    expect(page.kind).toBe('overview')
+    expect(rail[0]).toMatchObject({ kind: 'overview', isSelected: true })
+  })
+
+  it('lays out each page’s cells independently, worst finding first', () => {
+    const twoFindings: ExplainReport = {
+      ...REPORT,
+      moves: [
+        {
+          ...REPORT.moves[0]!,
+          blocks: [
+            { type: 'narrative', body: 'Intro.' },
+            {
+              type: 'finding',
+              system: 'pricing',
+              title: 'Low',
+              severity: 'low',
+              whyItMatters: 'Minor.',
+            },
+            {
+              type: 'finding',
+              system: 'pricing',
+              title: 'High',
+              severity: 'high',
+              whyItMatters: 'Major.',
+            },
+          ],
+        },
+      ],
+    }
+    const { page } = railOf(
+      run(
+        loadedWith(tab({ iid: 1, phase: 'report', runId: null, report: twoFindings })),
+        select(1),
+        openMove(1, 'rounding-leaves-pricing'),
+      ),
+    )
+    // The narrative that introduces them stays above them; the findings are
+    // re-ordered in place.
+    expect(page.blocks.map((block) => block.type)).toEqual(['narrative', 'finding', 'finding'])
+    expect(page.blocks[1]).toMatchObject({ title: 'High' })
+  })
+})
+
+describe('the remembered move', () => {
+  it('remembers the move last read in each tab', () => {
+    const state = run(
+      loadedWith(reported(1), reported(2)),
+      select(1),
+      openMove(1, 'legacy-helper-deleted'),
+      select(2),
+      openMove(2, 'rounding-leaves-pricing'),
+    )
+    expect(rememberedMove(state, 1)).toBe('legacy-helper-deleted')
+    expect(rememberedMove(state, 2)).toBe('rounding-leaves-pricing')
+  })
+
+  it('has nothing to remember for a tab that was only ever on Overview', () => {
+    const state = run(loadedWith(reported(1)), select(1), openMove(1, null))
+    expect(rememberedMove(state, 1)).toBeNull()
+  })
+
+  it('forgets a move once its tab is closed', () => {
+    const state = run(
+      loadedWith(reported(1), reported(2)),
+      select(1),
+      openMove(1, 'legacy-helper-deleted'),
+      { type: 'closed', iid: 1 },
+    )
+    expect(rememberedMove(state, 1)).toBeNull()
+    // And the closed tab's move must not linger as the neighbour's selection.
+    expect(state.selectedMove).toBeNull()
+  })
+
+  it('keeps the selection when a tab other than the selected one is closed', () => {
+    const state = run(
+      loadedWith(reported(1), reported(2)),
+      select(2),
+      openMove(2, 'legacy-helper-deleted'),
+      { type: 'closed', iid: 1 },
+    )
+    expect(state.selectedMove).toBe('legacy-helper-deleted')
   })
 })

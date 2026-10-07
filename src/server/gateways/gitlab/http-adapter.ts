@@ -15,6 +15,7 @@ import type {
   RawApprovals,
   RawDiscussion,
   RawMrDetail,
+  RawMrDiff,
   RawMrReviewerWithState,
   RawMrSummary,
 } from './types'
@@ -78,6 +79,30 @@ const WireDiscussionSchema = Schema.Struct({
   id: Schema.String,
   notes: Schema.Array(WireNoteSchema),
 })
+
+// `/merge_requests/:iid/diffs`. `diff` is absent on a binary file and on one
+// GitLab collapsed as too large, so it defaults to empty rather than failing the
+// whole fetch over a file nobody can read anyway — the same tolerance
+// `WireNoteSchema` shows for a missing `body`.
+const WireMrDiffSchema = Schema.Struct({
+  old_path: Schema.String,
+  new_path: Schema.String,
+  new_file: Schema.Boolean,
+  renamed_file: Schema.Boolean,
+  deleted_file: Schema.Boolean,
+  diff: Schema.optionalWith(Schema.String, { default: () => '' }),
+})
+
+function toRawMrDiff(wire: Schema.Schema.Type<typeof WireMrDiffSchema>): RawMrDiff {
+  return {
+    oldPath: wire.old_path,
+    newPath: wire.new_path,
+    newFile: wire.new_file,
+    renamedFile: wire.renamed_file,
+    deletedFile: wire.deleted_file,
+    diff: wire.diff,
+  }
+}
 type WireDiscussion = Schema.Schema.Type<typeof WireDiscussionSchema>
 
 const WireApprovalsSchema = Schema.Struct({
@@ -268,6 +293,17 @@ export const GitlabGatewayLive: Layer.Layer<
             `/api/v4/projects/${projectPath}/merge_requests/${iid}/discussions?${params.toString()}`,
           ),
         ).pipe(Effect.map((discussions) => discussions.map(toRawDiscussion)))
+      },
+
+      // One page of 100 files. A merge request with more than that is past the
+      // point where reading its whole diff in a side panel is the right move,
+      // and the expander says what it is showing rather than implying
+      // completeness it does not have.
+      getMrDiffs: (iid) => {
+        const params = new URLSearchParams({ per_page: '100' })
+        return executeJson(Schema.Array(WireMrDiffSchema))(
+          get(`/api/v4/projects/${projectPath}/merge_requests/${iid}/diffs?${params.toString()}`),
+        ).pipe(Effect.map((diffs) => diffs.map(toRawMrDiff)))
       },
 
       getMrApprovals: (iid) =>

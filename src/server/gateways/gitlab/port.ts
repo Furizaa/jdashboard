@@ -6,6 +6,7 @@ import type {
   RawApprovals,
   RawDiscussion,
   RawMrDetail,
+  RawMrDiff,
   RawMrReviewerWithState,
   RawMrSummary,
 } from './types'
@@ -15,6 +16,8 @@ export type GitlabGatewayShape = {
   readonly listMrs: (query: ListMrsQuery) => Effect.Effect<RawMrSummary[], GitlabGatewayError>
   readonly getMr: (iid: number) => Effect.Effect<RawMrDetail, GitlabGatewayError>
   readonly getMrDiscussions: (iid: number) => Effect.Effect<RawDiscussion[], GitlabGatewayError>
+  /** Every file's diff in one merge request — the whole-diff expander's source. */
+  readonly getMrDiffs: (iid: number) => Effect.Effect<RawMrDiff[], GitlabGatewayError>
   readonly getMrApprovals: (iid: number) => Effect.Effect<RawApprovals, GitlabGatewayError>
   readonly getMrReviewers: (
     iid: number,

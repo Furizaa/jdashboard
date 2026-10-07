@@ -3,14 +3,16 @@ import { cleanup, render } from '@testing-library/react'
 import type { ExplainBlock } from '~/kernel'
 import { renderBlock } from './index'
 import { parseUnifiedDiff } from './DiffHunk'
-import { EVERY_BLOCK_REPORT } from './__fixtures__/report'
+import { EVERY_BLOCK } from './__fixtures__/report'
 
 afterEach(() => {
   cleanup()
 })
 
-// Snapshots over one fixture report containing every block type — the pattern
-// `RenderAdf.test.tsx.snap` already establishes (ADR-0009, Tests). This is the
+// Snapshots over one fixture report containing every cell type — the pattern
+// `RenderAdf.test.tsx.snap` already establishes (ADR-0009, Tests). The fixture is
+// chaptered like a real report (ADR-0010), so `EVERY_BLOCK` flattens the
+// overview's cells and every move's into one reading-order list. This is the
 // renderers' whole coverage: a full e2e asserting a *persisted* report would
 // have to write to `~/.clashboard`, which is deliberately out of scope.
 
@@ -19,9 +21,9 @@ function html(block: ExplainBlock): string {
 }
 
 describe('renderBlock', () => {
-  it.each(EVERY_BLOCK_REPORT.blocks.map((block) => [block.type, block] as const))(
-    'renders a %s block',
-    (_type, block) => {
+  it.each(EVERY_BLOCK.map((block, index) => [`${index}-${block.type}`, block] as const))(
+    'renders cell %s',
+    (_label, block) => {
       expect(html(block)).toMatchSnapshot()
     },
   )
@@ -30,11 +32,13 @@ describe('renderBlock', () => {
     // If a new block type is added, the schema accepts it and `renderBlock`
     // fails to compile until it has a renderer — but nothing would force it
     // into the fixture. This is what does.
-    const covered = new Set(EVERY_BLOCK_REPORT.blocks.map((block) => block.type))
+    const covered = new Set(EVERY_BLOCK.map((block) => block.type))
     expect([...covered].toSorted()).toEqual([
       'blast-radius',
       'diagram',
+      'diff',
       'finding',
+      'model',
       'narrative',
       'questions',
       'systems',
@@ -100,6 +104,26 @@ describe('a diagram block', () => {
   })
 })
 
+describe('a model cell', () => {
+  it('renders the legend even while the diagram is still being drawn', () => {
+    // The legend is what carries "which of these types are new", and it is also
+    // what is left when mermaid cannot draw: a degraded cell rather than an
+    // empty one.
+    const markup = html({
+      type: 'model',
+      entities: [
+        { name: 'Money', kind: 'added', note: 'the new value object', fields: [] },
+        { name: 'Account', kind: 'existing', fields: [] },
+      ],
+      relations: [],
+    })
+    expect(markup).toContain('data-status="loading"')
+    expect(markup).toContain('Money')
+    expect(markup).toContain('the new value object')
+    expect(markup).toMatchSnapshot()
+  })
+})
+
 describe('parseUnifiedDiff', () => {
   it('classifies hunk headers, additions, removals, and context', () => {
     expect(parseUnifiedDiff('@@ -1,3 +1,3 @@\n context\n-old\n+new')).toEqual([
@@ -125,5 +149,17 @@ describe('parseUnifiedDiff', () => {
 
   it('reads a trailing newline as a terminator, not an empty line', () => {
     expect(parseUnifiedDiff('+one\n')).toHaveLength(1)
+  })
+})
+
+describe('a diff cell', () => {
+  it('renders without a caption — the optional half is genuinely optional', () => {
+    expect(
+      html({
+        type: 'diff',
+        path: 'src/pricing/quote.ts',
+        diff: '@@ -1,1 +1,1 @@\n-old\n+new',
+      }),
+    ).toMatchSnapshot()
   })
 })

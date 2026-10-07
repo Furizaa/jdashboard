@@ -6,8 +6,18 @@ import type { ExplainRecord } from './explain-store'
 import { discussionsToText, explainIssueKeyFor, projectExplainTab } from './explain-tab'
 
 const REPORT: ExplainReport = {
-  version: 1,
-  blocks: [{ type: 'verdict', verdict: 'sound', headline: 'Fits' }],
+  version: 2,
+  overview: [{ type: 'verdict', verdict: 'sound', headline: 'Fits' }],
+  moves: [
+    {
+      id: 'the-one-move',
+      title: 'One move',
+      summary: 'Enough of a move to satisfy the contract.',
+      systems: ['pricing'],
+      paths: ['src/pricing/quote.ts'],
+      blocks: [{ type: 'narrative', body: 'It moved.' }],
+    },
+  ],
 }
 
 const TARGET = {

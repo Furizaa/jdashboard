@@ -18,6 +18,10 @@ function finding(
 
 const VERDICT: ExplainBlock = { type: 'verdict', verdict: 'discuss', headline: 'hm' }
 const NARRATIVE: ExplainBlock = { type: 'narrative', body: 'prose' }
+const UNVERIFIED: ExplainBlock = {
+  type: 'unverified',
+  items: [{ claim: 'the suite passes', why: 'nothing is installed in the worktree' }],
+}
 const BLAST: ExplainBlock = {
   type: 'blast-radius',
   rows: [{ surface: 'POST /x', ifWrong: 'boom', downstream: [], likelihood: 'low' }],
@@ -111,10 +115,10 @@ describe('layOutReport', () => {
     ])
   })
 
-  it('replaces the findings in place, keeping every other block where it was', () => {
-    // A narrative that introduces the findings, and a blast-radius table that
-    // follows them, both have to stay put — re-sorting the whole document would
-    // be the view second-guessing the report's structure.
+  it('sinks the findings below the explanation, keeping that in the agent’s order', () => {
+    // ADR-0011 §4: the explanation is the deliverable and a finding is a
+    // footnote on it, so the cells that explain stay where they were written and
+    // the findings go underneath them.
     const laidOut = layOutReport([
       VERDICT,
       NARRATIVE,
@@ -125,9 +129,9 @@ describe('layOutReport', () => {
     expect(laidOut.map((block) => block.type)).toEqual([
       'verdict',
       'narrative',
-      'finding',
-      'finding',
       'blast-radius',
+      'finding',
+      'finding',
     ])
     expect(laidOut.filter((b) => b.type === 'finding').map((b) => b.title)).toEqual([
       'high-one',
@@ -135,18 +139,29 @@ describe('layOutReport', () => {
     ])
   })
 
-  it('leaves a report with one finding untouched', () => {
-    const blocks = [VERDICT, finding('pricing', 'low'), BLAST]
+  it('sinks a single finding too — a page may not open with a warning', () => {
+    const laidOut = layOutReport([finding('pricing', 'low', 'only'), NARRATIVE])
+    expect(laidOut.map((b) => b.type)).toEqual(['narrative', 'finding'])
+  })
+
+  it('keeps the unverified list last, under the findings', () => {
+    // It is the report's caveat rather than part of what it found.
+    const laidOut = layOutReport([NARRATIVE, UNVERIFIED, finding('pricing', 'high')])
+    expect(laidOut.map((b) => b.type)).toEqual(['narrative', 'finding', 'unverified'])
+  })
+
+  it('returns a page that is already laid out this way unchanged', () => {
+    const blocks = [VERDICT, NARRATIVE, finding('pricing', 'low'), UNVERIFIED]
     expect(layOutReport(blocks)).toBe(blocks)
   })
 
-  it('leaves a report with no findings untouched', () => {
+  it('leaves a page with no findings untouched', () => {
     const blocks = [VERDICT, NARRATIVE]
     expect(layOutReport(blocks)).toBe(blocks)
   })
 
-  it('collapses findings scattered through the report to the first position', () => {
+  it('collects findings scattered through the page into one run at the bottom', () => {
     const laidOut = layOutReport([finding('a', 'low', 'x'), NARRATIVE, finding('b', 'high', 'y')])
-    expect(laidOut.map((b) => b.type)).toEqual(['finding', 'finding', 'narrative'])
+    expect(laidOut.map((b) => b.type)).toEqual(['narrative', 'finding', 'finding'])
   })
 })

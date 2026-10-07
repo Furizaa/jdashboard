@@ -146,6 +146,22 @@ export function buildHandlers(getWorld: () => World): HttpHandler[] {
       )
     }),
 
+    http.get('*/api/v4/projects/:projectPath/merge_requests/:iid/diffs', ({ params }) => {
+      const iid = Number(params.iid)
+      return HttpResponse.json(
+        getWorld()
+          .getMrDiffs(iid)
+          .map((d) => ({
+            old_path: d.oldPath,
+            new_path: d.newPath,
+            new_file: d.newFile ?? false,
+            renamed_file: d.renamedFile ?? false,
+            deleted_file: d.deletedFile ?? false,
+            diff: d.diff,
+          })),
+      )
+    }),
+
     http.get('*/api/v4/projects/:projectPath/merge_requests/:iid/approvals', ({ params }) => {
       const iid = Number(params.iid)
       const approvals = getWorld().getMrApprovals(iid)

@@ -13,23 +13,24 @@ import { AppChrome } from '../-app-chrome'
  * Workspace controls and the palette's board commands are absent rather than
  * inert.
  */
-export function ExplainShell({ mr }: { mr: number | undefined }) {
+export function ExplainShell({ mr, move }: { mr: number | undefined; move: string | undefined }) {
   const navigateFn = useNavigate()
-  // `/explain` lists; `/explain?mr=123` selects — ADR-0007's rule, applied to a
-  // tab. `replace` on deselect keeps the back button meaningful: closing a tab
-  // should not leave the closed tab one step back in history.
+  // `/explain` lists; `/explain?mr=123` selects; `&move=<slug>` opens one move —
+  // ADR-0007's rule, applied to a tab and then to a page inside it (ADR-0010).
+  // `replace` on deselect keeps the back button meaningful: closing a tab should
+  // not leave the closed tab one step back in history.
   const navigate = useCallback(
-    (iid: number | null) => {
+    (iid: number | null, moveId: string | null) => {
       navigateFn({
         to: '/explain',
-        search: iid === null ? {} : { mr: iid },
+        search: iid === null ? {} : moveId === null ? { mr: iid } : { mr: iid, move: moveId },
         replace: iid === null,
       })
     },
     [navigateFn],
   )
 
-  const explain = useExplain({ selected: mr ?? null, navigate })
+  const explain = useExplain({ selected: mr ?? null, selectedMove: move ?? null, navigate })
 
   return (
     <AppChrome
@@ -49,7 +50,13 @@ export function ExplainShell({ mr }: { mr: number | undefined }) {
           onClose={explain.requestClose}
         />
         <div className="min-h-0 flex-1">
-          <ExplainReportPane pane={explain.display.pane} onRerun={explain.run} />
+          <ExplainReportPane
+            pane={explain.display.pane}
+            onRerun={explain.run}
+            onSelectMove={explain.selectMove}
+            diff={explain.diff}
+            onRequestDiff={explain.requestDiff}
+          />
         </div>
       </div>
     </AppChrome>

@@ -1,6 +1,11 @@
 import { useEffect, useRef } from 'react'
-import { useCloseExplain, useStartExplain } from '~/coordinator'
-import type { CloseExplainResult, ExplainRunEvent, StartExplainResult } from '~/kernel'
+import { useCloseExplain, useExplainDiffs, useStartExplain } from '~/coordinator'
+import type {
+  CloseExplainResult,
+  ExplainDiffFile,
+  ExplainRunEvent,
+  StartExplainResult,
+} from '~/kernel'
 
 // The React-bound half of Explain: the SSE subscription and the two mutations.
 // Everything stateful lives in the view-model; this file only wires the browser
@@ -84,4 +89,46 @@ export function useExplainActions(): {
   const { start, isPending: isStarting } = useStartExplain()
   const { close, isPending: isClosing } = useCloseExplain()
   return { start, close, isStarting, isClosing }
+}
+
+/**
+ * The whole-diff fetch, as the move page sees it (ADR-0010 §6).
+ *
+ * `idle` is a real state, not a placeholder: this is the one query in the app
+ * that must not run until the reader asks for it, so "nobody has asked" has to
+ * be distinguishable from "asked and waiting".
+ */
+export type ExplainDiffState =
+  | { readonly status: 'idle' }
+  | { readonly status: 'loading' }
+  | {
+      readonly status: 'ready'
+      /** The commit GitLab answered for — not necessarily the report's. */
+      readonly headSha: string
+      readonly files: readonly ExplainDiffFile[]
+    }
+  | { readonly status: 'failed'; readonly message: string }
+
+/**
+ * One merge request's diff, fetched only once `wanted` names it.
+ *
+ * The gate is the iid rather than a boolean, so switching tabs cannot leave the
+ * previous tab's "yes, fetch it" applied to the new one. Once fetched it is
+ * cached per merge request, so every move's expander on that report is free.
+ */
+export function useExplainDiffState(wanted: number | null): ExplainDiffState {
+  const query = useExplainDiffs(wanted)
+  if (wanted === null) return { status: 'idle' }
+  if (query.isPending) return { status: 'loading' }
+  if (query.data === undefined) {
+    return {
+      status: 'failed',
+      message:
+        query.error instanceof Error
+          ? query.error.message
+          : 'could not read the merge request’s diff',
+    }
+  }
+  if (!query.data.ok) return { status: 'failed', message: query.data.error.message }
+  return { status: 'ready', headSha: query.data.headSha, files: query.data.files }
 }

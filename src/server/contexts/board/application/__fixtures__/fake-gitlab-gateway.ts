@@ -11,6 +11,7 @@ export function fakeGitlabGateway(overrides: Partial<GitlabGatewayShape>): Gitla
     listMrs: () => notImpl('listMrs'),
     getMr: () => notImpl('getMr'),
     getMrDiscussions: () => notImpl('getMrDiscussions'),
+    getMrDiffs: () => notImpl('getMrDiffs'),
     getMrApprovals: () => notImpl('getMrApprovals'),
     getMrReviewers: () => notImpl('getMrReviewers'),
     ...overrides,

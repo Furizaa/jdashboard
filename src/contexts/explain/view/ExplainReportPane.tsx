@@ -9,10 +9,12 @@ import {
 import { match } from 'ts-pattern'
 import { testIds } from '~/lib/testids'
 import { shortSha } from '../domain'
+import type { ExplainDiffState } from '../presenter'
 import type { ExplainPaneDisplay, ExplainReportDisplay } from '../view-model'
 import { ExplainActivityLog } from './ExplainActivityLog'
 import { ExplainEmpty } from './ExplainEmpty'
-import { renderBlock } from './blocks'
+import { ExplainMoveRail } from './ExplainMoveRail'
+import { ExplainNotebook } from './ExplainNotebook'
 
 /**
  * Whatever the selected tab is showing: nothing, a run in progress, a report, a
@@ -22,9 +24,16 @@ import { renderBlock } from './blocks'
 export function ExplainReportPane({
   pane,
   onRerun,
+  onSelectMove,
+  diff,
+  onRequestDiff,
 }: {
   pane: ExplainPaneDisplay
   onRerun: (iid: number) => void
+  /** Open a move from the rail. `null` is Overview. */
+  onSelectMove: (moveId: string | null) => void
+  diff: ExplainDiffState
+  onRequestDiff: () => void
 }) {
   return match(pane)
     .with({ kind: 'loading' }, () => <div className="h-full" />)
@@ -60,7 +69,15 @@ export function ExplainReportPane({
         <ExplainActivityLog activity={working.activity} preparing={working.phase === 'preparing'} />
       </div>
     ))
-    .with({ kind: 'report' }, (report) => <Report report={report} onRerun={onRerun} />)
+    .with({ kind: 'report' }, (report) => (
+      <Report
+        report={report}
+        onRerun={onRerun}
+        onSelectMove={onSelectMove}
+        diff={diff}
+        onRequestDiff={onRequestDiff}
+      />
+    ))
     .with({ kind: 'failed' }, (failed) => (
       <div
         data-testid={testIds.explainFailed}
@@ -86,16 +103,32 @@ export function ExplainReportPane({
     .exhaustive()
 }
 
+/**
+ * A finished report: the merge-request header above, then the two-column body —
+ * the move rail on the left, the selected page's notebook on the right
+ * (ADR-0010 §3).
+ *
+ * The header and the stale-report warning stay **above** the split because both
+ * are about the merge request, and the thing below is about one move. The rail
+ * and the notebook scroll independently: a long overview must not scroll the
+ * rail's twelfth move out of reach.
+ */
 function Report({
   report,
   onRerun,
+  onSelectMove,
+  diff,
+  onRequestDiff,
 }: {
   report: ExplainReportDisplay
   onRerun: (iid: number) => void
+  onSelectMove: (moveId: string | null) => void
+  diff: ExplainDiffState
+  onRequestDiff: () => void
 }) {
   return (
-    <div data-testid={testIds.explainReport} className="h-full overflow-y-auto">
-      <div className="mx-auto flex max-w-4xl flex-col gap-4 p-6">
+    <div data-testid={testIds.explainReport} className="flex h-full min-h-0 flex-col">
+      <div className="flex shrink-0 flex-col gap-3 px-6 pt-5 pb-3">
         <PaneHeader
           title={report.title}
           iid={report.iid}
@@ -113,13 +146,19 @@ function Report({
             <span>{report.freshness}</span>
           </p>
         )}
-        {report.blocks.map((block, index) => (
-          // The index is the key because a report's block list is immutable once
-          // persisted — blocks are never inserted, removed, or reordered, so the
-          // position is a stable identity.
-          // oxlint-disable-next-line no-array-index-key -- see comment above
-          <div key={index}>{renderBlock(block)}</div>
-        ))}
+      </div>
+      <div className="border-border flex min-h-0 flex-1 border-t">
+        <ExplainMoveRail entries={report.rail} onSelect={onSelectMove} />
+        <div className="min-w-0 flex-1 overflow-y-auto">
+          <div className="mx-auto max-w-3xl p-6">
+            <ExplainNotebook
+              page={report.page}
+              diff={diff}
+              reportHeadSha={report.headSha}
+              onRequestDiff={onRequestDiff}
+            />
+          </div>
+        </div>
       </div>
     </div>
   )

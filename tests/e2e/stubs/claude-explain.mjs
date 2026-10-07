@@ -6,7 +6,8 @@
 // it is a subprocess — so the boundary here is the process, and this is the
 // stub that stands at it. It emits canned `--output-format stream-json` lines:
 // a couple of activity events the tab should render live, then a terminal
-// `result` carrying a report that satisfies `explainReportSchema`.
+// `result` carrying a report that satisfies `explainReportSchema` — chaptered
+// into an overview and two moves, like a real one (ADR-0010).
 //
 // It deliberately does *not* read stdin or inspect its argv. What the real
 // agent is asked and what it is allowed to do are covered by unit tests over
@@ -26,8 +27,8 @@ stdout.on('error', () => process.exit(0))
 const emit = (event) => stdout.write(`${JSON.stringify(event)}\n`)
 
 const REPORT = {
-  version: 1,
-  blocks: [
+  version: 2,
+  overview: [
     {
       type: 'verdict',
       verdict: 'discuss',
@@ -44,29 +45,6 @@ const REPORT = {
         },
         { name: 'checkout', role: 'now rounds before display', change: 'changed' },
       ],
-    },
-    {
-      type: 'narrative',
-      title: 'What changed',
-      body: '`quoteFor` returns raw cents now, and each caller rounds for itself.',
-    },
-    {
-      type: 'diagram',
-      title: 'Where rounding lives now',
-      mermaid: 'flowchart LR\n  checkout[checkout] --> pricing[pricing]\n  checkout --> round[round]',
-      caption: 'Rounding sits beside the caller, not inside the quote.',
-    },
-    {
-      type: 'finding',
-      system: 'pricing',
-      title: 'Two callers now own the same rounding rule',
-      severity: 'high',
-      whyItMatters: 'Totals and line items can disagree by a cent once they drift.',
-      hunk: {
-        path: 'src/pricing/quote.ts',
-        language: 'typescript',
-        diff: '@@ -41,7 +41,7 @@\n-  return round(subtotal + tax)\n+  return subtotal + tax',
-      },
     },
     {
       type: 'blast-radius',
@@ -88,6 +66,91 @@ const REPORT = {
       items: [{ claim: 'The suite still passes.', why: 'Tests cannot be run in the worktree.' }],
     },
   ],
+  moves: [
+    {
+      id: 'rounding-leaves-pricing',
+      title: 'Rounding leaves the pricing service',
+      summary: 'A rule the service owned becomes each caller’s responsibility.',
+      systems: ['pricing', 'checkout'],
+      paths: ['src/pricing/quote.ts', 'src/checkout/total.ts'],
+      blocks: [
+        {
+          type: 'narrative',
+          title: 'Where the rounding rule lives now',
+          body: '`quoteFor` returns raw cents now, and each caller rounds for itself.',
+        },
+        {
+          // Deliberately full of the things mermaid's ER grammar rejects — an
+          // angle-bracket generic, a pipe union, a space in a type, a `%` in a
+          // name, and a relation labelled `one`, which is a cardinality keyword.
+          // The report keeps them as the source spells them; `mermaidForModel`
+          // is what has to make them drawable, and this is the only place a real
+          // browser proves it did (ADR-0011 §2).
+          type: 'model',
+          title: 'What pricing returns now',
+          caption: '`Money` is the value object the rule should have moved onto.',
+          entities: [
+            {
+              name: 'Money',
+              kind: 'added',
+              note: 'the value object the rule lives on',
+              fields: [
+                { name: 'cents', type: 'number', note: 'unrounded' },
+                { name: 'byCurrency', type: 'Record<string, Money>' },
+                { name: 'label', type: 'string | null' },
+                { name: 'lines', type: 'readonly QuoteLine[]' },
+              ],
+            },
+            { name: 'Quote', kind: 'changed', fields: [{ name: 'total', type: 'Money' }] },
+            { name: '100% owned Account', kind: 'existing', note: 'owned by billing' },
+          ],
+          relations: [
+            { from: 'Quote', to: 'Money', cardinality: 'one-to-one', label: 'one' },
+            {
+              from: 'Quote',
+              to: '100% owned Account',
+              cardinality: 'one-to-optional',
+              label: 'is billed to',
+            },
+          ],
+        },
+        {
+          type: 'diff',
+          path: 'src/pricing/quote.ts',
+          language: 'typescript',
+          caption: 'The rounding call is simply gone.',
+          diff: '@@ -41,7 +41,7 @@\n-  return round(subtotal + tax)\n+  return subtotal + tax',
+        },
+        {
+          type: 'diagram',
+          title: 'Where rounding lives now',
+          mermaid:
+            'flowchart LR\n  checkout[checkout] --> pricing[pricing]\n  checkout --> round[round]',
+          caption: 'Rounding sits beside the caller, not inside the quote.',
+        },
+        {
+          type: 'finding',
+          system: 'pricing',
+          title: 'Two callers now own the same rounding rule',
+          severity: 'high',
+          whyItMatters: 'Totals and line items can disagree by a cent once they drift.',
+          hunk: {
+            path: 'src/checkout/total.ts',
+            language: 'typescript',
+            diff: '@@ -18,6 +18,7 @@\n+  return Math.round(quoteFor(cart))',
+          },
+        },
+      ],
+    },
+    {
+      id: 'legacy-helper-deleted',
+      title: 'The legacy rounding helper is deleted',
+      summary: 'Dead once the service stopped calling it.',
+      systems: ['legacy-quotes'],
+      paths: ['src/legacy-quotes/round.ts'],
+      blocks: [{ type: 'narrative', body: 'One caller, in `quoteFor`, and it goes with it.' }],
+    },
+  ],
 }
 
 const ACTIVITY = [
@@ -96,7 +159,14 @@ const ACTIVITY = [
     type: 'assistant',
     message: {
       role: 'assistant',
-      content: [{ type: 'tool_use', id: 'tu_1', name: 'Read', input: { file_path: 'src/pricing/quote.ts' } }],
+      content: [
+        {
+          type: 'tool_use',
+          id: 'tu_1',
+          name: 'Read',
+          input: { file_path: 'src/pricing/quote.ts' },
+        },
+      ],
     },
   },
   {

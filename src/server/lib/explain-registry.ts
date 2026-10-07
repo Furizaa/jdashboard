@@ -15,10 +15,10 @@ import { existsSync } from 'node:fs'
 import { spawn, spawnSync, type SpawnSyncReturns } from 'node:child_process'
 import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { loadSkillBody, streamClaude, type ClaudeStreamEvent } from './claude-cli'
 import {
+  EXPLAIN_SKILL_PATH,
   EXPLAIN_TIMEOUT_MS,
   buildExplainPrompt,
   explainClaudeArgs,
@@ -36,8 +36,6 @@ import {
   type ExplainStoreDeps,
 } from './explain-store'
 import { runDiscardExplainWorktree, runPrepareExplainWorktree } from './explain-worktree'
-
-const SKILL_PATH = join(process.cwd(), '.claude', 'skills', 'explain-mr', 'SKILL.md')
 
 function utf8Spawn(command: string, args: ReadonlyArray<string>): SpawnSyncReturns<string> {
   return spawnSync(command, [...args], { encoding: 'utf8' })
@@ -80,7 +78,7 @@ async function runExplainAgent(input: {
 }): Promise<ExplainAgentOutcome> {
   let skillBody: string
   try {
-    skillBody = await loadSkillBody(SKILL_PATH)
+    skillBody = await loadSkillBody(EXPLAIN_SKILL_PATH)
   } catch {
     return { ok: false, message: 'the explain skill is missing from the app install' }
   }
@@ -169,6 +167,21 @@ function createLiveExplainRuns(): ExplainRuns {
 // would start a run in one while the SSE route looked for it in the other, which
 // reads as "the stream 404s for no reason" rather than as the honest "the run
 // was lost". One registry per process, whatever the module graph does.
+//
+// **The cost, and it is sharp: HMR cannot reach anything the registry captured.**
+// `createLiveExplainRuns()` runs exactly once per process, so its closures hold
+// the module instances that existed at that moment — `parseExplainReport`,
+// `buildExplainPrompt`, `explainClaudeArgs`, the worktree runner. Editing any of
+// them re-evaluates this module, the `??=` finds the registry already there, and
+// the old closures keep running. A contract change therefore shows up as the
+// *previous* contract rejecting the *current* agent reply ("expected 1; blocks:
+// expected array, received undefined" after the report went v2), and re-running
+// never helps because every run goes through the same captured parser.
+//
+// So: **restart the dev server after touching an `explain-*` server module.** The
+// one thing that does pick up an edit live is the skill body, which is read from
+// disk per run — which is also why a stale server and a current agent can
+// disagree at all.
 const REGISTRY_KEY = '__clashboardExplainRuns'
 
 type RegistryHost = typeof globalThis & { [REGISTRY_KEY]?: ExplainRuns }

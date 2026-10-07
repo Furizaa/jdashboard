@@ -9,6 +9,7 @@ import { DetailConfigLive } from '../contexts/detail/config'
 import { loadIssue } from '../contexts/detail/application/load-issue'
 import { appRuntime } from '../runtime/app-runtime'
 import { adfToText } from '../lib/adf-to-text'
+import { explainDiffFiles, type ExplainDiffFile } from '../lib/mr-diff'
 import { assertIssueKey } from '../lib/jql'
 import { readNote, type NotesStoreDeps } from '../lib/notes-store'
 import {
@@ -53,6 +54,22 @@ export type GetExplainRunResult = { readonly tab: ExplainTab | null }
 
 export type CloseExplainResult = { readonly ok: true }
 
+/**
+ * The merge request's whole diff, for a move page's expander (ADR-0010 §6).
+ *
+ * `headSha` is part of the answer, not decoration: this is a **live** read, so
+ * it may describe a commit later than the one the report was written against,
+ * and the expander says which it is showing rather than letting the reader
+ * assume the two agree.
+ */
+export type GetExplainDiffsResult =
+  | {
+      readonly ok: true
+      readonly headSha: string
+      readonly files: readonly ExplainDiffFile[]
+    }
+  | { readonly ok: false; readonly error: { readonly message: string } }
+
 function requireIid(label: string, value: unknown): number {
   if (typeof value !== 'number' || !Number.isInteger(value) || value <= 0) {
     throw new Error(`${label} (iid): must be a positive integer`)
@@ -88,6 +105,17 @@ const headShaProgram = (iid: number) =>
     const detail = yield* gitlab.getMr(iid)
     return detail.headSha
   }).pipe(Effect.catchAll(() => Effect.succeed<string | null>(null)))
+
+/** The whole diff plus the head it belongs to. Both or neither — a diff with no
+ *  commit to attribute it to is the thing `GetExplainDiffsResult` exists to avoid. */
+const diffsProgram = (iid: number) =>
+  Effect.gen(function* () {
+    const gitlab = yield* GitlabGateway
+    const [detail, diffs] = yield* Effect.all([gitlab.getMr(iid), gitlab.getMrDiffs(iid)], {
+      concurrency: 2,
+    })
+    return { headSha: detail.headSha, files: explainDiffFiles(diffs) }
+  })
 
 /** Fetch the ticket for context, degrading to null on any Jira failure. */
 const issueProgram = (key: string) =>
@@ -218,6 +246,27 @@ export const getExplainRun = createServerFn({ method: 'GET' })
     const record = await readExplainTab(data.iid)
     const currentHeadSha = await appRuntime.runPromise(headShaProgram(data.iid))
     return { tab: tabFor(data.iid, record, currentHeadSha) }
+  })
+
+/**
+ * The merge request's diff, read on demand.
+ *
+ * Fetched **once per merge request** and shared by every move's expander: the
+ * client matches `move.paths` against the file list, so one read serves the
+ * whole report. Not folded into `getExplainRun`, because the common case is a
+ * report read without anyone opening an expander at all, and that case should
+ * not pay for a diff fetch.
+ */
+export const getExplainDiffs = createServerFn({ method: 'GET' })
+  .inputValidator((data: { iid: number }) => ({ iid: requireIid('getExplainDiffs', data?.iid) }))
+  .handler(async ({ data }): Promise<GetExplainDiffsResult> => {
+    const result = await appRuntime.runPromise(
+      diffsProgram(data.iid).pipe(Effect.catchAll(() => Effect.succeed(null))),
+    )
+    if (result === null) {
+      return { ok: false, error: { message: `could not read the diff of !${data.iid}` } }
+    }
+    return { ok: true, ...result }
   })
 
 export const closeExplain = createServerFn({ method: 'POST' })

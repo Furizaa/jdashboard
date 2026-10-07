@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useRef } from 'react'
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import { useExplainRuns } from '~/coordinator'
 import type { ExplainRunEvent } from '~/kernel'
 import {
@@ -8,10 +8,16 @@ import {
   initialState,
   neighbourAfterClose,
   reduce,
+  rememberedMove,
   streamingRun,
   type ExplainDisplay,
 } from '../view-model'
-import { useExplainActions, useExplainStream } from './use-explain-runs'
+import {
+  useExplainActions,
+  useExplainDiffState,
+  useExplainStream,
+  type ExplainDiffState,
+} from './use-explain-runs'
 
 // Explain's composition root: the server's tab snapshot, the URL's selection,
 // the SSE stream for whichever run is live, and the two mutations — all folded
@@ -20,20 +26,31 @@ import { useExplainActions, useExplainStream } from './use-explain-runs'
 
 export type ExplainApi = {
   readonly display: ExplainDisplay
+  /** Select a tab. Lands on the move last read in it, else Overview. */
   readonly select: (iid: number) => void
+  /** Open a move inside the selected tab. `null` is Overview. */
+  readonly selectMove: (moveId: string | null) => void
   /** Start, or re-run. One call: a start for an MR that has a tab supersedes it. */
   readonly run: (iid: number, issueKey?: string) => void
   readonly requestClose: (iid: number) => void
   readonly dismissClose: () => void
   readonly confirmClose: (iid: number) => void
   readonly isStarting: boolean
+  /** The selected merge request's whole diff, once a move page has asked for it. */
+  readonly diff: ExplainDiffState
+  readonly requestDiff: () => void
 }
 
 export type ExplainDeps = {
   /** The MR the URL names. `null` is the surface with nothing selected. */
   readonly selected: number | null
-  /** Push a selection into the URL — `?mr=` is the tab, per ADR-0007's rule. */
-  readonly navigate: (iid: number | null) => void
+  /** The move `?move=` names inside it. `null` is Overview (ADR-0010). */
+  readonly selectedMove: string | null
+  /**
+   * Push a selection into the URL — `?mr=` is the tab and `?move=` is the page,
+   * per ADR-0007's rule applied at both levels.
+   */
+  readonly navigate: (iid: number | null, moveId: string | null) => void
 }
 
 /**
@@ -75,8 +92,13 @@ function useStartOnArrival({
   }, [selected, loaded, known])
 }
 
-export function useExplain({ selected, navigate }: ExplainDeps): ExplainApi {
+export function useExplain({ selected, selectedMove, navigate }: ExplainDeps): ExplainApi {
   const [state, dispatch] = useReducer(reduce, initialState)
+  // Which merge request's diff the reader has asked for. Compared against the
+  // selection rather than kept as a boolean, so switching tabs cannot leave the
+  // previous tab's request applied to the new one — the fetch stays strictly
+  // on-demand per merge request (ADR-0010 §6).
+  const [diffWanted, setDiffWanted] = useState<number | null>(null)
   const query = useExplainRuns()
   const { start, close, isStarting } = useExplainActions()
 
@@ -90,6 +112,10 @@ export function useExplain({ selected, navigate }: ExplainDeps): ExplainApi {
   useEffect(() => {
     dispatch({ type: 'selected', iid: selected })
   }, [selected])
+
+  useEffect(() => {
+    dispatch({ type: 'moveSelected', iid: selected, moveId: selectedMove })
+  }, [selected, selectedMove])
 
   const onStreamEvent = useCallback((iid: number, runId: string, event: ExplainRunEvent) => {
     dispatch({ type: 'streamEvent', iid, runId, event })
@@ -134,7 +160,9 @@ export function useExplain({ selected, navigate }: ExplainDeps): ExplainApi {
       // since a tab that will not close is worse than one that returns.
       const next = neighbourAfterClose(state, iid)
       dispatch({ type: 'closed', iid })
-      if (state.selected === iid) navigate(next)
+      if (state.selected === iid) {
+        navigate(next, next === null ? null : rememberedMove(state, next))
+      }
       void close(iid)
     },
     [close, navigate, state],
@@ -153,13 +181,29 @@ export function useExplain({ selected, navigate }: ExplainDeps): ExplainApi {
     [confirmClose, state],
   )
 
+  // Hoisted out of the returned object: a hook call belongs where the hook order
+  // is obvious, and this one is gated by a comparison rather than by a branch.
+  const diff = useExplainDiffState(diffWanted === selected ? selected : null)
+
   return {
     display: deriveExplain(state),
-    select: navigate,
+    // Switching tabs restores the move the reader left off on. The memory is the
+    // view-model's; putting it in the URL is this layer's job, because the URL
+    // stays the one source of what is on screen.
+    select: useCallback(
+      (iid: number) => navigate(iid, rememberedMove(state, iid)),
+      [navigate, state],
+    ),
+    selectMove: useCallback(
+      (moveId: string | null) => navigate(state.selected, moveId),
+      [navigate, state.selected],
+    ),
     run,
     requestClose,
     dismissClose: useCallback(() => dispatch({ type: 'closeDismissed' }), []),
     confirmClose,
     isStarting,
+    diff,
+    requestDiff: useCallback(() => setDiffWanted(selected), [selected]),
   }
 }

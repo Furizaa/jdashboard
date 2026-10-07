@@ -50,6 +50,21 @@ export type RawDiscussion = {
   notes: RawNote[]
 }
 
+// One file's diff in a merge request, as `/merge_requests/:iid/diffs` returns
+// it. Read on demand by a move page's whole-diff expander (ADR-0010 §6) — the
+// first thing Explain reads from GitLab that the agent did not already put in
+// the report.
+export type RawMrDiff = {
+  oldPath: string
+  newPath: string
+  newFile: boolean
+  renamedFile: boolean
+  deletedFile: boolean
+  // Unified diff text. Empty for a binary file, and for one GitLab collapsed
+  // because it is too large to render.
+  diff: string
+}
+
 export type RawApprovals = {
   approvedUsernames: readonly string[]
 }

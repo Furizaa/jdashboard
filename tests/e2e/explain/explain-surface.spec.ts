@@ -38,6 +38,11 @@ const activityLine = (page: Page, kind: string) =>
 const blocks = (page: Page) => page.getByTestId(testIds.explainBlock)
 const block = (page: Page, kind: string) =>
   page.locator(`[data-testid="${testIds.explainBlock}"][data-kind="${kind}"]`)
+const railEntries = (page: Page) => page.getByTestId(testIds.explainRailEntry)
+const railMove = (page: Page, id: string) =>
+  page.locator(`[data-testid="${testIds.explainRailEntry}"][data-move="${id}"]`)
+const railOverview = (page: Page) =>
+  page.locator(`[data-testid="${testIds.explainRailEntry}"][data-kind="overview"]`)
 
 test.afterEach(() => {
   // The repo, and any worktree a run left behind, live under the throwaway HOME
@@ -71,6 +76,27 @@ function seedReviewableMr(world: World, iid: number) {
   world.seedMrReviewers(iid, [makeMrReviewer({ username: 'someone', state: 'unreviewed' })])
   world.seedMrApprovals(iid, makeApprovals())
   world.seedMrPipeline(iid, makePipeline({ status: 'success' }))
+  // The whole-diff expander reads the MR's real diff from GitLab on demand
+  // (ADR-0010 §6), so the world has to answer `/diffs`. The third file is not
+  // named by any move, which is what proves the expander narrows rather than
+  // dumping the merge request.
+  world.seedMrDiffs(iid, [
+    {
+      oldPath: 'src/pricing/quote.ts',
+      newPath: 'src/pricing/quote.ts',
+      diff: '@@ -41,7 +41,7 @@\n-  return round(subtotal + tax)\n+  return subtotal + tax',
+    },
+    {
+      oldPath: 'src/checkout/total.ts',
+      newPath: 'src/checkout/total.ts',
+      diff: '@@ -18,6 +18,7 @@\n+  return Math.round(quoteFor(cart))',
+    },
+    {
+      oldPath: 'src/unrelated/elsewhere.ts',
+      newPath: 'src/unrelated/elsewhere.ts',
+      diff: '@@ -1,1 +1,1 @@\n-nothing\n+to do with this move',
+    },
+  ])
   return { repo, key }
 }
 
@@ -118,15 +144,17 @@ test('Explain from the detail panel opens the surface, streams, and renders the 
   await expect(activityLine(page, 'read')).toContainText('src/pricing/quote.ts')
   await expect(activityLine(page, 'shell')).toContainText('git log')
 
-  // …and ends with the typed report.
+  // …and ends with the typed report, which lands on Overview (ADR-0010 §2).
   await expect(page.getByTestId(testIds.explainReport)).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByTestId(testIds.explainPage)).toHaveAttribute('data-kind', 'overview')
   await expect(block(page, 'verdict')).toHaveAttribute('data-verdict', 'discuss')
   await expect(block(page, 'systems')).toContainText('pricing')
-  await expect(block(page, 'finding')).toHaveAttribute('data-severity', 'high')
   await expect(block(page, 'blast-radius')).toContainText('POST /quotes')
   await expect(block(page, 'unverified')).toContainText('Tests cannot be run')
-  // Every block the stub's report carries got a renderer.
-  await expect(blocks(page)).toHaveCount(8)
+  // The overview holds only the whole-MR cells. The finding and the diagram
+  // belong to a move, so they are not on this page at all.
+  await expect(blocks(page)).toHaveCount(5)
+  await expect(block(page, 'finding')).toHaveCount(0)
   // The tab has settled out of its spinner.
   await expect(tabs(page).first()).toHaveAttribute('data-phase', 'report')
 
@@ -154,15 +182,19 @@ test('a diagram opens into an overlay that pans and zooms', async ({ page, world
   const iid = 4216
   seedReviewableMr(world, iid)
 
-  await page.goto(`/explain?e2e=1&mr=${iid}`)
+  // The diagram belongs to a move, so the URL opens that move's page directly.
+  await page.goto(`/explain?e2e=1&mr=${iid}&move=rounding-leaves-pricing`)
   await expect(page.getByTestId(testIds.explainReport)).toBeVisible({ timeout: 30_000 })
-  // Mermaid is imported per diagram block, so the SVG lands after the report.
-  const diagram = page.getByTestId(testIds.explainDiagram)
+  // Mermaid is imported per figure, so the SVG lands after the report. The page
+  // carries two of them — the model and this diagram — so both locators are
+  // scoped to the cell under test.
+  const diagramCell = block(page, 'diagram')
+  const diagram = diagramCell.getByTestId(testIds.explainDiagram)
   await expect(diagram).toHaveAttribute('data-status', 'ready', { timeout: 15_000 })
 
   // Inline, a diagram is a thumbnail — the report column is too narrow to read
   // a structural one in. The overlay is where it is read.
-  await page.getByTestId(testIds.explainDiagramExpand).click()
+  await diagramCell.getByTestId(testIds.explainDiagramExpand).click()
   const overlay = page.getByTestId(testIds.explainDiagramOverlay)
   await expect(overlay).toBeVisible()
   await expect(overlay).toContainText('Where rounding lives now')
@@ -170,7 +202,10 @@ test('a diagram opens into an overlay that pans and zooms', async ({ page, world
 
   const stage = page.getByTestId(testIds.explainDiagramStage)
   const transformOf = () =>
-    stage.locator('> div').first().evaluate((node) => node.style.transform)
+    stage
+      .locator('> div')
+      .first()
+      .evaluate((node) => node.style.transform)
   expect(await transformOf()).toBe('translate(0px, 0px) scale(1)')
 
   await page.getByTestId(testIds.explainDiagramZoomIn).click()
@@ -193,6 +228,39 @@ test('a diagram opens into an overlay that pans and zooms', async ({ page, world
   await expect(overlay).toHaveCount(0)
   // Closing the overlay leaves the report where it was.
   await expect(page.getByTestId(testIds.explainReport)).toBeVisible()
+})
+
+test('a model cell draws the domain, kinds and all', async ({ page, world }) => {
+  const iid = 4219
+  seedReviewableMr(world, iid)
+
+  await page.goto(`/explain?e2e=1&mr=${iid}&move=rounding-leaves-pricing`)
+  await expect(page.getByTestId(testIds.explainReport)).toBeVisible({ timeout: 30_000 })
+
+  const modelCell = block(page, 'model')
+  // The stub's model is full of types mermaid's ER grammar rejects on sight, so
+  // a `ready` status here is the end-to-end proof that `mermaidForModel`
+  // sanitised them — in a real browser, with the real renderer (ADR-0011 §2).
+  await expect(modelCell.getByTestId(testIds.explainDiagram)).toHaveAttribute(
+    'data-status',
+    'ready',
+    { timeout: 15_000 },
+  )
+
+  // The legend is what makes "which of these types are new" readable, and it is
+  // what survives a diagram that cannot be drawn.
+  await expect(modelCell).toContainText('Money')
+  await expect(modelCell).toContainText('the value object the rule lives on')
+  await expect(modelCell.locator('[data-kind="added"]')).toBeVisible()
+  await expect(modelCell.locator('[data-kind="changed"]')).toBeVisible()
+  await expect(modelCell.locator('[data-kind="existing"]')).toBeVisible()
+
+  // And it opens into the same overlay a diagram does — a model with a dozen
+  // entities is unreadable at report-column width.
+  await modelCell.getByTestId(testIds.explainDiagramExpand).click()
+  const overlay = page.getByTestId(testIds.explainDiagramOverlay)
+  await expect(overlay).toContainText('What pricing returns now')
+  await expect(overlay.locator('svg').first()).toBeVisible()
 })
 
 test('closing a tab prompts, then removes the tab and the worktree', async ({ page, world }) => {
@@ -260,4 +328,117 @@ test('a failed checkout fails the tab rather than hanging it', async ({ page, wo
   await page.getByTestId(testIds.explainTabClose).click()
   await expect(page.getByTestId(testIds.explainCloseDialog)).toHaveCount(0)
   await expect(tabs(page)).toHaveCount(0)
+})
+
+test('the rail groups the change into moves, and one opens as a notebook', async ({
+  page,
+  world,
+}) => {
+  const iid = 4217
+  seedReviewableMr(world, iid)
+
+  await page.goto(`/explain?e2e=1&mr=${iid}`)
+  await expect(page.getByTestId(testIds.explainReport)).toBeVisible({ timeout: 30_000 })
+
+  // Overview is pinned first, then one entry per move, in the agent's order.
+  await expect(railEntries(page)).toHaveCount(3)
+  await expect(railOverview(page)).toHaveAttribute('data-selected', 'true')
+  await expect(railOverview(page)).toContainText('2 moves')
+  // The verdict rides on the Overview entry, so the conclusion stays on screen
+  // from every move (ADR-0010 §2).
+  await expect(railOverview(page)).toContainText('discuss')
+
+  // The rail is rich on purpose: title, why, systems, size, and what is wrong.
+  const first = railMove(page, 'rounding-leaves-pricing')
+  await expect(first).toContainText('Rounding leaves the pricing service')
+  await expect(first).toContainText('becomes each caller')
+  await expect(first).toContainText('pricing')
+  await expect(first).toContainText('checkout')
+  await expect(first).toContainText('2 files')
+  // The dot is the worst finding in the move, rolled up — not an agent-stated
+  // severity.
+  await expect(first).toHaveAttribute('data-severity', 'high')
+  // …and a move with no findings gets no dot at all.
+  await expect(railMove(page, 'legacy-helper-deleted')).not.toHaveAttribute('data-severity', /.+/u)
+
+  await first.click()
+
+  // A move is a thing the URL names and the back button can return to —
+  // ADR-0007's rule, one level down.
+  await expect(page).toHaveURL(new RegExp(`mr=${iid}.*move=rounding-leaves-pricing`, 'u'))
+  const notebookPage = page.getByTestId(testIds.explainPage)
+  await expect(notebookPage).toHaveAttribute('data-kind', 'move')
+  await expect(notebookPage).toHaveAttribute('data-move', 'rounding-leaves-pricing')
+
+  // The page says what the move is, for a reader who arrived from a link and
+  // never saw the rail entry.
+  const header = page.getByTestId(testIds.explainMoveHeader)
+  await expect(header).toContainText('Move 1 of 2')
+  await expect(header).toContainText('Rounding leaves the pricing service')
+  await expect(header).toContainText('src/pricing/quote.ts')
+
+  // …then the cells, in the order that explains it: prose, the shape it leaves,
+  // the evidence, and only then what is wrong with it.
+  await expect(block(page, 'narrative')).toContainText('raw cents')
+  await expect(block(page, 'model')).toContainText('Money')
+  await expect(block(page, 'diff')).toContainText('src/pricing/quote.ts')
+  await expect(page.getByTestId(testIds.explainDiffCaption)).toContainText('simply gone')
+  await expect(block(page, 'diagram')).toBeVisible()
+  await expect(block(page, 'finding')).toHaveAttribute('data-severity', 'high')
+
+  // The finding is last on the page whatever order the agent wrote it in: an
+  // explanation that opens with a warning is a code review (ADR-0011 §4).
+  const kinds = await blocks(page).evaluateAll((nodes) =>
+    nodes.map((node) => (node as HTMLElement).dataset.kind),
+  )
+  expect(kinds.indexOf('finding')).toBe(kinds.length - 1)
+  // No verdict on a move page: that is the merge request's, not this move's.
+  await expect(block(page, 'verdict')).toHaveCount(0)
+
+  await page.goBack()
+  await expect(page.getByTestId(testIds.explainPage)).toHaveAttribute('data-kind', 'overview')
+})
+
+test('a move the report does not contain falls back to Overview', async ({ page, world }) => {
+  const iid = 4218
+  seedReviewableMr(world, iid)
+
+  // A shared link can outlive the report it was written against, and a re-run
+  // has no obligation to find the same moves.
+  await page.goto(`/explain?e2e=1&mr=${iid}&move=long-gone`)
+  await expect(page.getByTestId(testIds.explainReport)).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByTestId(testIds.explainPage)).toHaveAttribute('data-kind', 'overview')
+  await expect(railOverview(page)).toHaveAttribute('data-selected', 'true')
+})
+
+test('a move page can expand the whole diff of its own files', async ({ page, world }) => {
+  const iid = 4219
+  seedReviewableMr(world, iid)
+
+  await page.goto(`/explain?e2e=1&mr=${iid}&move=rounding-leaves-pricing`)
+  await expect(page.getByTestId(testIds.explainMoveHeader)).toBeVisible({ timeout: 30_000 })
+
+  // The curated diff cell is the default; the expander is how the reader checks
+  // what the curation left out (ADR-0010 §6).
+  const toggle = page.getByTestId(testIds.explainWholeDiffToggle)
+  await expect(toggle).toContainText('Show the whole diff')
+  await expect(toggle).toContainText('2 files')
+  await expect(page.getByTestId(testIds.explainWholeDiff)).toHaveCount(0)
+
+  await toggle.click()
+  const whole = page.getByTestId(testIds.explainWholeDiff)
+  await expect(whole).toBeVisible()
+
+  // The move's two files, and not the third one in the merge request.
+  const files = page.getByTestId(testIds.explainWholeDiffFile)
+  await expect(files).toHaveCount(2)
+  await expect(files.first()).toHaveAttribute('data-path', 'src/pricing/quote.ts')
+  await expect(whole).toContainText('Math.round(quoteFor(cart))')
+  await expect(whole).not.toContainText('to do with this move')
+
+  // It is a live read, so it names the commit it is showing.
+  await expect(whole).toContainText('the commit this report describes')
+
+  await toggle.click()
+  await expect(page.getByTestId(testIds.explainWholeDiff)).toHaveCount(0)
 })

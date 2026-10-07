@@ -19,9 +19,23 @@
 // `finalReplyFrom` and nothing else: the registry, the SSE route, and the view
 // all deal in `ExplainActivity`, which is ours.
 
+import { join } from 'node:path'
 import type { ClaudeStreamEvent } from './claude-cli'
 
 export type { ClaudeStreamEvent, ClaudeStreamResult, StreamClaude } from './claude-cli'
+
+/**
+ * The instructions the agent runs under. They live here, beside the argv and the
+ * prompt, because all three are one thing: what the agent is told. Read from disk
+ * per run, so editing the skill does not need a restart — unlike the report
+ * schema, which the pinned registry captures.
+ *
+ * It is also **half of the report contract**: the schema says what a cell may
+ * be, and the skill is the only place the agent learns a cell's field names.
+ * `explain-skill.test.ts` holds the two halves against each other, because a
+ * field the skill never names is a field the agent has to guess.
+ */
+export const EXPLAIN_SKILL_PATH = join(process.cwd(), '.claude', 'skills', 'explain-mr', 'SKILL.md')
 
 /** The model alias the local CLI resolves to the latest Opus. */
 export const EXPLAIN_MODEL = 'opus'
@@ -103,8 +117,8 @@ export const EXPLAIN_DISALLOWED_TOOLS: readonly string[] = [
 
 /**
  * Print mode, streamed machine-readable events, read-only tools only. The skill
- * body (the review philosophy and the output contract) rides in as the appended
- * system prompt; the data and the task go in on stdin.
+ * body (the review philosophy, how to find the moves, and the output contract)
+ * rides in as the appended system prompt; the data and the task go in on stdin.
  *
  * `stream-json` requires `--verbose`. `--allowedTools` / `--disallowedTools` are
  * variadic, so each tool is its own argv element and the following non-variadic
@@ -181,7 +195,9 @@ export function buildExplainPrompt(input: ExplainPromptInput): string {
   const { mr, ticket } = input
   const range = explainDiffRange(mr.targetBranch, mr.headSha)
   return [
-    'Review the merge request below as the architect of the system it lands in, following your instructions.',
+    'Explain the merge request below to the architect of the system it lands in, following your instructions.',
+    'Group it into the moves it makes — the logical changes running through it — then explain each one: what the system looks like now that the move is in, the domain types it introduces or reshapes, and the shape it leaves behind.',
+    'You are not reviewing it. Findings are a footnote on the explanation, and a move with nothing wrong with it has none.',
     '',
     section(
       'MERGE REQUEST',
@@ -206,11 +222,12 @@ export function buildExplainPrompt(input: ExplainPromptInput): string {
     section('LOCAL NOTE (the reviewer’s private working note)', ticket.note),
     '',
     section(
-      'THE CHANGE (this is what you are reviewing)',
+      'THE CHANGE (this is what you are explaining)',
       [
         `You are running inside a detached git worktree at ${input.worktreePath}, checked out at the MR's head commit.`,
         `The change is the diff range \`${range}\`. Start there.`,
         'The whole repository is readable, and its history is readable, so you can see what the change lands in — not just what it touches.',
+        'The moves you report are a grouping of that diff: every file it touches should belong to one of them.',
         'There are no dependencies installed and nothing is built: you cannot install, build, typecheck, or run tests. Say what that left unverified instead of implying you ran anything.',
       ].join('\n'),
     ),

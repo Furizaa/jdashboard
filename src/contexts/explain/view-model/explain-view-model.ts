@@ -2,11 +2,22 @@ import { match, P } from 'ts-pattern'
 import type {
   ExplainActivityLine,
   ExplainBlock,
+  ExplainMove,
   ExplainPhase,
+  ExplainReport,
   ExplainRunEvent,
+  ExplainSeverity,
   ExplainTab,
+  ExplainVerdict,
 } from '~/kernel'
-import { freshnessWarning, layOutReport } from '../domain'
+import {
+  findingCountOf,
+  freshnessWarning,
+  layOutReport,
+  moveById,
+  verdictIn,
+  worstSeverityOf,
+} from '../domain'
 
 // The Explain surface's state machine: which tabs are open, which one is
 // selected, and what each live run is doing.
@@ -20,6 +31,14 @@ import { freshnessWarning, layOutReport } from '../domain'
 //     `generatedAt`, the persisted report, and the MR's current head.
 //   - The **stream** is the present tense, and wins on phase, activity, and the
 //     report of the run it belongs to.
+//
+// A third, much smaller selection rides along: **which move is open** inside the
+// selected tab (ADR-0010). It mirrors `?move=` exactly as `selected` mirrors
+// `?mr=`, and the one piece of state that is not in the URL is the *memory* of
+// the move last read per tab — so switching merge requests and coming back lands
+// where the reader left off rather than back on Overview. The memory is only ever
+// read to decide what the presenter puts in the URL; the URL stays the one source
+// of what is on screen.
 //
 //      no tabs ─► tab(s), none selected ─► selected
 //                                            │
@@ -36,7 +55,8 @@ export type LiveRun = {
   readonly runId: string
   readonly phase: ExplainPhase
   readonly activity: readonly ExplainActivityLine[]
-  readonly report: readonly ExplainBlock[] | null
+  /** The whole chaptered report, not a block list — the rail needs the moves. */
+  readonly report: ExplainReport | null
   readonly error: string | null
 }
 
@@ -47,6 +67,14 @@ export type ExplainState = {
   readonly loaded: boolean
   /** The MR the URL names, or `null` for the surface with nothing selected. */
   readonly selected: number | null
+  /** The move `?move=` names inside that tab. `null` is the Overview page. */
+  readonly selectedMove: string | null
+  /**
+   * The move last read in each tab. Not the selection — the selection is the
+   * URL's — but what the presenter puts *into* the URL when the reader switches
+   * tabs, so a half-read report is not restarted from the top each time.
+   */
+  readonly lastMove: Readonly<Record<number, string>>
   /** Per-MR stream overlay, keyed by iid. */
   readonly live: Readonly<Record<number, LiveRun>>
   /** The MR whose close confirmation is open. */
@@ -66,6 +94,8 @@ export const initialState: ExplainState = {
   tabs: [],
   loaded: false,
   selected: null,
+  selectedMove: null,
+  lastMove: {},
   live: {},
   closing: null,
   starting: new Set(),
@@ -77,6 +107,15 @@ export type ExplainEvent =
   | { readonly type: 'tabsLoaded'; readonly tabs: readonly ExplainTab[] }
   /** The URL changed — `?mr=` is the selection, per ADR-0007's rule. */
   | { readonly type: 'selected'; readonly iid: number | null }
+  /**
+   * The URL's `?move=`. Dispatched from the URL rather than from the click, like
+   * every other selection here, so the back button works inside a report.
+   */
+  | {
+      readonly type: 'moveSelected'
+      readonly iid: number | null
+      readonly moveId: string | null
+    }
   /** A start was asked for. Dispatched before the call, not after it. */
   | { readonly type: 'runRequested'; readonly iid: number }
   /** `startExplain` returned a run; its tab exists before the snapshot refetches. */
@@ -108,7 +147,7 @@ function liveFromTab(tab: ExplainTab): LiveRun | null {
     runId: tab.runId,
     phase: tab.phase,
     activity: tab.activity,
-    report: tab.report?.blocks ?? null,
+    report: tab.report,
     error: tab.error,
   }
 }
@@ -131,7 +170,7 @@ function applyStreamEvent(live: LiveRun, event: ExplainRunEvent): LiveRun {
     .with({ kind: 'report' }, ({ report }) => ({
       ...live,
       phase: 'report' as const,
-      report: report.blocks,
+      report,
       error: null,
     }))
     .with({ kind: 'failed' }, ({ message }) => ({
@@ -195,6 +234,19 @@ export function reduce(state: ExplainState, event: ExplainEvent): ExplainState {
 
       .with({ type: 'selected' }, ({ iid }) => ({ ...state, selected: iid }))
 
+      // Remembered per tab as well as applied, so switching away and back
+      // returns the reader to the move they were on. An unknown slug is still
+      // remembered: the fall-back to Overview is a *derivation*, and a report
+      // that has just been re-run may yet come back with that move in it.
+      .with({ type: 'moveSelected' }, ({ iid, moveId }) => {
+        if (iid === null) return { ...state, selectedMove: moveId }
+        if (moveId === null) {
+          const { [iid]: _forgotten, ...lastMove } = state.lastMove
+          return { ...state, selectedMove: null, lastMove }
+        }
+        return { ...state, selectedMove: moveId, lastMove: { ...state.lastMove, [iid]: moveId } }
+      })
+
       .with({ type: 'runRequested' }, ({ iid }) => startRequested(state, iid))
 
       .with({ type: 'runStarted' }, ({ tab }) => {
@@ -257,11 +309,17 @@ export function reduce(state: ExplainState, event: ExplainEvent): ExplainState {
       .with({ type: 'closed' }, ({ iid }) => {
         const { [iid]: _live, ...live } = state.live
         const { [iid]: _error, ...startErrors } = state.startErrors
+        const { [iid]: _move, ...lastMove } = state.lastMove
         const tabs = state.tabs.filter((tab) => tab.iid !== iid)
         return {
           ...state,
           tabs,
           live,
+          lastMove,
+          // The neighbour's own remembered move goes into the URL, so the
+          // presenter navigates rather than this deciding — but the *old* tab's
+          // move must not linger as the new tab's selection for one frame.
+          selectedMove: state.selected === iid ? null : state.selectedMove,
           starting: without(state.starting, iid),
           startErrors,
           closing: null,
@@ -291,6 +349,15 @@ export function neighbourAfterClose(state: ExplainState, iid: number): number | 
   return neighbourOf(state.tabs, iid)
 }
 
+/**
+ * The move to open when the reader selects tab `iid`: the one they last read in
+ * it, else Overview. Exported for the same reason as `neighbourAfterClose` — it
+ * is a rule the presenter has to express as a URL.
+ */
+export function rememberedMove(state: ExplainState, iid: number): string | null {
+  return state.lastMove[iid] ?? null
+}
+
 // ---------------------------------------------------------------------------
 // Derivation
 // ---------------------------------------------------------------------------
@@ -306,6 +373,56 @@ export type ExplainTabDisplay = {
   readonly isBusy: boolean
 }
 
+/**
+ * One entry in the move rail (ADR-0010 §2). `overview` is pinned first and is
+ * where the surface lands; the rest are the report's moves in the agent's own
+ * order.
+ *
+ * The entries carry everything the rail draws, because the rail is the thing the
+ * reader *scans* — a strip of titles would be a table of contents, and the
+ * schema requires a `summary` and a system list precisely so this does not have
+ * to be one.
+ */
+export type ExplainRailEntryDisplay =
+  | {
+      readonly kind: 'overview'
+      readonly isSelected: boolean
+      /** The verdict chip, so the conclusion is on screen from every move. */
+      readonly verdict: ExplainVerdict | null
+      readonly moveCount: number
+    }
+  | {
+      readonly kind: 'move'
+      readonly id: string
+      /** 1-based, so the rail can number what it lists. */
+      readonly position: number
+      readonly title: string
+      readonly summary: string
+      readonly systems: readonly string[]
+      readonly fileCount: number
+      readonly findingCount: number
+      /** The worst finding in the move, rolled up. `null` means nothing flagged. */
+      readonly severity: ExplainSeverity | null
+      readonly isSelected: boolean
+    }
+
+/** The notebook page the rail's selection opens. */
+export type ExplainPageDisplay =
+  | { readonly kind: 'overview'; readonly blocks: readonly ExplainBlock[] }
+  | {
+      readonly kind: 'move'
+      readonly id: string
+      readonly position: number
+      readonly total: number
+      readonly title: string
+      readonly summary: string
+      readonly systems: readonly string[]
+      /** The files this move spans — what the whole-diff expander asks for. */
+      readonly paths: readonly string[]
+      readonly severity: ExplainSeverity | null
+      readonly blocks: readonly ExplainBlock[]
+    }
+
 /** What one finished report's pane needs. */
 export type ExplainReportDisplay = {
   readonly kind: 'report'
@@ -317,7 +434,8 @@ export type ExplainReportDisplay = {
   readonly generatedAt: string | null
   /** The warning when the MR has moved on since, or freshness is unknown. */
   readonly freshness: string | null
-  readonly blocks: readonly ExplainBlock[]
+  readonly rail: readonly ExplainRailEntryDisplay[]
+  readonly page: ExplainPageDisplay
 }
 
 export type ExplainPaneDisplay =
@@ -374,10 +492,69 @@ function phaseOf(tab: ExplainTab, live: LiveRun | undefined): ExplainPhase {
   return live?.phase ?? tab.phase
 }
 
+/**
+ * The rail: Overview, then every move in the order the agent wrote them.
+ *
+ * `selectedId === null` selects Overview, which is also what an unknown slug
+ * resolves to — the caller has already resolved it, so by here there is one
+ * answer rather than a fallback.
+ */
+function railFor(
+  report: ExplainReport,
+  selectedId: string | null,
+): readonly ExplainRailEntryDisplay[] {
+  const overview: ExplainRailEntryDisplay = {
+    kind: 'overview',
+    isSelected: selectedId === null,
+    verdict: verdictIn(report.overview),
+    moveCount: report.moves.length,
+  }
+  return [
+    overview,
+    ...report.moves.map(
+      (move, index): ExplainRailEntryDisplay => ({
+        kind: 'move',
+        id: move.id,
+        position: index + 1,
+        title: move.title,
+        summary: move.summary,
+        systems: move.systems,
+        fileCount: move.paths.length,
+        findingCount: findingCountOf(move),
+        severity: worstSeverityOf(move),
+        isSelected: move.id === selectedId,
+      }),
+    ),
+  ]
+}
+
+/**
+ * The page for the selected rail entry. `layOutReport` runs **per page** now
+ * rather than once per report — the findings-worst-first rule applied to the
+ * overview's blocks and to each move's independently, which is the same rule one
+ * level down (ADR-0010 §5).
+ */
+function pageFor(report: ExplainReport, move: ExplainMove | null): ExplainPageDisplay {
+  if (move === null) return { kind: 'overview', blocks: layOutReport(report.overview) }
+  return {
+    kind: 'move',
+    id: move.id,
+    position: report.moves.indexOf(move) + 1,
+    total: report.moves.length,
+    title: move.title,
+    summary: move.summary,
+    systems: move.systems,
+    paths: move.paths,
+    severity: worstSeverityOf(move),
+    blocks: layOutReport(move.blocks),
+  }
+}
+
 function paneFor(
   tab: ExplainTab,
   live: LiveRun | undefined,
   startError: string | undefined,
+  selectedMove: string | null,
 ): ExplainPaneDisplay {
   const phase = phaseOf(tab, live)
   // A start that never produced a run has no stream and no phase of its own.
@@ -394,11 +571,11 @@ function paneFor(
       activity: live?.activity ?? tab.activity,
     }))
     .with('report', (): ExplainPaneDisplay => {
-      const blocks = live?.report ?? tab.report?.blocks ?? null
-      // `report` with no blocks cannot happen through the normal path, but a
+      const report = live?.report ?? tab.report ?? null
+      // `report` with no report cannot happen through the normal path, but a
       // phase and a payload arriving as two messages means it is representable —
       // so it reads as still working rather than as an empty report.
-      if (blocks === null) {
+      if (report === null) {
         return {
           kind: 'working',
           iid: tab.iid,
@@ -408,6 +585,10 @@ function paneFor(
           activity: live?.activity ?? tab.activity,
         }
       }
+      // A `?move=` the report does not contain lands on Overview rather than on
+      // an error: a link can outlive the report it was written against, and a
+      // re-run has no obligation to find the same moves (ADR-0010).
+      const move = moveById(report.moves, selectedMove)
       return {
         kind: 'report',
         iid: tab.iid,
@@ -417,7 +598,8 @@ function paneFor(
         headSha: tab.headSha,
         generatedAt: tab.generatedAt,
         freshness: freshnessWarning(tab.headSha, tab.currentHeadSha),
-        blocks: layOutReport(blocks),
+        rail: railFor(report, move?.id ?? null),
+        page: pageFor(report, move),
       }
     })
     .with('failed', () => ({
@@ -459,7 +641,9 @@ export function deriveExplain(state: ExplainState): ExplainDisplay {
     // outranks whatever the tab used to show, because a re-run has already
     // thrown that away.
     if (state.starting.has(iid)) return { kind: 'starting', iid, title: selected?.title ?? null }
-    if (selected !== null) return paneFor(selected, state.live[iid], state.startErrors[iid])
+    if (selected !== null) {
+      return paneFor(selected, state.live[iid], state.startErrors[iid], state.selectedMove)
+    }
     // Selected but not in the open set. A start that failed this way never had
     // a tab to carry its message, so the pane is the only place it can appear.
     const startError = state.startErrors[iid]

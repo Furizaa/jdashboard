@@ -30,9 +30,11 @@ import {
 import { askTicket, type AskTicketResult } from '~/server/server-functions/ask'
 import {
   closeExplain,
+  getExplainDiffs,
   listExplainRuns,
   startExplain,
   type CloseExplainResult,
+  type GetExplainDiffsResult,
   type ListExplainRunsResult,
   type StartExplainResult,
 } from '~/server/server-functions/explain'
@@ -403,6 +405,22 @@ export function useExplainRuns(): UseQueryResult<ListExplainRunsResult> {
     queryFn: () => listExplainRuns(),
     retry: false,
     staleTime: DASHBOARD_STALE_TIMES.explainTabs,
+  })
+}
+
+// One merge request's whole diff, for a move page's expander (ADR-0010 §6).
+//
+// `enabled` is the whole point: this is the only query in the app that must not
+// run until the user asks for it. A report read with no expander opened — the
+// common case — costs no GitLab call at all, and once one move has fetched it
+// every other move on the same report reads it from the cache.
+export function useExplainDiffs(iid: number | null): UseQueryResult<GetExplainDiffsResult> {
+  return useQuery({
+    queryKey: DASHBOARD_QUERY_KEYS.explainDiffs(iid ?? 0),
+    queryFn: () => getExplainDiffs({ data: { iid: iid as number } }),
+    enabled: iid !== null,
+    retry: false,
+    staleTime: DASHBOARD_STALE_TIMES.explainDiffs,
   })
 }
 

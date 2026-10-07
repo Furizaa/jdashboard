@@ -326,6 +326,71 @@ describe('GitlabGatewayLive — getMrDiscussions tolerates missing `resolved`', 
   })
 })
 
+describe('GitlabGatewayLive — getMrDiffs', () => {
+  // The whole-diff read behind a move page's expander (ADR-0010 §6). GitLab
+  // omits `diff` on a binary file and on one it collapsed as too large, so the
+  // schema defaults it rather than failing the whole fetch over a file nobody
+  // could read anyway.
+  it.effect('decodes the file list and keeps a file with no diff', () => {
+    const captured: Capture[] = []
+    const client = fakeHttpClient(
+      () =>
+        jsonResponse([
+          {
+            old_path: 'src/pricing/quote.ts',
+            new_path: 'src/pricing/quote.ts',
+            new_file: false,
+            renamed_file: false,
+            deleted_file: false,
+            diff: '@@ -1 +1 @@\n-a\n+b',
+          },
+          {
+            old_path: 'public/logo.png',
+            new_path: 'public/logo.png',
+            new_file: true,
+            renamed_file: false,
+            deleted_file: false,
+          },
+        ]),
+      captured,
+    )
+    const program = Effect.gen(function* () {
+      const gateway = yield* GitlabGateway
+      const value = yield* gateway.getMrDiffs(4211)
+      expect(value).toEqual([
+        {
+          oldPath: 'src/pricing/quote.ts',
+          newPath: 'src/pricing/quote.ts',
+          newFile: false,
+          renamedFile: false,
+          deletedFile: false,
+          diff: '@@ -1 +1 @@\n-a\n+b',
+        },
+        {
+          oldPath: 'public/logo.png',
+          newPath: 'public/logo.png',
+          newFile: true,
+          renamedFile: false,
+          deletedFile: false,
+          diff: '',
+        },
+      ])
+      expect(captured[0]?.url).toContain('/merge_requests/4211/diffs?per_page=100')
+    })
+    return provideTestLayers(program, client)
+  })
+
+  it.effect('maps a 404 to NotFound, like every other MR read', () => {
+    const client = fakeHttpClient(() => new Response('{}', { status: 404 }))
+    const program = Effect.gen(function* () {
+      const gateway = yield* GitlabGateway
+      const error = yield* Effect.flip(gateway.getMrDiffs(9))
+      expect(error._tag).toBe('NotFound')
+    })
+    return provideTestLayers(program, client)
+  })
+})
+
 describe('GitlabGatewayLive — schema decode failures route to TransportError', () => {
   it.effect('getCurrentUser: wrong-shape body decodes as TransportError', () => {
     const client = fakeHttpClient(() => jsonResponse({ wrong: 'shape' }))

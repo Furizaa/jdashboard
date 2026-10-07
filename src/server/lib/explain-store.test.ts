@@ -15,8 +15,18 @@ import type { ExplainReport } from './explain-report'
 const HOME = '/home/dev'
 
 const REPORT: ExplainReport = {
-  version: 1,
-  blocks: [{ type: 'verdict', verdict: 'sound', headline: 'Fits the system' }],
+  version: 2,
+  overview: [{ type: 'verdict', verdict: 'sound', headline: 'Fits the system' }],
+  moves: [
+    {
+      id: 'the-one-move',
+      title: 'One move',
+      summary: 'Enough of a move to satisfy the contract.',
+      systems: ['pricing'],
+      paths: ['src/pricing/quote.ts'],
+      blocks: [{ type: 'narrative', body: 'It moved.' }],
+    },
+  ],
 }
 
 function record(overrides: Partial<ExplainRecord> & { iid: number }): ExplainRecord {
@@ -157,13 +167,27 @@ describe('readExplainRecord — hostile files', () => {
   it('rejects a report that does not match the block contract', async () => {
     // A hand-edited file is as untrusted as an agent reply: the renderers match
     // the union exhaustively, so an unknown block must never reach them.
-    const bad = { ...record({ iid: 7 }), report: { version: 1, blocks: [{ type: 'vibes' }] } }
+    const bad = {
+      ...record({ iid: 7 }),
+      report: { version: 2, overview: [{ type: 'vibes' }], moves: REPORT.moves },
+    }
     expect(await read(JSON.stringify(bad))).toBeNull()
   })
 
   it('takes identity from the filename, not from the body', async () => {
     const lying = await read(JSON.stringify(record({ iid: 999 })))
     expect(lying?.iid).toBe(7)
+  })
+
+  it('rejects a v1 report on disk — the no-migration-shim behaviour', async () => {
+    // ADR-0010 §4: a report whose contract has moved on is corrupt for every
+    // purpose the app has, so the record reads as absent and the tab asks for a
+    // re-run. This is the whole migration story.
+    const v1 = {
+      ...record({ iid: 7 }),
+      report: { version: 1, blocks: [{ type: 'verdict', verdict: 'sound', headline: 'Fits' }] },
+    }
+    expect(await read(JSON.stringify(v1))).toBeNull()
   })
 
   it('normalises missing envelope fields rather than failing', async () => {

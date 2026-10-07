@@ -1,12 +1,6 @@
 export {
   closeCostsARun,
   deriveExplain,
-  hasTab,
-  initialState,
-  neighbourAfterClose,
-  reduce,
-  rememberedMove,
-  streamingRun,
   type ExplainCloseDisplay,
   type ExplainDisplay,
   type ExplainPageDisplay,
@@ -14,5 +8,14 @@ export {
   type ExplainRailEntryDisplay,
   type ExplainReportDisplay,
   type ExplainTabDisplay,
-  type LiveRun,
-} from './explain-view-model'
+} from './explain-display'
+export {
+  hasTab,
+  initialState,
+  neighbourAfterClose,
+  reduce,
+  rememberedMove,
+  streamingRun,
+  type ExplainEvent,
+  type ExplainState,
+} from './explain-state'

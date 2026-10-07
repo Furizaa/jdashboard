@@ -12,10 +12,10 @@
 // on disk. Upgrade path: swap this module's store for a durable one.
 
 import { existsSync } from 'node:fs'
-import { spawn, spawnSync, type SpawnSyncReturns } from 'node:child_process'
 import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { randomUUID } from 'node:crypto'
+import { removeWorktreeInBackground, utf8Spawn } from './git-process'
 import { loadSkillBody, streamClaude, type ClaudeStreamEvent } from './claude-cli'
 import {
   EXPLAIN_SKILL_PATH,
@@ -36,20 +36,6 @@ import {
   type ExplainStoreDeps,
 } from './explain-store'
 import { runDiscardExplainWorktree, runPrepareExplainWorktree } from './explain-worktree'
-
-function utf8Spawn(command: string, args: ReadonlyArray<string>): SpawnSyncReturns<string> {
-  return spawnSync(command, [...args], { encoding: 'utf8' })
-}
-
-// Detached, unref'd child so the worktree deletion outlives the request and
-// never blocks closing a tab. stdio ignored — it is best-effort cleanup, and a
-// leftover directory is harmless because the next prepare removes it.
-function removeWorktreeInBackground(repoPath: string, worktreePath: string): void {
-  spawn('git', ['-C', repoPath, 'worktree', 'remove', '--force', worktreePath], {
-    detached: true,
-    stdio: 'ignore',
-  }).unref()
-}
 
 export function explainStoreDeps(): ExplainStoreDeps {
   return {

@@ -1,9 +1,9 @@
 import { existsSync } from 'node:fs'
-import { spawn, spawnSync } from 'node:child_process'
 import { homedir } from 'node:os'
 import { createServerFn } from '@tanstack/react-start'
 import { Effect, type Schema } from 'effect'
 import type { AllowedTransition, DetailIssue } from '../gateways/jira/types'
+import { removeWorktreeInBackground, utf8Spawn } from '../lib/git-process'
 import { DetailConfigLive } from '../contexts/detail/config'
 import {
   LoadIssueError,
@@ -75,19 +75,6 @@ function optionalColor(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined
   const trimmed = value.trim()
   return /^(#[0-9A-Fa-f]{6}|[A-Za-z]+)$/.test(trimmed) ? trimmed : undefined
-}
-
-function utf8Spawn(command: string, args: ReadonlyArray<string>) {
-  return spawnSync(command, [...args], { encoding: 'utf8' })
-}
-
-// Detached, unref'd child so the ~30s worktree deletion outlives the request
-// and never blocks the caller. stdio ignored — it's best-effort cleanup.
-function removeWorktreeInBackground(repoPath: string, worktreePath: string): void {
-  spawn('git', ['-C', repoPath, 'worktree', 'remove', '--force', worktreePath], {
-    detached: true,
-    stdio: 'ignore',
-  }).unref()
 }
 
 export const getIssue = createServerFn({ method: 'GET' })

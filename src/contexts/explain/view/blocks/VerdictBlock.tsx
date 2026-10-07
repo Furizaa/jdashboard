@@ -18,7 +18,7 @@ export function VerdictBlock({ block }: { block: ExplainBlockOf<'verdict'> }) {
       data-verdict={block.verdict}
       className={cn('flex items-start gap-3 rounded-md border px-4 py-3', style.frame)}
     >
-      <span className={cn('mt-[2px] shrink-0', style.icon)}>{style.glyph}</span>
+      <span className={cn('mt-0.5 shrink-0', style.icon)}>{style.glyph}</span>
       <div className="min-w-0">
         <p className="flex items-baseline gap-2">
           <span className={cn('text-[10px] font-semibold tracking-[0.06em] uppercase', style.icon)}>

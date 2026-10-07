@@ -36,7 +36,7 @@ export function ExplainActivityLog({
           data-kind={line.kind}
           className="border-border/50 flex items-start gap-2 border-b px-3 py-1.5 last:border-b-0"
         >
-          <span className="mt-[1px] shrink-0">
+          <span className="mt-px shrink-0">
             <KindIcon kind={line.kind} />
           </span>
           <span className="text-ink-subtle shrink-0 tabular-nums">{verbFor(line.kind)}</span>

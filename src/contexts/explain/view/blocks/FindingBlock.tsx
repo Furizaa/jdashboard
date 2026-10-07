@@ -23,7 +23,7 @@ export function FindingBlock({ block }: { block: ExplainBlockOf<'finding'> }) {
       className={cn('rounded-md border', style.frame)}
     >
       <header className="flex items-start gap-2.5 px-3 py-2.5">
-        <span className={cn('mt-[2px] shrink-0', style.icon)}>{style.glyph}</span>
+        <span className={cn('mt-0.5 shrink-0', style.icon)}>{style.glyph}</span>
         <div className="min-w-0 flex-1">
           <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
             <span
@@ -31,7 +31,7 @@ export function FindingBlock({ block }: { block: ExplainBlockOf<'finding'> }) {
             >
               {block.severity}
             </span>
-            <span className="border-border text-ink-subtle rounded border px-1.5 py-[1px] font-mono text-[10px]">
+            <span className="border-border text-ink-subtle rounded border px-1.5 py-px font-mono text-[10px]">
               {block.system}
             </span>
             <span className="text-foreground text-[13px] leading-snug font-medium">

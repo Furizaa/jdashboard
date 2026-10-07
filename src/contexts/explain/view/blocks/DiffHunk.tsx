@@ -56,7 +56,7 @@ export function DiffHunk({
         {path}
       </figcaption>
       <div className="overflow-x-auto">
-        <pre className="font-mono text-[11px] leading-[1.55]">
+        <pre className="leading-code font-mono text-[11px]">
           <code>
             {lines.map((line, index) => (
               // The index is the key because a hunk is immutable text: its lines

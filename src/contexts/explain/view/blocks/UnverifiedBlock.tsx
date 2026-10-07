@@ -22,7 +22,7 @@ export function UnverifiedBlock({ block }: { block: ExplainBlockOf<'unverified'>
       <ul className="flex flex-col gap-2">
         {block.items.map((item) => (
           <li key={item.claim} className="flex gap-2.5">
-            <span className="text-ink-tertiary mt-[1px] shrink-0 font-mono text-[10px]">—</span>
+            <span className="text-ink-tertiary mt-px shrink-0 font-mono text-[10px]">—</span>
             <span className="min-w-0">
               <span className="text-foreground block text-xs leading-relaxed">{item.claim}</span>
               <span className="text-ink-subtle mt-0.5 block text-xs leading-relaxed">

@@ -66,19 +66,39 @@ export function projectExplainTab(input: {
     targetBranch: target.targetBranch,
     headSha: target.headSha,
     issueKey: target.issueKey,
-    phase: run?.phase ?? (record?.report === null || record === null ? 'interrupted' : 'report'),
+    phase: phaseOf(record, run),
     runId: run?.runId ?? null,
-    startedAt: run === null ? (record?.startedAt ?? '') : new Date(run.startedAt).toISOString(),
+    startedAt: startedAtOf(record, run),
     generatedAt: record?.generatedAt ?? null,
     activity: run?.activity ?? [],
-    // A live run answers for its own report, including with `null`. Falling back
-    // to the file during a re-run would pair a report of the *old* commit with
-    // the `headSha` of the new one — a tab claiming to describe a tree it does
-    // not. The activity log is what the user watches meanwhile.
-    report: run === null ? (record?.report ?? null) : run.report,
+    report: reportOf(record, run),
     error: run?.error ?? null,
     currentHeadSha,
   }
+}
+
+/**
+ * The live run's phase if there is one. Otherwise the file decides, and its one
+ * unique meaning applies: a pending record with no live run is **interrupted**.
+ */
+function phaseOf(record: ExplainRecord | null, run: ExplainRunView | null): ExplainPhase {
+  if (run !== null) return run.phase
+  return record === null || record.report === null ? 'interrupted' : 'report'
+}
+
+/** The run's start, as the ISO string the file already stores it as. */
+function startedAtOf(record: ExplainRecord | null, run: ExplainRunView | null): string {
+  return run === null ? (record?.startedAt ?? '') : new Date(run.startedAt).toISOString()
+}
+
+/**
+ * A live run answers for its own report, including with `null`. Falling back to
+ * the file during a re-run would pair a report of the *old* commit with the
+ * `headSha` of the new one — a tab claiming to describe a tree it does not. The
+ * activity log is what the user watches meanwhile.
+ */
+function reportOf(record: ExplainRecord | null, run: ExplainRunView | null): ExplainReport | null {
+  return run === null ? (record?.report ?? null) : run.report
 }
 
 /**

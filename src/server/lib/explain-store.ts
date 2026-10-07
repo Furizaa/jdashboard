@@ -159,7 +159,8 @@ function str(value: unknown, fallback = ''): string {
  * disk is as much an untrusted input as an agent reply, and the renderers match
  * the block union exhaustively, so a hand-edited file must not reach them.
  */
-function decodeRecord(raw: string, iid: number): ExplainRecord | null {
+/** JSON text → a plain object, or nothing. An array is not a record. */
+function parseObject(raw: string): Record<string, unknown> | null {
   let parsed: unknown
   try {
     parsed = JSON.parse(raw)
@@ -167,17 +168,26 @@ function decodeRecord(raw: string, iid: number): ExplainRecord | null {
     return null
   }
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null
-  const record = parsed as Record<string, unknown>
-  if (record.version !== EXPLAIN_RECORD_VERSION) return null
+  return parsed as Record<string, unknown>
+}
 
-  // A pending record legitimately carries no report. A record that carries one
-  // which no longer validates is corrupt, not pending — failing it is right.
-  let report: ExplainReport | null = null
-  if (record.report !== null && record.report !== undefined) {
-    const parsedReport = explainReportSchema.safeParse(record.report)
-    if (!parsedReport.success) return null
-    report = parsedReport.data
-  }
+/**
+ * A pending record legitimately carries **no** report, while one that carries a
+ * report which no longer validates is corrupt. The two are different answers, so
+ * `'corrupt'` is distinct from `null` rather than collapsed into it.
+ */
+function decodeReport(value: unknown): ExplainReport | null | 'corrupt' {
+  if (value === null || value === undefined) return null
+  const parsed = explainReportSchema.safeParse(value)
+  return parsed.success ? parsed.data : 'corrupt'
+}
+
+function decodeRecord(raw: string, iid: number): ExplainRecord | null {
+  const record = parseObject(raw)
+  if (record === null || record.version !== EXPLAIN_RECORD_VERSION) return null
+
+  const report = decodeReport(record.report)
+  if (report === 'corrupt') return null
 
   const generatedAt = typeof record.generatedAt === 'string' ? record.generatedAt : null
   return {

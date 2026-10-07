@@ -44,6 +44,12 @@
   --tracking-headline: -0.015em;
   --tracking-tight: -0.01em;
   --tracking-eyebrow: 0.04em;
+  /* The Explain report's mono chips (severity, cardinality, system) — wider than
+     an eyebrow because they are short, uppercase and sit inside a 1px border. */
+  --tracking-chip: 0.03em;
+  /* Diff and code lines: looser than `leading-relaxed` so a hunk stays scannable
+     at 11px without the rows touching. */
+  --leading-code: 1.55;
 }
 
 /* Linear-derived palette. Surface ladder is canvas → 1 → 2 → 3 → 4.

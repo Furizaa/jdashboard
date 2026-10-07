@@ -5,21 +5,20 @@
 // cells (ADR-0010).
 //
 // Everything the Explain context renders arrives through this file. The block
-// union, the move shape and their Zod schema are owned server-side
-// (`explain-report.ts` validates at the boundary, once), the tab and run shapes
-// by their server modules; the client refers to all of them through the kernel,
-// never `~/server/...` directly.
+// union is owned by `explain-blocks.ts` and the move and report shapes by
+// `explain-report.ts`, which validates at the boundary once; the tab and run
+// shapes belong to their own server modules. The client refers to all of them
+// through the kernel, never `~/server/...` directly.
 export type {
   ExplainBlock,
   ExplainBlockOf,
   ExplainModelCardinality,
   ExplainModelEntityKind,
-  ExplainMove,
-  ExplainReport,
   ExplainSeverity,
   ExplainSystemChange,
   ExplainVerdict,
-} from '~/server/lib/explain-report'
+} from '~/server/lib/explain-blocks'
+export type { ExplainMove, ExplainReport } from '~/server/lib/explain-report'
 
 // Types only, deliberately. A *value* re-export here would pull the report's Zod
 // schema into every module that imports the kernel barrel, to no purpose: the
@@ -35,7 +34,6 @@ export type { ExplainTab } from '~/server/lib/explain-tab'
 export type {
   CloseExplainResult,
   GetExplainDiffsResult,
-  GetExplainRunResult,
   ListExplainRunsResult,
   StartExplainResult,
 } from '~/server/server-functions/explain'

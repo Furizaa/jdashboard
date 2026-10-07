@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { EXPLAIN_SKILL_PATH } from './explain-agent'
-import { explainBlockSchema } from './explain-report'
+import { explainBlockSchema } from './explain-blocks'
 
 // The skill and the schema are two halves of one contract, and only one half is
 // type-checked. The schema says what a cell may be; the **skill is the only place

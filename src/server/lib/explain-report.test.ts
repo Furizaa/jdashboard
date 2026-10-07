@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { EXPLAIN_REPORT_VERSION, parseExplainReport, type ExplainBlock } from './explain-report'
+import type { ExplainBlock } from './explain-blocks'
+import { EXPLAIN_REPORT_VERSION, parseExplainReport } from './explain-report'
 
 // The report is the contract between an untrusted agent and a typed UI, so
 // everything here is hostile input. Table-driven over the nine cell types first,

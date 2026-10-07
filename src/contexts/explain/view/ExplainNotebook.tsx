@@ -1,5 +1,4 @@
-import { match } from 'ts-pattern'
-import { CircleAlert, CircleDot, TriangleAlert } from 'lucide-react'
+import { severityStyle } from './severity-style'
 import type { ExplainBlock, ExplainSeverity } from '~/kernel'
 import { cn } from '~/lib/cn'
 import { testIds } from '~/lib/testids'
@@ -96,7 +95,7 @@ function MoveHeader({ page }: { page: MovePage }) {
         {page.systems.map((system) => (
           <span
             key={system}
-            className="border-border text-ink-subtle rounded border px-1.5 py-[1px] font-mono text-[10px]"
+            className="border-border text-ink-subtle rounded border px-1.5 py-px font-mono text-[10px]"
           >
             {system}
           </span>
@@ -113,11 +112,7 @@ function MoveHeader({ page }: { page: MovePage }) {
 }
 
 function SeverityLabel({ severity }: { severity: ExplainSeverity }) {
-  const style = match(severity)
-    .with('high', () => ({ tone: 'text-destructive', glyph: <CircleAlert size={11} /> }))
-    .with('medium', () => ({ tone: 'text-amber-400', glyph: <TriangleAlert size={11} /> }))
-    .with('low', () => ({ tone: 'text-ink-subtle', glyph: <CircleDot size={11} /> }))
-    .exhaustive()
+  const style = severityStyle(severity)
   return (
     <span className={cn('inline-flex items-center gap-1 font-semibold', style.tone)}>
       <span aria-hidden>{style.glyph}</span>

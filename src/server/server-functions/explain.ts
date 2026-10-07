@@ -1,23 +1,15 @@
-import { readFile } from 'node:fs/promises'
-import { homedir } from 'node:os'
 import { createServerFn } from '@tanstack/react-start'
 import { Effect } from 'effect'
-import type { DetailIssue } from '../gateways/jira/types'
 import type { RawDiscussion } from '../gateways/gitlab/types'
 import { GitlabGateway } from '../gateways/gitlab/port'
-import { DetailConfigLive } from '../contexts/detail/config'
-import { loadIssue } from '../contexts/detail/application/load-issue'
 import { appRuntime } from '../runtime/app-runtime'
-import { adfToText } from '../lib/adf-to-text'
 import { explainDiffFiles, type ExplainDiffFile } from '../lib/mr-diff'
+import { adfToText } from '../lib/adf-to-text'
 import { assertIssueKey } from '../lib/jql'
-import { readNote, type NotesStoreDeps } from '../lib/notes-store'
-import {
-  closeExplainTab,
-  explainRuns,
-  readExplainTab,
-  readExplainTabs,
-} from '../lib/explain-registry'
+import { commentsToText, issueContextProgram, readOnlyNotesDeps } from '../lib/agent-ticket-context'
+import type { ExplainRecord } from '../lib/explain-store'
+import { readNote } from '../lib/notes-store'
+import { closeExplainTab, explainRuns, readExplainTabs } from '../lib/explain-registry'
 import type { ExplainRunContext } from '../lib/explain-runs'
 import {
   discussionsToText,
@@ -49,8 +41,6 @@ export type StartExplainResult =
   | { readonly ok: false; readonly error: { readonly message: string } }
 
 export type ListExplainRunsResult = { readonly tabs: readonly ExplainTab[] }
-
-export type GetExplainRunResult = { readonly tab: ExplainTab | null }
 
 export type CloseExplainResult = { readonly ok: true }
 
@@ -117,43 +107,8 @@ const diffsProgram = (iid: number) =>
     return { headSha: detail.headSha, files: explainDiffFiles(diffs) }
   })
 
-/** Fetch the ticket for context, degrading to null on any Jira failure. */
-const issueProgram = (key: string) =>
-  loadIssue(key).pipe(
-    Effect.provide(DetailConfigLive),
-    Effect.map((ok): DetailIssue | null => ok.issue),
-    Effect.catchAll(() => Effect.succeed<DetailIssue | null>(null)),
-  )
-
-// Read-only notes deps: Explain only ever calls `readNote`, so the write hooks
-// are inert. The "never writes the note" contract is structural, not a promise.
-function notesReadDeps(): NotesStoreDeps {
-  return {
-    homeDir: homedir(),
-    readFile: (p) => readFile(p, 'utf8'),
-    writeFile: () => Promise.reject(new Error('explain is read-only')),
-    mkdir: () => Promise.reject(new Error('explain is read-only')),
-    deleteFile: () => Promise.reject(new Error('explain is read-only')),
-    readDir: () => Promise.resolve([]),
-  }
-}
-
-function commentsToText(issue: DetailIssue | null): string {
-  if (issue === null) return ''
-  return issue.comments
-    .map((c) => {
-      const body = adfToText(c.body)
-      return body === '' ? '' : `${c.authorName ?? 'Unknown'} (${c.created}):\n${body}`
-    })
-    .filter((block) => block !== '')
-    .join('\n\n')
-}
-
-const tabFor = (
-  iid: number,
-  record: Awaited<ReturnType<typeof readExplainTab>>,
-  head: string | null,
-) => projectExplainTab({ iid, record, run: explainRuns.getRunForMr(iid), currentHeadSha: head })
+const tabFor = (iid: number, record: ExplainRecord | null, head: string | null) =>
+  projectExplainTab({ iid, record, run: explainRuns.getRunForMr(iid), currentHeadSha: head })
 
 // ---------------------------------------------------------------------------
 // The four calls
@@ -175,8 +130,9 @@ export const startExplain = createServerFn({ method: 'POST' })
     }
 
     const issueKey = explainIssueKeyFor(data.issueKey, mr.detail.title)
-    const issue = issueKey === null ? null : await appRuntime.runPromise(issueProgram(issueKey))
-    const note = issueKey === null ? '' : await readNote(issueKey, notesReadDeps())
+    const issue =
+      issueKey === null ? null : await appRuntime.runPromise(issueContextProgram(issueKey))
+    const note = issueKey === null ? '' : await readNote(issueKey, readOnlyNotesDeps('explain'))
 
     const context: ExplainRunContext = {
       mrDescription: mr.detail.description,
@@ -240,22 +196,14 @@ export const listExplainRuns = createServerFn({ method: 'GET' }).handler(
   },
 )
 
-export const getExplainRun = createServerFn({ method: 'GET' })
-  .inputValidator((data: { iid: number }) => ({ iid: requireIid('getExplainRun', data?.iid) }))
-  .handler(async ({ data }): Promise<GetExplainRunResult> => {
-    const record = await readExplainTab(data.iid)
-    const currentHeadSha = await appRuntime.runPromise(headShaProgram(data.iid))
-    return { tab: tabFor(data.iid, record, currentHeadSha) }
-  })
-
 /**
  * The merge request's diff, read on demand.
  *
  * Fetched **once per merge request** and shared by every move's expander: the
  * client matches `move.paths` against the file list, so one read serves the
- * whole report. Not folded into `getExplainRun`, because the common case is a
- * report read without anyone opening an expander at all, and that case should
- * not pay for a diff fetch.
+ * whole report. Deliberately separate from the tab read, because the common case
+ * is a report read without anyone opening an expander at all, and that case
+ * should not pay for a diff fetch.
  */
 export const getExplainDiffs = createServerFn({ method: 'GET' })
   .inputValidator((data: { iid: number }) => ({ iid: requireIid('getExplainDiffs', data?.iid) }))

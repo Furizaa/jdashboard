@@ -22,8 +22,6 @@
 import { join } from 'node:path'
 import type { ClaudeStreamEvent } from './claude-cli'
 
-export type { ClaudeStreamEvent, ClaudeStreamResult, StreamClaude } from './claude-cli'
-
 /**
  * The instructions the agent runs under. They live here, beside the argv and the
  * prompt, because all three are one thing: what the agent is told. Read from disk
@@ -285,40 +283,44 @@ function relativeTo(path: string, worktreePath: string | undefined): string {
   return path.startsWith(prefix) ? path.slice(prefix.length) : path
 }
 
+/**
+ * How each tool the agent is allowed becomes one activity line: which field of
+ * its input is worth showing, and what kind of step it is. A table rather than a
+ * switch, so "which tools we translate" is one readable list — the thing that
+ * has to be checked against the allowlist when either changes.
+ *
+ * `Read` is the one entry whose text is rewritten rather than clipped: an
+ * absolute path inside a throwaway worktree tells the reader nothing.
+ */
+const TOOL_ACTIVITY: Readonly<
+  Record<
+    string,
+    { readonly field: string; readonly kind: ExplainActivityKind; readonly relative?: true }
+  >
+> = {
+  Read: { field: 'file_path', kind: 'read', relative: true },
+  Grep: { field: 'pattern', kind: 'search' },
+  Glob: { field: 'pattern', kind: 'list' },
+  Bash: { field: 'command', kind: 'shell' },
+  WebFetch: { field: 'url', kind: 'web' },
+  WebSearch: { field: 'query', kind: 'web' },
+}
+
 function activityForToolUse(
   name: string,
   input: Readonly<Record<string, unknown>>,
   worktreePath: string | undefined,
 ): ExplainActivity | null {
-  switch (name) {
-    case 'Read': {
-      const path = str(input.file_path)
-      return path === '' ? null : { kind: 'read', text: relativeTo(path, worktreePath) }
-    }
-    case 'Grep': {
-      const pattern = str(input.pattern)
-      return pattern === '' ? null : { kind: 'search', text: clip(pattern) }
-    }
-    case 'Glob': {
-      const pattern = str(input.pattern)
-      return pattern === '' ? null : { kind: 'list', text: clip(pattern) }
-    }
-    case 'Bash': {
-      const command = str(input.command)
-      return command === '' ? null : { kind: 'shell', text: clip(command) }
-    }
-    case 'WebFetch': {
-      const url = str(input.url)
-      return url === '' ? null : { kind: 'web', text: clip(url) }
-    }
-    case 'WebSearch': {
-      const query = str(input.query)
-      return query === '' ? null : { kind: 'web', text: clip(query) }
-    }
-    // A tool we did not allow, or one added to the CLI since: name it rather
-    // than drop it, so an unexpected capability shows up in the log.
-    default:
-      return name === '' ? null : { kind: 'tool', text: name }
+  const spec = TOOL_ACTIVITY[name]
+  // A tool we did not allow, or one added to the CLI since: name it rather than
+  // drop it, so an unexpected capability shows up in the log.
+  if (spec === undefined) return name === '' ? null : { kind: 'tool', text: name }
+
+  const value = str(input[spec.field])
+  if (value === '') return null
+  return {
+    kind: spec.kind,
+    text: spec.relative === true ? relativeTo(value, worktreePath) : clip(value),
   }
 }
 

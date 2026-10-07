@@ -55,7 +55,7 @@ function ChangeBadge({ change }: { change: ExplainSystemChange }) {
     <span
       data-change={change}
       className={cn(
-        'inline-flex h-[18px] w-[72px] shrink-0 items-center justify-center rounded border text-[10px] font-medium tracking-[0.03em]',
+        'tracking-chip inline-flex h-4.5 w-18 shrink-0 items-center justify-center rounded border text-[10px] font-medium',
         className,
       )}
     >

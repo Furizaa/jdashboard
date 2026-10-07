@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
+import { useCallback, useEffect, useReducer, useRef, useState, type Dispatch } from 'react'
 import { useExplainRuns } from '~/coordinator'
-import type { ExplainRunEvent } from '~/kernel'
+import type { ExplainRunEvent, ExplainTab } from '~/kernel'
 import {
   closeCostsARun,
   deriveExplain,
@@ -11,6 +11,8 @@ import {
   rememberedMove,
   streamingRun,
   type ExplainDisplay,
+  type ExplainEvent,
+  type ExplainState,
 } from '../view-model'
 import {
   useExplainActions,
@@ -92,6 +94,103 @@ function useStartOnArrival({
   }, [selected, loaded, known])
 }
 
+/**
+ * Fold this surface's two inputs into the reducer: the server's tab snapshot and
+ * the URL's selection. Both are fed in rather than read from inside the
+ * view-model, so the view-model never sees TanStack Query or the router
+ * (ADR-0003).
+ */
+function useExplainInputs({
+  dispatch,
+  tabs,
+  selected,
+  selectedMove,
+}: {
+  dispatch: Dispatch<ExplainEvent>
+  tabs: readonly ExplainTab[] | undefined
+  selected: number | null
+  selectedMove: string | null
+}): void {
+  useEffect(() => {
+    if (tabs !== undefined) dispatch({ type: 'tabsLoaded', tabs })
+  }, [dispatch, tabs])
+
+  useEffect(() => {
+    dispatch({ type: 'selected', iid: selected })
+  }, [dispatch, selected])
+
+  useEffect(() => {
+    dispatch({ type: 'moveSelected', iid: selected, moveId: selectedMove })
+  }, [dispatch, selected, selectedMove])
+}
+
+/** Subscribe to whichever run the view-model says is live, and dispatch its events. */
+function useStreamDispatch(state: ExplainState, dispatch: Dispatch<ExplainEvent>): void {
+  const onEvent = useCallback(
+    (iid: number, runId: string, event: ExplainRunEvent) => {
+      dispatch({ type: 'streamEvent', iid, runId, event })
+    },
+    [dispatch],
+  )
+  const onLost = useCallback(
+    (iid: number, runId: string) => {
+      dispatch({ type: 'streamLost', iid, runId })
+    },
+    [dispatch],
+  )
+  useExplainStream(streamingRun(state), { onEvent, onLost })
+}
+
+/**
+ * Closing a tab: the confirmation rule and the optimistic close behind it.
+ *
+ * The confirmation guards a close that costs another multi-minute run — a
+ * finished report or a run in flight (ADR-0009 §9). A failed or interrupted tab
+ * has nothing behind it, so it closes outright rather than asking about nothing.
+ */
+function useCloseActions({
+  state,
+  dispatch,
+  navigate,
+  close,
+}: {
+  state: ExplainState
+  dispatch: Dispatch<ExplainEvent>
+  navigate: ExplainDeps['navigate']
+  close: (iid: number) => Promise<unknown>
+}): Pick<ExplainApi, 'requestClose' | 'dismissClose' | 'confirmClose'> {
+  const confirmClose = useCallback(
+    (iid: number) => {
+      // Optimistic: the tab goes the moment the user confirms, and the server
+      // call tears down the report and the worktree behind it. A failure leaves
+      // a file the next list read puts the tab back from — the right way round,
+      // since a tab that will not close is worse than one that returns.
+      const next = neighbourAfterClose(state, iid)
+      dispatch({ type: 'closed', iid })
+      if (state.selected === iid) {
+        navigate(next, next === null ? null : rememberedMove(state, next))
+      }
+      void close(iid)
+    },
+    [close, dispatch, navigate, state],
+  )
+
+  const requestClose = useCallback(
+    (iid: number) => {
+      const tab = state.tabs.find((candidate) => candidate.iid === iid)
+      if (tab !== undefined && !closeCostsARun(tab, state.live[iid])) confirmClose(iid)
+      else dispatch({ type: 'closeRequested', iid })
+    },
+    [confirmClose, dispatch, state],
+  )
+
+  return {
+    requestClose,
+    dismissClose: useCallback(() => dispatch({ type: 'closeDismissed' }), [dispatch]),
+    confirmClose,
+  }
+}
+
 export function useExplain({ selected, selectedMove, navigate }: ExplainDeps): ExplainApi {
   const [state, dispatch] = useReducer(reduce, initialState)
   // Which merge request's diff the reader has asked for. Compared against the
@@ -102,28 +201,8 @@ export function useExplain({ selected, selectedMove, navigate }: ExplainDeps): E
   const query = useExplainRuns()
   const { start, close, isStarting } = useExplainActions()
 
-  // Fed in rather than read from inside the reducer, so the view-model never
-  // sees TanStack Query.
-  const tabs = query.data?.tabs
-  useEffect(() => {
-    if (tabs !== undefined) dispatch({ type: 'tabsLoaded', tabs })
-  }, [tabs])
-
-  useEffect(() => {
-    dispatch({ type: 'selected', iid: selected })
-  }, [selected])
-
-  useEffect(() => {
-    dispatch({ type: 'moveSelected', iid: selected, moveId: selectedMove })
-  }, [selected, selectedMove])
-
-  const onStreamEvent = useCallback((iid: number, runId: string, event: ExplainRunEvent) => {
-    dispatch({ type: 'streamEvent', iid, runId, event })
-  }, [])
-  const onStreamLost = useCallback((iid: number, runId: string) => {
-    dispatch({ type: 'streamLost', iid, runId })
-  }, [])
-  useExplainStream(streamingRun(state), { onEvent: onStreamEvent, onLost: onStreamLost })
+  useExplainInputs({ dispatch, tabs: query.data?.tabs, selected, selectedMove })
+  useStreamDispatch(state, dispatch)
 
   const run = useCallback(
     (iid: number, issueKey?: string) => {
@@ -152,34 +231,7 @@ export function useExplain({ selected, selectedMove, navigate }: ExplainDeps): E
     run,
   })
 
-  const confirmClose = useCallback(
-    (iid: number) => {
-      // Optimistic: the tab goes the moment the user confirms, and the server
-      // call tears down the report and the worktree behind it. A failure leaves
-      // a file the next list read puts the tab back from — the right way round,
-      // since a tab that will not close is worse than one that returns.
-      const next = neighbourAfterClose(state, iid)
-      dispatch({ type: 'closed', iid })
-      if (state.selected === iid) {
-        navigate(next, next === null ? null : rememberedMove(state, next))
-      }
-      void close(iid)
-    },
-    [close, navigate, state],
-  )
-
-  // The confirmation guards a close that costs another multi-minute run — a
-  // finished report or a run in flight (ADR-0009 §9). A failed or interrupted
-  // tab has nothing behind it, so it closes outright rather than asking about
-  // nothing.
-  const requestClose = useCallback(
-    (iid: number) => {
-      const tab = state.tabs.find((candidate) => candidate.iid === iid)
-      if (tab !== undefined && !closeCostsARun(tab, state.live[iid])) confirmClose(iid)
-      else dispatch({ type: 'closeRequested', iid })
-    },
-    [confirmClose, state],
-  )
+  const closing = useCloseActions({ state, dispatch, navigate, close })
 
   // Hoisted out of the returned object: a hook call belongs where the hook order
   // is obvious, and this one is gated by a comparison rather than by a branch.
@@ -199,9 +251,7 @@ export function useExplain({ selected, selectedMove, navigate }: ExplainDeps): E
       [navigate, state.selected],
     ),
     run,
-    requestClose,
-    dismissClose: useCallback(() => dispatch({ type: 'closeDismissed' }), []),
-    confirmClose,
+    ...closing,
     isStarting,
     diff,
     requestDiff: useCallback(() => setDiffWanted(selected), [selected]),

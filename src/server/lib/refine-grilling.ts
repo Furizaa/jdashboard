@@ -37,6 +37,27 @@ export type RefineClarification = {
   readonly answer: string
 }
 
+/**
+ * Answers from earlier grilling rounds, sanitised to `{ question, answer }` pairs
+ * of non-empty strings. Anything else is dropped, so a malformed client payload
+ * degrades to "no clarifications" rather than throwing.
+ *
+ * The inverse of `parseQuestions` below, and shared by every surface that grills:
+ * Refine asks, Ask asks, and both hand the answers back on the next round.
+ */
+export function parsePriorAnswers(value: unknown): RefineClarification[] {
+  if (!Array.isArray(value)) return []
+  const pairs: RefineClarification[] = []
+  for (const item of value) {
+    if (typeof item !== 'object' || item === null) continue
+    const p = item as Record<string, unknown>
+    const question = typeof p.question === 'string' ? p.question.trim() : ''
+    const answer = typeof p.answer === 'string' ? p.answer.trim() : ''
+    if (question !== '' && answer !== '') pairs.push({ question, answer })
+  }
+  return pairs
+}
+
 // Validate + normalise the agent's `questions` array out of its parsed JSON
 // reply. Tolerant, like the note parser: skip malformed entries, synthesise ids
 // when missing, keep at most one recommended option, and force a free-text field

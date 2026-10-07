@@ -71,7 +71,6 @@ export type {
   ExplainTab,
   ExplainVerdict,
   GetExplainDiffsResult,
-  GetExplainRunResult,
   ListExplainRunsResult,
   StartExplainResult,
 } from './explain'

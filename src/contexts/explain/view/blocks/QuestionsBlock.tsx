@@ -17,7 +17,7 @@ export function QuestionsBlock({ block }: { block: ExplainBlockOf<'questions'> }
       <ol className="flex flex-col gap-2.5">
         {block.questions.map((question) => (
           <li key={question.question} className="flex gap-2.5">
-            <span className="text-ink-tertiary mt-[1px] shrink-0 font-mono text-[10px]">?</span>
+            <span className="text-ink-tertiary mt-px shrink-0 font-mono text-[10px]">?</span>
             <span className="min-w-0">
               <span className="text-foreground block text-xs leading-relaxed">
                 {question.question}

@@ -142,7 +142,7 @@ function Report({
             data-testid={testIds.explainStaleWarning}
             className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-300"
           >
-            <AlertTriangle size={13} className="mt-[1px] shrink-0" aria-hidden />
+            <AlertTriangle size={13} className="mt-px shrink-0" aria-hidden />
             <span>{report.freshness}</span>
           </p>
         )}

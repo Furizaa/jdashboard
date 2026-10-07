@@ -1,5 +1,6 @@
-import { CircleAlert, CircleDot, LayoutList, TriangleAlert } from 'lucide-react'
+import { LayoutList } from 'lucide-react'
 import { match } from 'ts-pattern'
+import { severityStyle } from './severity-style'
 import type { ExplainSeverity, ExplainVerdict } from '~/kernel'
 import { cn } from '~/lib/cn'
 import { testIds } from '~/lib/testids'
@@ -63,7 +64,7 @@ function OverviewEntry({ entry, onSelect }: { entry: OverviewEntry; onSelect: ()
           <span className="text-foreground text-[13px] font-medium">Overview</span>
           {entry.verdict !== null && <VerdictChip verdict={entry.verdict} />}
         </span>
-        <span className="text-ink-tertiary mt-1 block pl-[21px] text-[11px]">
+        <span className="text-ink-tertiary mt-1 block pl-5.25 text-[11px]">
           {entry.moveCount === 1 ? '1 move' : `${entry.moveCount} moves`}
         </span>
       </RailButton>
@@ -92,7 +93,7 @@ function MoveEntry({ entry, onSelect }: { entry: MoveEntry; onSelect: () => void
             <SeverityDot severity={entry.severity} count={entry.findingCount} />
           )}
         </span>
-        <span className="mt-1 block pl-[22px]">
+        <span className="mt-1 block pl-5.5">
           <span className="text-ink-subtle line-clamp-2 text-[11px] leading-relaxed">
             {entry.summary}
           </span>
@@ -100,7 +101,7 @@ function MoveEntry({ entry, onSelect }: { entry: MoveEntry; onSelect: () => void
             {entry.systems.map((system) => (
               <span
                 key={system}
-                className="border-border/80 text-ink-tertiary rounded border px-1 py-[1px] font-mono text-[10px]"
+                className="border-border/80 text-ink-tertiary rounded border px-1 py-px font-mono text-[10px]"
               >
                 {system}
               </span>
@@ -161,7 +162,7 @@ function VerdictChip({ verdict }: { verdict: ExplainVerdict }) {
   return (
     <span
       className={cn(
-        'ml-auto rounded border px-1.5 py-[1px] text-[10px] font-semibold tracking-[0.04em] uppercase',
+        'ml-auto rounded border px-1.5 py-px text-[10px] font-semibold tracking-[0.04em] uppercase',
         tone,
       )}
     >
@@ -176,11 +177,7 @@ function VerdictChip({ verdict }: { verdict: ExplainVerdict }) {
  * should not claim a clean bill of health the report never gave.
  */
 function SeverityDot({ severity, count }: { severity: ExplainSeverity; count: number }) {
-  const style = match(severity)
-    .with('high', () => ({ tone: 'text-destructive', glyph: <CircleAlert size={11} /> }))
-    .with('medium', () => ({ tone: 'text-amber-400', glyph: <TriangleAlert size={11} /> }))
-    .with('low', () => ({ tone: 'text-ink-subtle', glyph: <CircleDot size={11} /> }))
-    .exhaustive()
+  const style = severityStyle(severity)
   return (
     <span
       className={cn('inline-flex shrink-0 items-center gap-0.5 text-[10px]', style.tone)}

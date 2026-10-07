@@ -1,17 +1,13 @@
-import { readFile } from 'node:fs/promises'
-import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { createServerFn } from '@tanstack/react-start'
-import { Effect } from 'effect'
 import type { DetailIssue, IssueLink } from '../gateways/jira/types'
-import { DetailConfigLive } from '../contexts/detail/config'
-import { loadIssue } from '../contexts/detail/application/load-issue'
 import { appRuntime } from '../runtime/app-runtime'
 import { adfToText } from '../lib/adf-to-text'
 import { assertIssueKey } from '../lib/jql'
+import { commentsToText, issueContextProgram, readOnlyNotesDeps } from '../lib/agent-ticket-context'
 import { loadSkillBody, spawnClaude } from '../lib/claude-cli'
-import type { RefineClarification, RefineQuestion } from '../lib/refine-grilling'
-import { readNote, type NotesStoreDeps } from '../lib/notes-store'
+import { parsePriorAnswers, type RefineQuestion } from '../lib/refine-grilling'
+import { readNote } from '../lib/notes-store'
 import { runAsk } from '../lib/ask-ticket'
 
 // The Ask feature: answer a question about a ticket with a headless `claude` agent.
@@ -45,56 +41,6 @@ const SKILL_PATH = join(process.cwd(), '.claude', 'skills', 'ask-ticket', 'SKILL
 
 function str(value: unknown): string {
   return typeof value === 'string' ? value : ''
-}
-
-// Answers from earlier grilling rounds, sanitised to `{ question, answer }` pairs of
-// non-empty strings; anything else is dropped so a malformed payload degrades to "no
-// clarifications" rather than throwing.
-function parsePriorAnswers(value: unknown): RefineClarification[] {
-  if (!Array.isArray(value)) return []
-  const pairs: RefineClarification[] = []
-  for (const item of value) {
-    if (typeof item !== 'object' || item === null) continue
-    const p = item as Record<string, unknown>
-    const question = str(p.question).trim()
-    const answer = str(p.answer).trim()
-    if (question !== '' && answer !== '') pairs.push({ question, answer })
-  }
-  return pairs
-}
-
-// Read-only notes deps: Ask only ever calls `readNote`, so the write/dir/delete hooks
-// are inert. This makes the "never writes" contract structural, not just a promise.
-function notesReadDeps(): NotesStoreDeps {
-  return {
-    homeDir: homedir(),
-    readFile: (p) => readFile(p, 'utf8'),
-    writeFile: () => Promise.reject(new Error('ask is read-only')),
-    mkdir: () => Promise.reject(new Error('ask is read-only')),
-    deleteFile: () => Promise.reject(new Error('ask is read-only')),
-    readDir: () => Promise.resolve([]),
-  }
-}
-
-// Fetch the ticket for context, degrading to null (empty context) on any Jira failure
-// — the context informs the answer but never gates asking.
-const issueContextProgram = (key: string) =>
-  loadIssue(key).pipe(
-    Effect.provide(DetailConfigLive),
-    Effect.map((ok): DetailIssue | null => ok.issue),
-    Effect.catchAll(() => Effect.succeed<DetailIssue | null>(null)),
-  )
-
-function commentsToText(issue: DetailIssue | null): string {
-  if (issue === null) return ''
-  return issue.comments
-    .map((c) => {
-      const who = c.authorName ?? 'Unknown'
-      const body = adfToText(c.body)
-      return body === '' ? '' : `${who} (${c.created}):\n${body}`
-    })
-    .filter((block) => block !== '')
-    .join('\n\n')
 }
 
 // One line per linked ticket: `relationship KEY — summary (status)`. The relationship
@@ -133,7 +79,7 @@ export const askTicket = createServerFn({ method: 'POST' })
     }
 
     const issue = await appRuntime.runPromise(issueContextProgram(data.key))
-    const note = await readNote(data.key, notesReadDeps())
+    const note = await readNote(data.key, readOnlyNotesDeps('ask'))
 
     const parsed = await runAsk(
       {

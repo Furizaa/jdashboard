@@ -102,7 +102,7 @@ function Body({
       ))
       .with({ status: 'failed' }, (failed) => (
         <p className="text-ink-subtle flex items-start gap-2 py-2 text-xs leading-relaxed">
-          <AlertTriangle size={13} className="text-destructive mt-[1px] shrink-0" aria-hidden />
+          <AlertTriangle size={13} className="text-destructive mt-px shrink-0" aria-hidden />
           {failed.message}
         </p>
       ))

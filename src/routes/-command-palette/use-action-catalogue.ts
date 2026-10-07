@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useMemo } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { match } from 'ts-pattern'
 import { toast } from 'sonner'
@@ -15,7 +15,13 @@ import {
   useWatchlistCards,
   type BrowserActions,
 } from '~/coordinator'
-import { resolveMrForWorkItem, workItemJiraKey, type ActionKind, type WorkItem } from '~/kernel'
+import {
+  resolveMrForWorkItem,
+  workItemJiraKey,
+  type ActionKind,
+  type MrSources,
+  type WorkItem,
+} from '~/kernel'
 import {
   legalActions,
   workspaceTargetFields,
@@ -168,27 +174,48 @@ function performFor(
   )
 }
 
-export function useActionCatalogue({
-  workspace,
-  transitions,
-  tagCount,
-}: ActionCatalogueDeps): (item: WorkItem) => readonly PaletteAction[] {
-  const navigateFn = useNavigate()
+/**
+ * The board-wide reads every action's legality is judged against, unwrapped from
+ * their queries once.
+ *
+ * Memoised on the queries' own arrays rather than rebuilt per render, so the
+ * catalogue callback below keeps a stable identity — which is what stops the
+ * palette re-deriving every row on every keystroke.
+ */
+function useCatalogueInputs(): MrSources & {
+  readonly jiraBaseUrl: string | null
+  readonly watchlistKeys: readonly string[]
+  readonly openWorkspaceKeys: readonly string[]
+} {
   const board = useBoardData()
   const watchlist = useWatchlistCards()
   const mrStatuses = useMrStatuses()
   const reviewQuery = useReviewCards()
   const openWorkspaceKeys = useOpenWorkspaceKeys()
-  const { add } = useAddToWatchlist()
-  const { remove } = useRemoveFromWatchlist()
-  const browser = useBrowserActions()
 
   const jiraBaseUrl = board.data?.ok === true ? board.data.baseUrl : null
-  // Held as the query's own array rather than a fresh `.map` per render, so the
-  // catalogue callback below has a stable identity.
   const watchlistCards = watchlist.data?.ok === true ? watchlist.data.cards : undefined
   const authoredByKey = mrStatuses.data?.ok === true ? mrStatuses.data.byKey : undefined
   const reviewCards = reviewQuery.data?.ok === true ? reviewQuery.data.cards : undefined
+
+  return useMemo(
+    () => ({
+      jiraBaseUrl,
+      watchlistKeys: watchlistCards?.map((card) => card.key) ?? [],
+      openWorkspaceKeys,
+      authoredByKey,
+      reviewCards,
+    }),
+    [jiraBaseUrl, watchlistCards, openWorkspaceKeys, authoredByKey, reviewCards],
+  )
+}
+
+/** Which hook implements each action. Memoised for the same reason as the inputs. */
+function useRunnerDeps(workspace: WorkspaceActionsApi): RunnerDeps {
+  const navigateFn = useNavigate()
+  const browser = useBrowserActions()
+  const { add } = useAddToWatchlist()
+  const { remove } = useRemoveFromWatchlist()
 
   const navigate = useCallback(
     (search: { issue: string; notes?: true; ai?: 'refine' | 'ask' }) =>
@@ -202,23 +229,36 @@ export function useActionCatalogue({
     [navigateFn],
   )
 
+  return useMemo(
+    () => ({
+      navigate,
+      navigateExplain,
+      browser,
+      addToWatchlist: add,
+      removeFromWatchlist: remove,
+      workspace,
+    }),
+    [navigate, navigateExplain, browser, add, remove, workspace],
+  )
+}
+
+export function useActionCatalogue({
+  workspace,
+  transitions,
+  tagCount,
+}: ActionCatalogueDeps): (item: WorkItem) => readonly PaletteAction[] {
+  const inputs = useCatalogueInputs()
+  const deps = useRunnerDeps(workspace)
+
   return useCallback(
     (item: WorkItem): readonly PaletteAction[] => {
       const context: ActionContext = {
-        jiraBaseUrl,
-        watchlistKeys: watchlistCards?.map((card) => card.key) ?? [],
-        openWorkspaceKeys,
-        mr: resolveMrForWorkItem(item, { authoredByKey, reviewCards }),
+        jiraBaseUrl: inputs.jiraBaseUrl,
+        watchlistKeys: inputs.watchlistKeys,
+        openWorkspaceKeys: inputs.openWorkspaceKeys,
+        mr: resolveMrForWorkItem(item, inputs),
         transitions,
         tagCount,
-      }
-      const deps: RunnerDeps = {
-        navigate,
-        navigateExplain,
-        browser,
-        addToWatchlist: add,
-        removeFromWatchlist: remove,
-        workspace,
       }
       return legalActions(item, context).flatMap((descriptor) => {
         const perform = performFor(descriptor.kind, item, context, deps)
@@ -231,20 +271,6 @@ export function useActionCatalogue({
           : [{ ...descriptor, enabled: true, perform } satisfies PaletteAction]
       })
     },
-    [
-      jiraBaseUrl,
-      watchlistCards,
-      openWorkspaceKeys,
-      authoredByKey,
-      reviewCards,
-      navigate,
-      navigateExplain,
-      browser,
-      add,
-      remove,
-      workspace,
-      transitions,
-      tagCount,
-    ],
+    [inputs, deps, transitions, tagCount],
   )
 }

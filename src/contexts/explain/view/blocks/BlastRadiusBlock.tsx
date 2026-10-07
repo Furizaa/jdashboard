@@ -53,7 +53,7 @@ export function BlastRadiusBlock({ block }: { block: ExplainBlockOf<'blast-radiu
                       {row.downstream.map((name) => (
                         <span
                           key={name}
-                          className="border-border text-ink-subtle rounded border px-1.5 py-[1px] font-mono text-[10px]"
+                          className="border-border text-ink-subtle rounded border px-1.5 py-px font-mono text-[10px]"
                         >
                           {name}
                         </span>
@@ -82,10 +82,7 @@ function Likelihood({ value }: { value: 'high' | 'medium' | 'low' }) {
   return (
     <span
       data-likelihood={value}
-      className={cn(
-        'inline-flex rounded border px-1.5 py-[1px] text-[10px] font-medium',
-        className,
-      )}
+      className={cn('inline-flex rounded border px-1.5 py-px text-[10px] font-medium', className)}
     >
       {value}
     </span>

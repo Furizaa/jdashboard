@@ -18,6 +18,7 @@ export type ActionKind =
   | 'copy-issue-key'
   | 'open-mr'
   | 'explain-mr'
+  | 'show-in-gantt'
   | 'open-workspace'
   | 'focus-workspace'
   | 'discard-workspace'
@@ -48,6 +49,7 @@ export const ACTION_SHORTCUTS: Record<ActionKind, string> = {
   'copy-issue-key': 'y',
   'open-mr': 'm',
   'explain-mr': 'v',
+  'show-in-gantt': 'g',
   'open-workspace': 'e',
   'focus-workspace': 'f',
   'discard-workspace': 'x',
@@ -80,6 +82,7 @@ export const ACTION_GROUPS: Record<ActionKind, ActionGroup> = {
   'open-detail': 'workflow',
   'change-status': 'workflow',
   'explain-mr': 'workflow',
+  'show-in-gantt': 'workflow',
   'open-notes': 'workflow',
   tags: 'workflow',
   'watchlist-toggle': 'workflow',
@@ -108,6 +111,7 @@ export const ACTION_LABELS: Record<ActionKind, string> = {
   'copy-issue-key': 'Copy Issue Key',
   'open-mr': 'Open MR in GitLab',
   'explain-mr': 'Explain MR',
+  'show-in-gantt': 'Show in Gantt',
   'open-workspace': 'Open in Workspace',
   'focus-workspace': 'Focus Workspace',
   'discard-workspace': 'Discard Workspace',

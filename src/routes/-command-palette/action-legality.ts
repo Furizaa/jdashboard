@@ -1,5 +1,11 @@
 import { match } from 'ts-pattern'
-import { workItemJiraKey, type ActionKind, type MrRef, type WorkItem } from '~/kernel'
+import {
+  workItemJiraKey,
+  type ActionKind,
+  type GanttKeyLocation,
+  type MrRef,
+  type WorkItem,
+} from '~/kernel'
 
 // Which actions are legal for one work item, and what each is called. Pure over
 // the item plus a snapshot of the state the answer depends on — so the rule can
@@ -27,6 +33,14 @@ export type ActionContext = {
   readonly transitions: 'unknown' | 'none' | 'some'
   /** How many tags are defined at all. `t` against none is a dead end. */
   readonly tagCount: number
+  /**
+   * Where this ticket sits in the plan, if it is on a chart at all — resolved
+   * from the Gantt key index by the catalogue hook. `null` means `g` is
+   * **absent** rather than disabled: "this ticket is not in any plan" is a fact
+   * about the ticket, and an offered-but-dead action would be a worse answer
+   * than no action (ADR-0012).
+   */
+  readonly ganttNode: GanttKeyLocation | null
 }
 
 export type ActionDescriptor = {
@@ -55,6 +69,11 @@ export function legalActions(item: WorkItem, context: ActionContext): readonly A
     // `t` against no definitions would open an empty list; the Manage Tags
     // command is where you go instead, and it is one level up.
     if (context.tagCount > 0) descriptors.push({ kind: 'tags', label: 'Tags…' })
+    // `g` — where is this ticket in the plan. Legal only for a ticket some chart
+    // actually carries, which is the key index's whole job.
+    if (context.ganttNode !== null) {
+      descriptors.push({ kind: 'show-in-gantt', label: 'Show in Gantt' })
+    }
     // Both hand off to the note editor's own modals through the URL, so they are
     // legal on anything with a ticket and absent on a fake review card.
     descriptors.push({ kind: 'ai-refine', label: 'AI Refine' }, { kind: 'ai-ask', label: 'AI Ask' })

@@ -31,10 +31,15 @@ export type PaletteAction = {
   readonly perform: PaletteActionPerform
 }
 
-/** The two actions that open a nested list rather than running. */
-export type SubListKind = 'status' | 'tags'
+/**
+ * The nested lists. Two are opened from an item's action list — transitions and
+ * tags — and `charts` is opened from a **root-level command**, which is the one
+ * asymmetry worth naming here: a chart belongs to no work item, so the list it
+ * fills is owned by the command rather than by a ticket (ADR-0012).
+ */
+export type SubListKind = 'status' | 'tags' | 'charts'
 
-/** One row in a nested list: a transition to pick, or a tag to toggle. */
+/** One row in a nested list: a transition to pick, a tag to toggle, a chart to open. */
 export type PaletteSubItem = {
   readonly id: string
   readonly label: string
@@ -59,9 +64,18 @@ export type PaletteSubList =
   | { readonly kind: 'status'; readonly state: 'failed'; readonly message: string }
   | { readonly kind: 'status'; readonly state: 'ready'; readonly items: readonly PaletteSubItem[] }
   | { readonly kind: 'tags'; readonly items: readonly PaletteSubItem[] }
+  // Charts are in the cache for the same reason tags are — one list read for the
+  // whole surface — so this arm has no loading state either.
+  | { readonly kind: 'charts'; readonly items: readonly PaletteSubItem[] }
 
-/** The injected source of a nested list's contents. */
-export type PaletteSubListSource = (item: WorkItem, kind: SubListKind) => PaletteSubList
+/**
+ * The injected source of a nested list's contents.
+ *
+ * `item` is `null` for a list a **command** opened, because such a list is about
+ * no work item. The two item-owned lists already treat a keyless item as an
+ * empty list, so there is one fewer case here than it looks.
+ */
+export type PaletteSubListSource = (item: WorkItem | null, kind: SubListKind) => PaletteSubList
 
 /** A board-level command, belonging to no work item. */
 export type PaletteCommand = {
@@ -70,7 +84,13 @@ export type PaletteCommand = {
   /** Extra searchable words ("create" finds "New Ticket"). Never rendered. */
   readonly synonyms?: readonly string[]
   readonly enabled: boolean
-  readonly run: () => void
+  /**
+   * Shares the action's two-case union rather than carrying a bare `run`, for
+   * the reason ADR-0008 gives for actions: one command opens a nested list
+   * instead of acting, and a callback that secretly navigated a level deeper
+   * would be a callback that lies.
+   */
+  readonly perform: PaletteActionPerform
 }
 
 /**

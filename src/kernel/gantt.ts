@@ -34,14 +34,18 @@ export type { GanttChangelogActor, GanttChangelogEntry } from '~/server/lib/gant
 export type {
   GanttBodyView,
   GanttChartView,
+  GanttKeyIndex,
+  GanttKeyLocation,
   GanttNodeView,
 } from '~/server/contexts/gantt/application/load-chart'
 
 /** The server-function result types, per the kernel rule. */
 export type {
+  ArchiveGanttChartResult,
   GetGanttBodyResult,
   GetGanttChangelogResult,
   GetGanttChartResult,
+  GetGanttKeyIndexResult,
   GetGanttSkillResult,
   ListGanttChartsResult,
   SyncGanttChartResult,

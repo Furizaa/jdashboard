@@ -27,6 +27,13 @@ export type GanttState = {
   readonly collapsed: ReadonlySet<string>
   /** Lanes whose markdown body is open inline, under the lane (ADR-0012 §10). */
   readonly expandedInfo: ReadonlySet<string>
+  /**
+   * The lane a hand-off asked to be shown — the palette's `g`, arriving as
+   * `?node=`. It is **not a preference**: `gantt-preference.ts` does not persist
+   * it, so a refresh lands on the chart without re-announcing a lane the reader
+   * has already been shown.
+   */
+  readonly revealed: string | null
 }
 
 export type GanttEvent =
@@ -40,6 +47,18 @@ export type GanttEvent =
   | { readonly type: 'allCollapsed'; readonly parentIds: readonly string[] }
   | { readonly type: 'allExpanded' }
   | { readonly type: 'infoToggled'; readonly nodeId: string }
+  /**
+   * Show one lane: unfold every ancestor between it and a root, and mark it as
+   * the revealed one so the view can scroll to it and flash it.
+   *
+   * The ancestors ride on the event for the same reason `allCollapsed`'s parents
+   * do — the reducer holds no chart, and the caller already has the tree.
+   */
+  | {
+      readonly type: 'revealed'
+      readonly nodeId: string
+      readonly ancestorIds: readonly string[]
+    }
   /** A previous session's state, handed back by the presenter from `localStorage`. */
   | { readonly type: 'restored'; readonly state: GanttState }
 
@@ -77,7 +96,19 @@ function openingZoom(chart: GanttChart): GanttZoom {
  * — the useful one — is one click away and worth arriving at on purpose.
  */
 export function initialGanttState(chart: GanttChart): GanttState {
-  return { zoom: openingZoom(chart), collapsed: new Set(), expandedInfo: new Set() }
+  return {
+    zoom: openingZoom(chart),
+    collapsed: new Set(),
+    expandedInfo: new Set(),
+    revealed: null,
+  }
+}
+
+/** `set` without any of `members`. */
+function without(set: ReadonlySet<string>, members: readonly string[]): ReadonlySet<string> {
+  const next = new Set(set)
+  for (const member of members) next.delete(member)
+  return next
 }
 
 /** `set` with `member` toggled in or out. */
@@ -109,6 +140,15 @@ export function reduce(state: GanttState, event: GanttEvent): GanttState {
       .with({ type: 'infoToggled' }, ({ nodeId }) => ({
         ...state,
         expandedInfo: toggle(state.expandedInfo, nodeId),
+      }))
+
+      // Unfolding the ancestors is the whole mechanism: a lane cannot be scrolled
+      // to while a collapsed parent is hiding it, so the reveal has to change the
+      // collapse set rather than only announce a target.
+      .with({ type: 'revealed' }, ({ nodeId, ancestorIds }) => ({
+        ...state,
+        collapsed: without(state.collapsed, ancestorIds),
+        revealed: nodeId,
       }))
 
       .with({ type: 'restored' }, ({ state: restored }) => restored)

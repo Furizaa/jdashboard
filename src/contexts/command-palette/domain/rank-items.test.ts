@@ -101,7 +101,7 @@ describe('rankCommands', () => {
     label,
     synonyms,
     enabled: true,
-    run: () => {},
+    perform: { effect: 'run', run: () => {} },
   })
 
   const commands = [command('new', 'New Ticket', ['create', 'add']), command('refresh', 'Refresh')]

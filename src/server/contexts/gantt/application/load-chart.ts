@@ -1,6 +1,7 @@
 import { Effect } from 'effect'
 import {
   bodyNodeIds,
+  listChartIds,
   listCharts,
   readBody,
   readChart,
@@ -70,6 +71,43 @@ export function loadChart(
       chart === null ? Effect.fail(new ChartNotFound({ chartId })) : Effect.succeed(chart),
     ),
   )
+}
+
+/** Where one Jira key sits in the plan: which chart, and which lane in it. */
+export type GanttKeyLocation = { readonly chartId: string; readonly nodeId: string }
+
+/**
+ * Every mirrored Jira key on any chart, to the lane that carries it.
+ *
+ * This is the command palette's **legality input** for `show-in-gantt`: `g` is
+ * offered on a ticket that appears somewhere in the plan and is absent — not
+ * disabled — on one that does not. The palette never reaches `contexts/gantt`
+ * for it; it gets this record and hands off through the URL (ADR-0008).
+ *
+ * One pass over every chart's nodes, because the question is "is this key
+ * anywhere" and there is no cheaper shape than a reverse index for that. A key
+ * on **two** charts resolves to the first by chart id: `listChartIds` is sorted,
+ * so the answer is at least stable, and offering a second destination would mean
+ * a sub-list for a case that is a mistake in the plan rather than a choice.
+ */
+export type GanttKeyIndex = Readonly<Record<string, GanttKeyLocation>>
+
+export function loadKeyIndex(deps: GanttStoreDeps): Effect.Effect<GanttKeyIndex, never> {
+  return Effect.promise(async () => {
+    const index: Record<string, GanttKeyLocation> = {}
+    for (const chartId of await listChartIds(deps)) {
+      // Sequential for the reason `listCharts` is: a handful of small local
+      // files, and a bounded pool would be more machinery than the read is worth.
+      // oxlint-disable-next-line no-await-in-loop -- see comment above
+      const chart = await readChart(chartId, deps)
+      if (chart === null) continue
+      for (const node of chart.nodes) {
+        if (node.source.kind !== 'jira') continue
+        index[node.source.key] ??= { chartId, nodeId: node.id }
+      }
+    }
+    return index
+  })
 }
 
 /**

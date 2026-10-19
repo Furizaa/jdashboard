@@ -3,7 +3,7 @@ import { match } from 'ts-pattern'
 import { ChevronLeft } from 'lucide-react'
 import type { GanttNodeView } from '~/kernel'
 import { cn } from '~/lib/cn'
-import { useGanttChart, type GanttChartApi } from '../presenter'
+import { useGanttChart, useNodeReveal, type GanttChartApi } from '../presenter'
 import type { GanttLayout } from '../view-model'
 import { ChartHeader } from './GanttChartHeader'
 import { CycleWarning } from './CycleWarning'
@@ -26,7 +26,26 @@ import { INFO_BAND_HEIGHT } from './InfoBand'
 // is the only writer (ADR-0012 §8), so there is no control on this surface that
 // a reader could mistake for one.
 
-export function GanttChartView({ chartId, onBack }: { chartId: string; onBack: () => void }) {
+export type GanttChartViewProps = {
+  readonly chartId: string
+  readonly onBack: () => void
+  /**
+   * The lane `?node=` asked for, if any — the palette's `g` hand-off. Consumed
+   * on arrival via `onNodeConsumed`, so a refresh does not re-reveal it.
+   */
+  readonly revealNodeId: string | undefined
+  readonly onNodeConsumed: () => void
+  /** Opens the real ticket reader over the chart, by setting `?issue=`. */
+  readonly onOpenIssue: (issueKey: string) => void
+}
+
+export function GanttChartView({
+  chartId,
+  onBack,
+  revealNodeId,
+  onNodeConsumed,
+  onOpenIssue,
+}: GanttChartViewProps) {
   const api = useGanttChart(chartId)
 
   return match(api)
@@ -41,14 +60,31 @@ export function GanttChartView({ chartId, onBack }: { chartId: string; onBack: (
         {message}
       </FrameMessage>
     ))
-    .with({ phase: 'ready' }, (ready) => <Chart api={ready} onBack={onBack} />)
+    .with({ phase: 'ready' }, (ready) => (
+      <Chart
+        api={ready}
+        onBack={onBack}
+        revealNodeId={revealNodeId}
+        onNodeConsumed={onNodeConsumed}
+        onOpenIssue={onOpenIssue}
+      />
+    ))
     .exhaustive()
 }
 
 type ReadyApi = Extract<GanttChartApi, { phase: 'ready' }>
 
-function Chart({ api, onBack }: { api: ReadyApi; onBack: () => void }) {
+function Chart({
+  api,
+  onBack,
+  revealNodeId,
+  onNodeConsumed,
+  onOpenIssue,
+}: Omit<GanttChartViewProps, 'chartId'> & { api: ReadyApi }) {
   const { layout: laidOut, chart } = api
+  // Mounted only once the chart is ready, which is what makes "unfold the
+  // ancestors" possible at all — there is no tree to walk before then.
+  useNodeReveal(revealNodeId ?? null, api.reveal, onNodeConsumed)
   const nodesById = useMemo(
     () => new Map(chart.nodes.map((node) => [node.id, node] as const)),
     [chart.nodes],
@@ -87,8 +123,10 @@ function Chart({ api, onBack }: { api: ReadyApi; onBack: () => void }) {
                 chartId={api.chartId}
                 bar={laidOut.bars.get(row.node.id)}
                 childSpan={laidOut.childSpans.get(row.node.id)}
+                revealed={api.revealed === row.node.id}
                 onToggleCollapse={() => api.toggleCollapse(row.node.id)}
                 onToggleInfo={() => api.toggleInfo(row.node.id)}
+                onOpenIssue={onOpenIssue}
               />
             ))}
           </div>

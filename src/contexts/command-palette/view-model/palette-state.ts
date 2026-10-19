@@ -23,8 +23,16 @@ export type PaletteState =
       readonly status: 'sub-list'
       readonly query: string
       readonly selected: number
-      readonly itemId: string
-      readonly actionIndex: number
+      /**
+       * Which level opened this list, and therefore which one `wentBack` returns
+       * to. An item's action list carries the fields that level held; a command
+       * carries none, because the root level's own fields are already here.
+       *
+       * The union is what lets `charts` reuse this level at all: the list of
+       * charts belongs to no work item (ADR-0012), and widening `itemId` to a
+       * sentinel would have been the lie this type exists to avoid.
+       */
+      readonly owner: SubListOwner
       readonly subList: SubListKind
       readonly subIndex: number
     }
@@ -35,6 +43,10 @@ export type PaletteState =
       readonly query: string
       readonly selected: number
     }
+
+export type SubListOwner =
+  | { readonly kind: 'item'; readonly itemId: string; readonly actionIndex: number }
+  | { readonly kind: 'command' }
 
 export type PaletteEvent =
   | { readonly type: 'opened' }
@@ -107,6 +119,19 @@ function reduceOpen(state: OpenState, event: PaletteEvent): PaletteState {
         { type: 'enteredHelp' },
         (): PaletteState => ({ status: 'help', query: state.query, selected: state.selected }),
       )
+      // A command can open a nested list straight from the root, skipping the
+      // action level entirely — `Open Gantt chart…` is the one that does.
+      .with(
+        { type: 'enteredSubList' },
+        (e): PaletteState => ({
+          status: 'sub-list',
+          query: state.query,
+          selected: state.selected,
+          owner: { kind: 'command' },
+          subList: e.subList,
+          subIndex: 0,
+        }),
+      )
       // Root has no level above it, so `wentBack` here is a no-op — the key map
       // does not even produce it, and this is the belt to those braces.
       .otherwise(() => state)
@@ -133,7 +158,14 @@ function reduceActions(state: ActionsState, event: PaletteEvent): PaletteState {
     .with({ type: 'highlighted' }, (e) => ({ ...state, actionIndex: Math.max(0, e.index) }))
     .with(
       { type: 'enteredSubList' },
-      (e): PaletteState => ({ ...state, status: 'sub-list', subList: e.subList, subIndex: 0 }),
+      (e): PaletteState => ({
+        status: 'sub-list',
+        query: state.query,
+        selected: state.selected,
+        owner: { kind: 'item', itemId: state.itemId, actionIndex: state.actionIndex },
+        subList: e.subList,
+        subIndex: 0,
+      }),
     )
     .with(
       { type: 'wentBack' },
@@ -147,24 +179,31 @@ function reduceActions(state: ActionsState, event: PaletteEvent): PaletteState {
 }
 
 function reduceSubList(state: SubListState, event: PaletteEvent): PaletteState {
-  return match(event)
-    .with({ type: 'closed' }, () => initialPaletteState)
-    .with({ type: 'moved' }, (e) => ({
-      ...state,
-      subIndex: wrap(state.subIndex + e.delta, e.count),
-    }))
-    .with({ type: 'highlighted' }, (e) => ({ ...state, subIndex: Math.max(0, e.index) }))
-    .with(
-      { type: 'wentBack' },
-      (): PaletteState => ({
-        status: 'actions',
-        query: state.query,
-        selected: state.selected,
-        itemId: state.itemId,
-        actionIndex: state.actionIndex,
-      }),
-    )
-    .otherwise(() => state)
+  return (
+    match(event)
+      .with({ type: 'closed' }, () => initialPaletteState)
+      .with({ type: 'moved' }, (e) => ({
+        ...state,
+        subIndex: wrap(state.subIndex + e.delta, e.count),
+      }))
+      .with({ type: 'highlighted' }, (e) => ({ ...state, subIndex: Math.max(0, e.index) }))
+      // Back to whichever level opened the list — the action list for an item's,
+      // the results for a command's. Conflating the two would strand the reader on
+      // an action list for a ticket they never chose.
+      .with({ type: 'wentBack' }, (): PaletteState => {
+        const { owner } = state
+        return owner.kind === 'command'
+          ? { status: 'open', query: state.query, selected: state.selected }
+          : {
+              status: 'actions',
+              query: state.query,
+              selected: state.selected,
+              itemId: owner.itemId,
+              actionIndex: owner.actionIndex,
+            }
+      })
+      .otherwise(() => state)
+  )
 }
 
 export function reducePalette(state: PaletteState, event: PaletteEvent): PaletteState {
@@ -199,8 +238,14 @@ export function paletteQuery(state: PaletteState): string {
  * result, so typing never fans out a request per row.
  */
 export function paletteActiveItemId(state: PaletteState): string | null {
-  return match(state)
-    .with({ status: 'closed' }, { status: 'open' }, { status: 'help' }, () => null)
-    .with({ status: 'actions' }, { status: 'sub-list' }, (s) => s.itemId)
-    .exhaustive()
+  return (
+    match(state)
+      .with({ status: 'closed' }, { status: 'open' }, { status: 'help' }, () => null)
+      .with({ status: 'actions' }, (s) => s.itemId)
+      // A command-owned list points at no ticket, so there is nothing for the host
+      // to fetch transitions for — which is the whole reason this returns `null`
+      // rather than the last item visited.
+      .with({ status: 'sub-list' }, (s) => (s.owner.kind === 'item' ? s.owner.itemId : null))
+      .exhaustive()
+  )
 }

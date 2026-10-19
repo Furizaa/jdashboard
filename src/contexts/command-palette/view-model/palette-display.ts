@@ -141,8 +141,10 @@ export type PaletteDisplay =
   | {
       readonly status: 'sub-list'
       readonly query: string
-      readonly item: WorkItem
+      /** `null` for a list a command opened — it is about no work item. */
+      readonly item: WorkItem | null
       readonly itemBadge: string | null
+      /** The breadcrumb's first half: the ticket, or the list itself when none. */
       readonly itemTitle: string
       readonly subList: SubListKind
       readonly title: string
@@ -262,6 +264,7 @@ function groupActionRows(rows: readonly PaletteActionRow[]): readonly PaletteAct
 const SUB_LIST_TITLE: Record<SubListKind, string> = {
   status: 'Change Status',
   tags: 'Tags',
+  charts: 'Charts',
 }
 
 function subItemRows(items: readonly PaletteSubItem[]): readonly PaletteSubItemRow[] {
@@ -284,8 +287,12 @@ function subListContent(list: PaletteSubList): PaletteSubListContent {
         state: 'ready' as const,
         rows: subItemRows(l.items),
       }))
-      // Tags are already in the cache, so there is no loading arm to forget.
-      .with({ kind: 'tags' }, (l) => ({ state: 'ready' as const, rows: subItemRows(l.items) }))
+      // Tags and charts are already in the cache, so neither has a loading arm
+      // to forget.
+      .with({ kind: 'tags' }, { kind: 'charts' }, (l) => ({
+        state: 'ready' as const,
+        rows: subItemRows(l.items),
+      }))
       .exhaustive()
   )
 }
@@ -362,19 +369,24 @@ export function derivePalette(state: PaletteState, inputs: PaletteInputs): Palet
       groups: deriveHelpGroups(),
     }))
     .with({ status: 'sub-list' }, (s) => {
-      const item = findItem(s, inputs)
-      if (item === undefined) {
+      const owner = s.owner
+      // Only an item-owned list can lose the thing it is about; a command's has
+      // nothing to go missing, so it never falls back to the results.
+      const subject = owner.kind === 'item' ? findItem(owner, inputs) : null
+      if (subject === undefined) {
         return deriveRoot({ status: 'open', query: s.query, selected: s.selected }, inputs)
       }
-      const content = subListContent(inputs.subListFor(item, s.subList))
+      const content = subListContent(inputs.subListFor(subject, s.subList))
       const rows = content.state === 'ready' ? content.rows : []
       const subIndex = rows.length === 0 ? 0 : Math.min(s.subIndex, rows.length - 1)
       return {
         status: 'sub-list' as const,
         query: s.query,
-        item,
-        itemBadge: itemBadge(item),
-        itemTitle: workItemTitle(item),
+        item: subject,
+        itemBadge: subject === null ? null : itemBadge(subject),
+        // With no ticket to name, the breadcrumb is just the list: the view drops
+        // the `›` segment when `item` is `null` rather than starting at one.
+        itemTitle: subject === null ? SUB_LIST_TITLE[s.subList] : workItemTitle(subject),
         subList: s.subList,
         title: SUB_LIST_TITLE[s.subList],
         content,

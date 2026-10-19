@@ -26,10 +26,12 @@ export {
 } from './hooks'
 export { useExplainDiffs, useExplainRuns, useStartExplain, useCloseExplain } from './explain-hooks'
 export {
+  useArchiveGanttChart,
   useGanttBody,
   useGanttChangelog,
   useGanttChart,
   useGanttCharts,
+  useGanttKeyIndex,
   useGanttSkill,
   useSyncGanttChart,
 } from './gantt-hooks'

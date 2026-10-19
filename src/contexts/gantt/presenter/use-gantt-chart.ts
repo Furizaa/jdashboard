@@ -3,6 +3,7 @@ import { format } from 'date-fns'
 import { useGanttBody, useGanttChart as useGanttChartQuery, useSyncGanttChart } from '~/coordinator'
 import type { GanttChart, GanttChartView } from '~/kernel'
 import {
+  ancestorsOf,
   initialGanttState,
   layout,
   reduce,
@@ -60,6 +61,14 @@ export type GanttChartApi =
       readonly collapseAll: () => void
       readonly expandAll: () => void
       readonly toggleInfo: (nodeId: string) => void
+      /**
+       * Unfold every ancestor of one lane and mark it as the revealed one, so
+       * the view can scroll to it and flash it — the palette's `g` hand-off,
+       * arriving as `?node=`.
+       */
+      readonly reveal: (nodeId: string) => void
+      /** Which lane the hand-off pointed at, or `null` when none did. */
+      readonly revealed: string | null
       /** A lane's title by id, for the cycle warning and the arrow labels. */
       readonly titleOf: (nodeId: string) => string
     }
@@ -145,6 +154,7 @@ export function useGanttChart(chartId: string): GanttChartApi {
     [view],
   )
 
+  const reveal = useReveal(chart, dispatch)
   const actions = useGanttActions(dispatch, laidOut)
 
   if (query.isError) {
@@ -169,9 +179,29 @@ export function useGanttChart(chartId: string): GanttChartApi {
     canSync: view.jiraSources.length > 0,
     isSyncing,
     refresh,
+    reveal,
+    revealed: state.revealed,
     titleOf,
     ...actions,
   }
+}
+
+/**
+ * Show one lane. Separate from the five view actions because it is the only one
+ * that needs the **chart** rather than the rows: a collapsed ancestor is not a
+ * row at all, so the chain to unfold comes from the tree.
+ */
+function useReveal(
+  chart: GanttChart | null,
+  dispatch: (event: GanttEvent) => void,
+): (nodeId: string) => void {
+  return useCallback(
+    (nodeId: string) => {
+      if (chart === null) return
+      dispatch({ type: 'revealed', nodeId, ancestorIds: ancestorsOf(chart, nodeId) })
+    },
+    [chart, dispatch],
+  )
 }
 
 type GanttActions = Pick<

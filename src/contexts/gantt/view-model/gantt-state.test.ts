@@ -40,6 +40,7 @@ const STATE: GanttState = {
   zoom: 'month',
   collapsed: new Set(['p1']),
   expandedInfo: new Set(['a1']),
+  revealed: null,
 }
 
 describe('initialGanttState', () => {
@@ -110,11 +111,35 @@ describe('reduce', () => {
     expect([...reduce(STATE, { type: 'infoToggled', nodeId: 'a1' }).expandedInfo]).toEqual([])
   })
 
+  // The palette's `g` hand-off: unfolding the ancestors is the whole mechanism,
+  // since a lane behind a collapsed parent is not a row to scroll to at all.
+  it('reveals a lane by unfolding its ancestors and naming it', () => {
+    const folded: GanttState = {
+      ...STATE,
+      collapsed: new Set(['p1', 'prd', 'feature', 'elsewhere']),
+    }
+    const revealed = reduce(folded, {
+      type: 'revealed',
+      nodeId: 'task',
+      ancestorIds: ['feature', 'prd'],
+    })
+
+    expect([...revealed.collapsed].toSorted()).toEqual(['elsewhere', 'p1'])
+    expect(revealed.revealed).toBe('task')
+  })
+
+  it('reveals a lane that was already visible without folding anything else', () => {
+    const revealed = reduce(STATE, { type: 'revealed', nodeId: 'a1', ancestorIds: [] })
+    expect([...revealed.collapsed]).toEqual(['p1'])
+    expect(revealed.revealed).toBe('a1')
+  })
+
   it('takes a restored state wholesale, from wherever the presenter kept it', () => {
     const restored: GanttState = {
       zoom: 'week',
       collapsed: new Set(['x']),
       expandedInfo: new Set(),
+      revealed: 'x1',
     }
 
     expect(reduce(STATE, { type: 'restored', state: restored })).toEqual(restored)

@@ -298,3 +298,31 @@ export function layout(chart: GanttChart, opts: GanttLayoutOptions): GanttLayout
     needsAttention: needsAttentionFor(chart, tree),
   }
 }
+
+/**
+ * Every ancestor of one lane, nearest first — the lanes a reveal has to unfold
+ * before the lane itself can be on screen (the palette's `g` hand-off).
+ *
+ * Built from `buildTree`'s **effective** parent links rather than from the
+ * stored `parentId`s, which is the whole reason it lives beside `layout` instead
+ * of being a two-line walk at the call site: a node whose parent is missing was
+ * re-rooted and a `parentId` cycle was cut, so the chain that is actually drawn
+ * is the only chain worth unfolding. A node the chart does not have yields the
+ * empty list rather than throwing — `?node=` is hostile input until proven
+ * otherwise, and a stale link should land on the chart, not on an error.
+ */
+export function ancestorsOf(chart: GanttChart, nodeId: string): readonly string[] {
+  const { parentOf } = buildTree(chart.nodes)
+  if (!parentOf.has(nodeId)) return []
+  const ancestors: string[] = []
+  // The forest `buildTree` guarantees means this terminates, but the seen set
+  // stays: this walks a map, and a map is cheaper to guard than to trust.
+  const seen = new Set<string>([nodeId])
+  let current = parentOf.get(nodeId) ?? null
+  while (current !== null && !seen.has(current)) {
+    ancestors.push(current)
+    seen.add(current)
+    current = parentOf.get(current) ?? null
+  }
+  return ancestors
+}

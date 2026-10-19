@@ -14,6 +14,7 @@ export type CommandId =
   | 'manage-tags'
   | 'bulk-refine'
   | 'configure-lanes'
+  | 'open-gantt-chart'
   | 'go-to-board'
   | 'go-to-watchlist'
   | 'go-to-explain'
@@ -37,6 +38,12 @@ export type GlobalCommandContext = {
   readonly onlyWorkspace: boolean
   /** Targets with a live opener on the command bus. */
   readonly registered: readonly CommandTarget[]
+  /**
+   * How many Gantt charts exist at all — gates `Open Gantt chart…` exactly as
+   * `tagCount` gates `t`. Offering a nested list with nothing in it is a dead
+   * end, and the honest answer is that there is no chart to open yet.
+   */
+  readonly chartCount: number
 }
 
 /** Which bus target a command opens, for the five that open a header modal. */
@@ -58,6 +65,18 @@ export function globalCommands(context: GlobalCommandContext): readonly GlobalCo
   for (const modal of MODAL_COMMANDS) {
     const target = COMMAND_TARGETS[modal.id]
     if (target !== undefined && context.registered.includes(target)) commands.push(modal)
+  }
+
+  // The one command that opens a **nested list** rather than acting: the charts
+  // are the list, and choosing one navigates to it. It sits with the modals
+  // rather than with the navigation commands below because opening a named
+  // chart is picking a thing, not switching surfaces (ADR-0012).
+  if (context.chartCount > 0) {
+    commands.push({
+      id: 'open-gantt-chart',
+      label: 'Open Gantt chart…',
+      synonyms: ['gantt', 'chart', 'plan', 'roadmap', 'timeline'],
+    })
   }
 
   // Surface navigation: the surface you are already on is left out rather than

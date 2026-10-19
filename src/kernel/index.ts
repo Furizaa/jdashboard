@@ -112,6 +112,7 @@ export {
   type ActionKind,
 } from './commands'
 export type {
+  ArchiveGanttChartResult,
   GanttBodyView,
   GanttChangelogActor,
   GanttChangelogEntry,
@@ -120,12 +121,15 @@ export type {
   GanttChartView,
   GanttEdge,
   GanttEdgeSource,
+  GanttKeyIndex,
+  GanttKeyLocation,
   GanttNode,
   GanttNodeSource,
   GanttNodeView,
   GetGanttBodyResult,
   GetGanttChangelogResult,
   GetGanttChartResult,
+  GetGanttKeyIndexResult,
   GetGanttSkillResult,
   ListGanttChartsResult,
   SyncGanttChartResult,

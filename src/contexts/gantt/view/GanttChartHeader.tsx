@@ -2,12 +2,13 @@ import { ChevronLeft, FoldVertical, RefreshCw, UnfoldVertical } from 'lucide-rea
 import { cn } from '~/lib/cn'
 import { testIds } from '~/lib/testids'
 import type { GanttChartApi } from '../presenter'
+import { ArchiveChartDialog } from './ArchiveChartDialog'
 import { ChangelogPopover } from './ChangelogPopover'
 import { CopySkillButton } from './CopySkillButton'
 import { NeedsAttention } from './NeedsAttention'
 import { ZoomControls } from './ZoomControls'
 
-// The chart's own header strip: where it is, what needs attention, and the five
+// The chart's own header strip: where it is, what needs attention, and the six
 // controls a reader has over it.
 //
 // Its own file because `GanttChartView.tsx` sits at the repo's fifteen-import
@@ -15,9 +16,11 @@ import { ZoomControls } from './ZoomControls'
 // The split is along the obvious seam — the frame draws rows, bars and arrows;
 // the header draws none of them.
 //
-// **Nothing here writes to the plan.** Copy SKILL hands an agent its brief and
-// Refresh refreshes the mirrored half Jira owns; the other three are the
-// reader's own view state (ADR-0012 §8).
+// **Nothing here writes to the plan.** Copy SKILL hands an agent its brief,
+// Refresh refreshes the mirrored half Jira owns, and Archive ends the chart's
+// life rather than editing it — the one irreversible verb, which is why it is
+// the human's and not the API's (ADR-0012 §8). The other three are the reader's
+// own view state.
 
 type ReadyApi = Extract<GanttChartApi, { phase: 'ready' }>
 
@@ -43,6 +46,9 @@ export function ChartHeader({ api, onBack }: { api: ReadyApi; onBack: () => void
         <FoldButton api={api} />
         <ZoomControls zoom={api.zoom} onZoom={api.setZoom} />
         <ChangelogPopover chartId={api.chartId} />
+        {/* Last, and on its own: the only control here that changes what is on
+            disk. `onBack` is also where archiving lands — the chart list. */}
+        <ArchiveChartDialog chartId={api.chartId} title={api.chart.title} onArchived={onBack} />
       </div>
     </div>
   )

@@ -8,6 +8,7 @@ import {
   useAddToWatchlist,
   useBoardData,
   useBrowserActions,
+  useGanttKeyIndex,
   useMrStatuses,
   useOpenWorkspaceKeys,
   useRemoveFromWatchlist,
@@ -19,6 +20,8 @@ import {
   resolveMrForWorkItem,
   workItemJiraKey,
   type ActionKind,
+  type GanttKeyIndex,
+  type GanttKeyLocation,
   type MrSources,
   type WorkItem,
 } from '~/kernel'
@@ -56,6 +59,8 @@ type RunnerDeps = {
   readonly navigate: (search: { issue: string; notes?: true; ai?: 'refine' | 'ask' }) => void
   /** The Explain hand-off: `/explain?mr=<iid>`, a surface rather than a modal. */
   readonly navigateExplain: (iid: number) => void
+  /** The Gantt hand-off: `/gantt?chart=<id>&node=<id>`, which reveals the lane. */
+  readonly navigateGantt: (location: GanttKeyLocation) => void
   readonly browser: BrowserActions
   readonly addToWatchlist: (key: string) => Promise<{ ok: boolean }>
   readonly removeFromWatchlist: (key: string) => Promise<{ ok: boolean }>
@@ -143,6 +148,14 @@ function performFor(
         const mr = context.mr
         return mr === null ? null : run(() => deps.navigateExplain(mr.iid))
       })
+      // The same hand-off one surface over: `g` navigates to the chart with the
+      // node named in the URL, and the Gantt surface reveals it on arrival. The
+      // palette never reaches `contexts/gantt` — `pnpm depcruise` is the proof
+      // (ADR-0008, ADR-0009 §3).
+      .with('show-in-gantt', () => {
+        const node = context.ganttNode
+        return node === null ? null : run(() => deps.navigateGantt(node))
+      })
       .with('open-workspace', () => {
         const fields = workspaceTargetFields(item)
         if (workspaceKey === null || fields === null) return null
@@ -186,17 +199,23 @@ function useCatalogueInputs(): MrSources & {
   readonly jiraBaseUrl: string | null
   readonly watchlistKeys: readonly string[]
   readonly openWorkspaceKeys: readonly string[]
+  readonly ganttByKey: GanttKeyIndex
 } {
   const board = useBoardData()
   const watchlist = useWatchlistCards()
   const mrStatuses = useMrStatuses()
   const reviewQuery = useReviewCards()
   const openWorkspaceKeys = useOpenWorkspaceKeys()
+  const ganttKeys = useGanttKeyIndex()
 
   const jiraBaseUrl = board.data?.ok === true ? board.data.baseUrl : null
   const watchlistCards = watchlist.data?.ok === true ? watchlist.data.cards : undefined
   const authoredByKey = mrStatuses.data?.ok === true ? mrStatuses.data.byKey : undefined
   const reviewCards = reviewQuery.data?.ok === true ? reviewQuery.data.cards : undefined
+  // An unresolved index reads as "no ticket is on a chart", which makes `g`
+  // absent rather than wrong — the same optimism `transitions` declines, and for
+  // the opposite reason: there is no sub-list here to explain itself.
+  const ganttByKey = ganttKeys.data?.byKey ?? EMPTY_KEY_INDEX
 
   return useMemo(
     () => ({
@@ -205,10 +224,14 @@ function useCatalogueInputs(): MrSources & {
       openWorkspaceKeys,
       authoredByKey,
       reviewCards,
+      ganttByKey,
     }),
-    [jiraBaseUrl, watchlistCards, openWorkspaceKeys, authoredByKey, reviewCards],
+    [jiraBaseUrl, watchlistCards, openWorkspaceKeys, authoredByKey, reviewCards, ganttByKey],
   )
 }
+
+/** Stable identity, so an unresolved index does not re-key the memo each render. */
+const EMPTY_KEY_INDEX: GanttKeyIndex = {}
 
 /** Which hook implements each action. Memoised for the same reason as the inputs. */
 function useRunnerDeps(workspace: WorkspaceActionsApi): RunnerDeps {
@@ -228,18 +251,32 @@ function useRunnerDeps(workspace: WorkspaceActionsApi): RunnerDeps {
     (iid: number) => navigateFn({ to: '/explain', search: { mr: iid } }),
     [navigateFn],
   )
+  // Absolute for the same reason, and carrying `node` so the surface knows which
+  // lane to expand to and scroll into view.
+  const navigateGantt = useCallback(
+    ({ chartId, nodeId }: GanttKeyLocation) =>
+      navigateFn({ to: '/gantt', search: { chart: chartId, node: nodeId } }),
+    [navigateFn],
+  )
 
   return useMemo(
     () => ({
       navigate,
       navigateExplain,
+      navigateGantt,
       browser,
       addToWatchlist: add,
       removeFromWatchlist: remove,
       workspace,
     }),
-    [navigate, navigateExplain, browser, add, remove, workspace],
+    [navigate, navigateExplain, navigateGantt, browser, add, remove, workspace],
   )
+}
+
+/** Where one work item sits in the plan — `null` for anything not on a chart. */
+function ganttLocationFor(item: WorkItem, byKey: GanttKeyIndex): GanttKeyLocation | null {
+  const key = workItemJiraKey(item)
+  return key === null ? null : (byKey[key] ?? null)
 }
 
 export function useActionCatalogue({
@@ -259,6 +296,7 @@ export function useActionCatalogue({
         mr: resolveMrForWorkItem(item, inputs),
         transitions,
         tagCount,
+        ganttNode: ganttLocationFor(item, inputs.ganttByKey),
       }
       return legalActions(item, context).flatMap((descriptor) => {
         const perform = performFor(descriptor.kind, item, context, deps)

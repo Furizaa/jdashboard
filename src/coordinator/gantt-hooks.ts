@@ -1,16 +1,20 @@
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query'
 import type {
+  ArchiveGanttChartResult,
   GetGanttBodyResult,
   GetGanttChangelogResult,
   GetGanttChartResult,
+  GetGanttKeyIndexResult,
   GetGanttSkillResult,
   ListGanttChartsResult,
   SyncGanttChartResult,
 } from '~/kernel'
 import {
+  archiveGanttChart,
   getGanttBody,
   getGanttChangelog,
   getGanttChart,
+  getGanttKeyIndex,
   getGanttSkill,
   listGanttCharts,
   syncGanttChart,
@@ -21,9 +25,11 @@ import { DASHBOARD_QUERY_KEYS, DASHBOARD_STALE_TIMES } from './adapters/tanstack
 // reason `explain-hooks.ts` does — that file is already the app's longest and a
 // surface's whole read side belongs together.
 //
-// Five reads and **one** write, and the one write is not an exception to the
-// agent being the chart's only writer (ADR-0012 §8): sync touches only the
-// mirrored half Jira owns, never a lane, a date or a body an agent authored.
+// Six reads and **two** writes, and neither write is an exception to the agent
+// being the chart's only writer (ADR-0012 §8): sync touches only the mirrored
+// half Jira owns, never a lane, a date or a body an agent authored, and archive
+// is a chart *lifecycle* verb the human owns — it moves the folder rather than
+// editing a plan, which is why there is no `DELETE /charts/:chartId` beside it.
 //
 // The wire types come through `~/kernel`, as the kernel rule asks: the values
 // below are server functions and must be imported from their module, but their
@@ -113,6 +119,51 @@ export function useSyncGanttChart(): {
   })
   return {
     sync: (chartId) => mutation.mutateAsync({ chartId }),
+    isPending: mutation.isPending,
+  }
+}
+
+/**
+ * Which tickets appear anywhere in the plan. The command palette reads this to
+ * decide whether `g` — Show in Gantt — is legal for the item in front of you,
+ * and nothing else does.
+ *
+ * One query for every chart rather than one per chart, because the question is
+ * a membership test over all of them. The 60s stale time is the longest of the
+ * Gantt keys: a key joins or leaves a chart when an agent writes, not on its own.
+ */
+export function useGanttKeyIndex(): UseQueryResult<GetGanttKeyIndexResult> {
+  return useQuery({
+    queryKey: DASHBOARD_QUERY_KEYS.ganttKeyIndex,
+    queryFn: () => getGanttKeyIndex(),
+    retry: false,
+    staleTime: DASHBOARD_STALE_TIMES.ganttKeyIndex,
+  })
+}
+
+/**
+ * Archive one chart — the confirmed, human-owned end of a chart's life
+ * (ADR-0012 §8). The folder moves to `gantt/.archive/`; nothing is erased.
+ *
+ * Only the **list** and the key index are invalidated, deliberately. The chart's
+ * own query is left alone because the caller navigates away from it in the same
+ * breath, and invalidating it would fire one more read of a folder that has just
+ * moved — a guaranteed `ChartNotFound` with nothing to show for it.
+ */
+export function useArchiveGanttChart(): {
+  archive: (chartId: string) => Promise<ArchiveGanttChartResult>
+  isPending: boolean
+} {
+  const queryClient = useQueryClient()
+  const mutation = useMutation<ArchiveGanttChartResult, Error, { chartId: string }>({
+    mutationFn: (data) => archiveGanttChart({ data }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: DASHBOARD_QUERY_KEYS.ganttCharts })
+      queryClient.invalidateQueries({ queryKey: DASHBOARD_QUERY_KEYS.ganttKeyIndex })
+    },
+  })
+  return {
+    archive: (chartId) => mutation.mutateAsync({ chartId }),
     isPending: mutation.isPending,
   }
 }

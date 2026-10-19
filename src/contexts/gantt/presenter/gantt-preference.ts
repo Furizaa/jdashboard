@@ -48,6 +48,11 @@ export function readGanttPreference(chartId: string): GanttState | null {
       zoom: parsed.zoom as GanttZoom,
       collapsed: stringsOf(parsed.collapsed),
       expandedInfo: stringsOf(parsed.expandedInfo),
+      // Deliberately not restored, and not written below either: a revealed lane
+      // is an answer to one hand-off, not a preference. Persisting it would make
+      // a refresh re-announce a lane the reader has already been shown, which is
+      // exactly what consuming `?node=` with `replace` exists to prevent.
+      revealed: null,
     }
   } catch {
     return null

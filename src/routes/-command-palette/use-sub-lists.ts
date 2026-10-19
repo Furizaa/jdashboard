@@ -1,10 +1,12 @@
 import { useCallback } from 'react'
+import { useNavigate } from '@tanstack/react-router'
 import { match } from 'ts-pattern'
 import { toast } from 'sonner'
 import type { PaletteSubItem, PaletteSubList, SubListKind } from '~/contexts/command-palette'
 import {
   useAttachTag,
   useDetachTag,
+  useGanttCharts,
   useTagDefinitions,
   useTicketTags,
   useTransitionAction,
@@ -13,18 +15,22 @@ import {
 import {
   resolveTagColor,
   workItemJiraKey,
+  type GanttChartSummary,
   type GetTransitionsResult,
   type WorkItem,
 } from '~/kernel'
 import { displayNameForStatus } from '~/widgets/status-pill'
 
-// The contents of the palette's two nested lists. Both are cross-context reads,
-// so they live here beside the action catalogue (ADR-0008).
+// The contents of the palette's three nested lists. All of them are
+// cross-context reads, so they live here beside the action catalogue (ADR-0008).
 //
 // The asymmetry is real and deliberate: **transitions are async and per-ticket**
-// (Jira decides what a ticket can become), where **tags are already in the
-// cache**. The descriptor union only gives `status` loading and failed arms for
-// exactly that reason.
+// (Jira decides what a ticket can become), where **tags and charts are already
+// in the cache**. The descriptor union only gives `status` loading and failed
+// arms for exactly that reason.
+//
+// `charts` is the one list that belongs to **no work item** — it is opened by a
+// root-level command, so `item` arrives `null` and nothing in that arm reads it.
 
 // A sentinel key so the transitions query has a stable shape while nothing is
 // selected; `enabled: false` means it never actually runs. Mirrors `useTicket`.
@@ -34,7 +40,7 @@ const NO_KEY = '__none__'
 export type TransitionsKnowledge = 'unknown' | 'none' | 'some'
 
 export type SubListsApi = {
-  readonly subListFor: (item: WorkItem, kind: SubListKind) => PaletteSubList
+  readonly subListFor: (item: WorkItem | null, kind: SubListKind) => PaletteSubList
   /**
    * Feeds `s`'s legality. `unknown` while the fetch is in flight or failed —
    * which is why `s` can appear and only then turn out to have nothing in it.
@@ -80,6 +86,23 @@ function knowledgeOf(query: {
  * on entering an item, so the transitions fetch happens once per item rather
  * than once per search result.
  */
+/**
+ * Every chart on disk, in the order the store lists them. Choosing one
+ * **navigates** — the palette hands off through the URL and still imports no
+ * context, exactly as `explain-mr` does (ADR-0009 §3).
+ */
+function chartsList(
+  charts: readonly GanttChartSummary[] | undefined,
+  open: (chartId: string) => void,
+): PaletteSubList {
+  return {
+    kind: 'charts',
+    items: (charts ?? []).map(
+      (chart): PaletteSubItem => ({ id: chart.id, label: chart.title, run: () => open(chart.id) }),
+    ),
+  }
+}
+
 export function useSubLists(activeKey: string | null): SubListsApi {
   const enabled = activeKey !== null
   const transitionsQuery = useTransitions(activeKey ?? NO_KEY, enabled)
@@ -88,6 +111,12 @@ export function useSubLists(activeKey: string | null): SubListsApi {
   const attached = useTicketTags(activeKey ?? '')
   const { attach } = useAttachTag()
   const { detach } = useDetachTag()
+  const navigateFn = useNavigate()
+  const chartRows = useGanttCharts().data?.charts
+  const openChart = useCallback(
+    (chartId: string) => navigateFn({ to: '/gantt', search: { chart: chartId } }),
+    [navigateFn],
+  )
 
   const transitions = knowledgeOf(transitionsQuery)
   const transitionsPending = transitionsQuery.isPending
@@ -97,10 +126,10 @@ export function useSubLists(activeKey: string | null): SubListsApi {
   const transitionsBroke = transitionsQuery.isError
 
   const subListFor = useCallback(
-    (item: WorkItem, kind: SubListKind): PaletteSubList =>
+    (item: WorkItem | null, kind: SubListKind): PaletteSubList =>
       match(kind)
         .with('status', (): PaletteSubList => {
-          const key = workItemJiraKey(item)
+          const key = item === null ? null : workItemJiraKey(item)
           if (key === null || transitionsPending) return { kind: 'status', state: 'loading' }
           if (transitionsBroke || transitionsData === undefined) {
             return {
@@ -132,7 +161,7 @@ export function useSubLists(activeKey: string | null): SubListsApi {
           }
         })
         .with('tags', (): PaletteSubList => {
-          const key = workItemJiraKey(item)
+          const key = item === null ? null : workItemJiraKey(item)
           const attachedIds = new Set(attached.map((tag) => tag.id))
           return {
             kind: 'tags',
@@ -156,8 +185,11 @@ export function useSubLists(activeKey: string | null): SubListsApi {
                   }),
           }
         })
+        .with('charts', (): PaletteSubList => chartsList(chartRows, openChart))
         .exhaustive(),
     [
+      chartRows,
+      openChart,
       transitionsPending,
       transitionsBroke,
       transitionsData,

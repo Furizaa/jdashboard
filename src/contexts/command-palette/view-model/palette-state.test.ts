@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { ACTION_LABELS, ACTION_SHORTCUTS, type WorkItem } from '~/kernel'
-import type { PaletteAction, PaletteCommand, PaletteSubItem, PaletteSubList } from '../domain'
+import type {
+  PaletteAction,
+  PaletteCommand,
+  PaletteSubItem,
+  PaletteSubList,
+  SubListKind,
+} from '../domain'
 import {
   derivePalette,
   deriveHelpGroups,
@@ -56,7 +62,7 @@ const command = (id: string, label: string, enabled = true): PaletteCommand => (
   id,
   label,
   enabled,
-  run: () => {},
+  perform: { effect: 'run', run: () => {} },
 })
 
 const ITEMS: readonly WorkItem[] = [
@@ -104,8 +110,22 @@ const subList = (
   status: 'sub-list',
   query,
   selected,
-  itemId,
-  actionIndex,
+  owner: { kind: 'item', itemId, actionIndex },
+  subList: kind,
+  subIndex,
+})
+
+/** The command-owned shape of the same level: no item, no action index. */
+const commandSubList = (
+  kind: SubListKind,
+  query = '',
+  selected = 0,
+  subIndex = 0,
+): PaletteState => ({
+  status: 'sub-list',
+  query,
+  selected,
+  owner: { kind: 'command' },
   subList: kind,
   subIndex,
 })
@@ -444,6 +464,69 @@ describe('the three-deep navigation stack', () => {
     expect(paletteActiveItemId(open('hdr', 1))).toBeNull()
     expect(paletteActiveItemId(actions('HDR-2'))).toBe('HDR-2')
     expect(paletteActiveItemId(subList('HDR-2', 'status'))).toBe('HDR-2')
+  })
+})
+
+// `Open Gantt chart…` opens a nested list straight from the **root**, skipping
+// the action level: a chart belongs to no work item (ADR-0012), which is why the
+// sub-list level carries an owner rather than an item id.
+describe('a sub-list a command opened', () => {
+  it('steps results → sub-list, with no item behind it', () => {
+    const entered = reducePalette(open('gantt', 3), { type: 'enteredSubList', subList: 'charts' })
+    expect(entered).toEqual(commandSubList('charts', 'gantt', 3, 0))
+  })
+
+  // The level above a command's list is the results, not an action list for some
+  // ticket the reader never chose.
+  it('pops back to the results rather than to an action list', () => {
+    const back = reducePalette(commandSubList('charts', 'gantt', 3, 2), { type: 'wentBack' })
+    expect(back).toEqual(open('gantt', 3))
+  })
+
+  it('points at no ticket, so the host fetches no transitions', () => {
+    expect(paletteActiveItemId(commandSubList('charts'))).toBeNull()
+  })
+
+  it('moves its highlight like any other list', () => {
+    expect(
+      reducePalette(commandSubList('charts', '', 0, 0), { type: 'moved', delta: 1, count: 3 }),
+    ).toEqual(commandSubList('charts', '', 0, 1))
+  })
+
+  it('derives a breadcrumb that is just the list, and rows from the injected source', () => {
+    const display = subListView(
+      commandSubList('charts'),
+      inputs({
+        subListFor: () => ({
+          kind: 'charts',
+          items: [subItem('demo-pricing-rework', 'Pricing rework')],
+        }),
+      }),
+    )
+    expect(display.item).toBeNull()
+    expect(display.itemBadge).toBeNull()
+    expect(display.itemTitle).toBe('Charts')
+    expect(display.title).toBe('Charts')
+    expect(display.content.state).toBe('ready')
+    expect(display.rowCount).toBe(1)
+    expect(display.selectedRow).toMatchObject({
+      id: 'demo-pricing-rework',
+      label: 'Pricing rework',
+      index: 0,
+      digit: '1',
+    })
+    // Picking a chart is the whole errand, so the palette closes on it — unlike
+    // the tag list, where several usually get set in one visit.
+    expect(display.staysOpen).toBe(false)
+  })
+
+  // The item-owned fallback must not fire for a list that has no item to lose.
+  it('never falls back to the results, because nothing can vanish under it', () => {
+    const display = derivePalette(
+      commandSubList('charts'),
+      inputs({ subListFor: () => ({ kind: 'charts', items: [] }) }),
+    )
+    expect(display.status).toBe('sub-list')
   })
 })
 

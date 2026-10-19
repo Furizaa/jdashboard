@@ -56,18 +56,22 @@ _Avoid_: "filter" for what the palette does to its own list (that is **ranking**
 
 ```
 closed ─(⌘K)─▶ open ─(↵ on a result)─▶ actions ─(s / t)─▶ sub-list
-   ▲            │  ▲                      │  ▲              │
-   └─(Esc/⌘K)───┘  └───────(← / ⌫)────────┘  └───(← / ⌫)────┘
+   ▲            │  ▲      │               │  ▲              │
+   └─(Esc/⌘K)───┘  │      └──(↵ on `Open Gantt chart…`)──▶  │
+                   └───────(← / ⌫)────────┘  └───(← / ⌫)────┘
    └────────────────(Esc, from any depth)───────────────────┘
 
 open     { query, selected }
 actions  { query, selected, itemId, actionIndex }
-sub-list { query, selected, itemId, actionIndex, subList, subIndex }
+sub-list { query, selected, owner, subList, subIndex }
+owner    { kind: 'item', itemId, actionIndex } | { kind: 'command' }
 ```
 
 The status **is** the navigation level, and each deeper level carries the shallower one's fields, so backing out of a level with the query and the selected result intact is structural rather than something the reducer has to remember. `Esc` closes from any depth; `← / ⌫` pops exactly one — conflating them would mean losing your query because you backed out of an action list.
 
-The deep levels hold the item by `workItemId`, not by index, so a board refresh that reorders the results cannot silently retarget an action. If the item disappears entirely (a Done ticket drops off, a watchlist removal lands) `derive` falls back to the results list rather than rendering an action list for nothing.
+A sub-list carries an **owner** rather than an item id, because one of them belongs to no work item: `Open Gantt chart…` opens the chart list straight from the root, so `← / ⌫` there pops to the results rather than to an action list for a ticket the reader never chose. Widening `itemId` to a sentinel would have been exactly the lie the shape exists to prevent.
+
+The item-owned levels hold the item by `workItemId`, not by index, so a board refresh that reorders the results cannot silently retarget an action. If the item disappears entirely (a Done ticket drops off, a watchlist removal lands) `derive` falls back to the results list rather than rendering an action list for nothing. A command-owned sub-list has nothing that can vanish, so it never falls back.
 
 The reducer is one small function per level dispatched on the level, with an `exhaustive()` over the union — so adding a level is a compile error until it has rules of its own.
 

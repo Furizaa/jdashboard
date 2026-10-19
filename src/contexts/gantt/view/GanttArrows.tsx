@@ -26,6 +26,22 @@ const BACKTRACK_GAP = 0.012
 const MARKER_ID = 'gantt-arrowhead'
 const CYCLE_MARKER_ID = 'gantt-arrowhead-cycle'
 
+/**
+ * The merge badge: a filled pill the size of the surface's other chips, held
+ * clear of the elbow by `BADGE_GAP` pixels.
+ *
+ * Both numbers are the fix for a real defect. The count used to be a 9px grey
+ * glyph in a `surface-3` circle sitting exactly on the arrow's corner, which in
+ * a fully collapsed chart put it on top of a bar's child-span underlay and made
+ * it unreadable at a glance — and in a collapsed chart the count *is* the
+ * information (ADR-0012 §10). So: a solid fill with a contrasting foreground,
+ * 16px like a chip, and offset sideways so it never lands on the corner.
+ */
+const BADGE_HEIGHT = 16
+const BADGE_GAP = 8
+/** Extra width per digit past the first, so `12` is a pill rather than a circle. */
+const BADGE_DIGIT_WIDTH = 6
+
 export function GanttArrows({
   arrows,
   bars,
@@ -141,25 +157,37 @@ function Arrow({
  * which is what makes collapse *summarise* dependencies instead of hiding them.
  */
 function MergeCount({ arrow, x, y }: { arrow: GanttArrow; x: number; y: number }) {
+  const label = String(arrow.count)
+  const width = BADGE_HEIGHT + (label.length - 1) * BADGE_DIGIT_WIDTH
   return (
-    <>
-      <circle
-        cx={pct(x)}
-        cy={y}
-        r={7}
-        className={cn('fill-surface-3', arrow.inCycle ? 'stroke-destructive' : 'stroke-border')}
-        strokeWidth={1}
+    // One group, translated in **pixels** from a percentage origin: `x` is a
+    // fraction of the bar region and the gap is not, so the offset has to be a
+    // transform rather than arithmetic on the coordinate.
+    <g transform={`translate(${BADGE_GAP}, 0)`}>
+      <rect
+        x={pct(x)}
+        y={y - BADGE_HEIGHT / 2}
+        width={width}
+        height={BADGE_HEIGHT}
+        rx={BADGE_HEIGHT / 2}
+        className={arrow.inCycle ? 'fill-destructive' : 'fill-ink-subtle'}
       />
+      {/* `dx` centres the text over the pill: the rect starts at `x`, so the
+          anchor has to move half a pill's width to the right of it. */}
       <text
         x={pct(x)}
+        dx={width / 2}
         y={y}
         textAnchor="middle"
         dominantBaseline="central"
-        className="fill-ink-subtle text-[9px] font-medium"
+        className={cn(
+          'text-[10px] font-semibold tabular-nums',
+          arrow.inCycle ? 'fill-destructive-foreground' : 'fill-background',
+        )}
       >
-        {arrow.count}
+        {label}
       </text>
-    </>
+    </g>
   )
 }
 

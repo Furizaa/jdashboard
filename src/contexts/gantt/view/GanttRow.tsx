@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { ChevronDown, ChevronRight, FileText, Link2Off, TriangleAlert } from 'lucide-react'
 import { cn } from '~/lib/cn'
 import { testIds } from '~/lib/testids'
@@ -35,25 +36,45 @@ export function GanttChartRow({
   chartId,
   bar,
   childSpan,
+  revealed,
   onToggleCollapse,
   onToggleInfo,
+  onOpenIssue,
 }: {
   row: GanttRow
   node: GanttNodeView
   chartId: string
   bar: GanttBarGeometry | undefined
   childSpan: GanttChildSpanBar | undefined
+  /** This is the lane a `?node=` hand-off pointed at — scroll to it and flash it. */
+  revealed: boolean
   onToggleCollapse: () => void
   onToggleInfo: () => void
+  onOpenIssue: (issueKey: string) => void
 }) {
+  const ref = useRef<HTMLDivElement>(null)
+
+  // The same one-line effect the palette's lists use to keep the active row on
+  // screen. `block: 'center'` rather than `'nearest'`: a hand-off from somewhere
+  // else should land the lane where the eye already is, not just barely inside
+  // the viewport.
+  useEffect(() => {
+    if (revealed) ref.current?.scrollIntoView({ block: 'center' })
+  }, [revealed])
+
   return (
     <div
+      ref={ref}
       data-testid={testIds.ganttRow}
       data-node-id={node.id}
       data-depth={row.depth}
       data-undated={row.undated}
       data-collapsed={row.collapsed}
       data-blocked={row.blocked}
+      // The flash itself is one keyframe in `globals.css`, keyed off this
+      // attribute exactly as the board's changed-card pulse is — so it is one
+      // animation with one reduced-motion guard rather than inline style.
+      data-revealed={revealed ? 'true' : undefined}
     >
       {/* The border is *inside* the fixed height (border-box), so a row's outer
           height is exactly `ROW_HEIGHT` and the arrow overlay's offsets stay
@@ -68,7 +89,7 @@ export function GanttChartRow({
           style={{ paddingLeft: 8 + row.depth * INDENT_PER_DEPTH }}
         >
           <CollapseToggle row={row} onToggle={onToggleCollapse} />
-          <LaneTitle node={node} />
+          <LaneTitle node={node} onOpenIssue={onOpenIssue} />
           <LaneBadges row={row} node={node} />
           <InfoToggle node={node} open={row.infoExpanded} onToggle={onToggleInfo} />
         </div>
@@ -99,16 +120,43 @@ function CollapseToggle({ row, onToggle }: { row: GanttRow; onToggle: () => void
   )
 }
 
-function LaneTitle({ node }: { node: GanttNodeView }) {
+/**
+ * A lane's key and title. A **jira** lane is a button: clicking it opens the
+ * real ticket reader over the chart — ADF, comments, relationships, transitions
+ * — because that is already the best ticket reader in the app and ADR-0012 §10
+ * gives the ticket panel the overlay while the lane's own document gets the
+ * inline band. A **local** lane has no ticket to open, so it stays plain text
+ * rather than becoming a button that would do nothing.
+ */
+function LaneTitle({
+  node,
+  onOpenIssue,
+}: {
+  node: GanttNodeView
+  onOpenIssue: (issueKey: string) => void
+}) {
+  const source = node.source
+  if (source.kind !== 'jira') {
+    return (
+      <span className="text-foreground min-w-0 flex-1 truncate text-xs" title={node.title}>
+        {node.title}
+      </span>
+    )
+  }
   return (
-    <span className="min-w-0 flex-1 truncate text-xs" title={node.title}>
-      {node.source.kind === 'jira' && (
-        <span className="text-ink-tertiary mr-1.5 font-mono text-[10px] tracking-[0.03em]">
-          {node.source.key}
-        </span>
-      )}
-      <span className="text-foreground">{node.title}</span>
-    </span>
+    <button
+      type="button"
+      onClick={() => onOpenIssue(source.key)}
+      data-testid={testIds.ganttJiraLane}
+      data-issue-key={source.key}
+      title={`${source.key} — ${node.title}`}
+      className="focus-visible:ring-ring min-w-0 flex-1 truncate rounded text-left text-xs focus-visible:ring-2 focus-visible:outline-none"
+    >
+      <span className="text-ink-tertiary mr-1.5 font-mono text-[10px] tracking-[0.03em]">
+        {source.key}
+      </span>
+      <span className="text-foreground hover:underline">{node.title}</span>
+    </button>
   )
 }
 

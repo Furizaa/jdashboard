@@ -8,6 +8,7 @@ export {
   type GanttZoom,
 } from './gantt-axis'
 export {
+  ancestorsOf,
   layout,
   type GanttArrow,
   type GanttBar,

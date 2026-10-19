@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { ChevronLeft, Search } from 'lucide-react'
 import { Dialog, DialogContent, DialogTitle } from '~/design-system'
 import { testIds } from '~/lib/testids'
+import type { SubListKind } from '../domain'
 import { useCommandPalette, type CommandPaletteDeps } from '../presenter'
 import { PaletteActions } from './PaletteActions'
 import { PaletteEmpty } from './PaletteEmpty'
@@ -9,6 +10,18 @@ import { PaletteHelp } from './PaletteHelp'
 import { PaletteFooter } from './PaletteFooter'
 import { PaletteResults } from './PaletteResults'
 import { PaletteSubList } from './PaletteSubList'
+
+/**
+ * What an empty nested list says. Each one has to name the *reason* it is empty:
+ * "no transitions" is a fact about a ticket, "no tags" is a fact about the app,
+ * and "no charts" is a fact about the plan — and none of the three is helped by
+ * a shared "nothing here".
+ */
+const EMPTY_MESSAGE: Record<SubListKind, string> = {
+  status: 'No transitions available for this ticket.',
+  tags: 'No tags defined.',
+  charts: 'No Gantt charts yet.',
+}
 
 // The ⌘K surface. All state lives in the presenter's reducer and the pure
 // view-model; this file only renders `display` and forwards keystrokes.
@@ -87,7 +100,7 @@ export function CommandPalette(deps: CommandPaletteDeps) {
                 </span>
               )}
               <span className="text-foreground min-w-0 truncate">{display.itemTitle}</span>
-              {display.status === 'sub-list' && (
+              {display.status === 'sub-list' && display.item !== null && (
                 <>
                   <span className="text-ink-tertiary shrink-0" aria-hidden>
                     ›
@@ -118,11 +131,7 @@ export function CommandPalette(deps: CommandPaletteDeps) {
             <PaletteSubList
               content={display.content}
               subIndex={display.subIndex}
-              emptyMessage={
-                display.subList === 'status'
-                  ? 'No transitions available for this ticket.'
-                  : 'No tags defined.'
-              }
+              emptyMessage={EMPTY_MESSAGE[display.subList]}
               onHighlight={palette.highlight}
               onRun={palette.runSubItem}
             />

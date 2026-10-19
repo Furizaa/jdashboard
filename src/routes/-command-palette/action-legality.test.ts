@@ -59,6 +59,7 @@ function context(overrides: Partial<ActionContext> = {}): ActionContext {
     mr: null,
     transitions: 'some',
     tagCount: 2,
+    ganttNode: null,
     ...overrides,
   }
 }
@@ -203,6 +204,35 @@ describe('MR legality', () => {
   })
 })
 
+// `g` is the one action whose legality is a fact about the *plan* rather than
+// about the ticket or the board, which is why the key index exists at all.
+describe('Show in Gantt legality', () => {
+  it('offers it for a ticket some chart carries', () => {
+    const onAChart = kinds(JIRA, context({ ganttNode: { chartId: 'plan', nodeId: 'hdr-1' } }))
+    expect(onAChart).toContain('show-in-gantt')
+    expect(
+      labelFor(JIRA, 'show-in-gantt', context({ ganttNode: { chartId: 'p', nodeId: 'n' } })),
+    ).toBe('Show in Gantt')
+  })
+
+  // Absent, not disabled: "this ticket is not in any plan" is an answer, and a
+  // dead row that cannot be run is not.
+  it('withholds it entirely for a ticket no chart carries', () => {
+    expect(kinds(JIRA, context({ ganttNode: null }))).not.toContain('show-in-gantt')
+  })
+
+  it('never offers it for a card with no ticket behind it', () => {
+    const ctx = context({ ganttNode: { chartId: 'plan', nodeId: 'hdr-1' } })
+    expect(kinds(REVIEW_FAKE, ctx)).not.toContain('show-in-gantt')
+  })
+
+  it('offers it on a watchlist card and a review card the same way', () => {
+    const ctx = context({ ganttNode: { chartId: 'plan', nodeId: 'hdr-1' } })
+    expect(kinds(WATCHED, ctx)).toContain('show-in-gantt')
+    expect(kinds(REVIEW_REAL, ctx)).toContain('show-in-gantt')
+  })
+})
+
 describe('workspace legality', () => {
   it('offers Open-in when no workspace is open for the ticket', () => {
     expect(kinds(JIRA)).toContain('open-workspace')
@@ -237,6 +267,7 @@ describe('legalActions invariants', () => {
       watchlistKeys: ['HDR-1'],
       openWorkspaceKeys: ['HDR-1'],
       mr: { iid: 1, webUrl: 'https://gitlab/1' },
+      ganttNode: { chartId: 'plan', nodeId: 'hdr-1' },
     }),
   ]
 

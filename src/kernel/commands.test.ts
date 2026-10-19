@@ -23,6 +23,7 @@ const PRD_TABLE: Record<ActionKind, string> = {
   'copy-issue-key': 'y',
   'open-mr': 'm',
   'explain-mr': 'v',
+  'show-in-gantt': 'g',
   'open-workspace': 'e',
   'focus-workspace': 'f',
   'discard-workspace': 'x',

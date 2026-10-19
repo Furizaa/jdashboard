@@ -1,8 +1,12 @@
 import { useCallback } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { match } from 'ts-pattern'
-import type { PaletteCommand, PaletteCommandSource } from '~/contexts/command-palette'
-import { useCommands, useRefreshAll } from '~/coordinator'
+import type {
+  PaletteActionPerform,
+  PaletteCommand,
+  PaletteCommandSource,
+} from '~/contexts/command-palette'
+import { useCommands, useGanttCharts, useRefreshAll } from '~/coordinator'
 import type { ShellVariant } from '../-app-chrome'
 import { COMMAND_TARGETS, globalCommands, type CommandId } from './global-commands'
 
@@ -30,10 +34,17 @@ export type BoardCommandsState = {
 
 const noop = () => {}
 
+/** Sugar so each arm below reads as one line, as the action catalogue's does. */
+const run = (fn: () => void): PaletteActionPerform => ({ effect: 'run', run: fn })
+
 export function useBoardCommands(state: BoardCommandsState): PaletteCommandSource {
   const navigate = useNavigate()
   const refresh = useRefreshAll()
   const commands = useCommands()
+  // Read for its **count** only: it gates `Open Gantt chart…`, and the list the
+  // command then shows is `useSubLists`' business. One query serves both.
+  const charts = useGanttCharts()
+  const chartCount = charts.data?.charts.length ?? 0
   const { registered, open } = commands
   const { variant } = state
   const filter = state.filter ?? ''
@@ -41,16 +52,19 @@ export function useBoardCommands(state: BoardCommandsState): PaletteCommandSourc
   const onFilterChange = state.onFilterChange ?? noop
   const onToggleOnlyWorkspace = state.onToggleOnlyWorkspace ?? noop
 
-  const runFor = useCallback(
-    (id: CommandId, query: string): (() => void) =>
+  const performFor = useCallback(
+    (id: CommandId, query: string): PaletteActionPerform =>
       match(id)
-        .with('filter-board', () => () => onFilterChange(query.trim()))
-        .with('clear-board-filter', () => () => onFilterChange(''))
-        .with('go-to-board', () => () => navigate({ to: '/' }))
-        .with('go-to-watchlist', () => () => navigate({ to: '/watchlist' }))
-        .with('go-to-explain', () => () => navigate({ to: '/explain' }))
-        .with('refresh', () => refresh)
-        .with('toggle-only-workspace', () => onToggleOnlyWorkspace)
+        .with('filter-board', () => run(() => onFilterChange(query.trim())))
+        .with('clear-board-filter', () => run(() => onFilterChange('')))
+        .with('go-to-board', () => run(() => navigate({ to: '/' })))
+        .with('go-to-watchlist', () => run(() => navigate({ to: '/watchlist' })))
+        .with('go-to-explain', () => run(() => navigate({ to: '/explain' })))
+        .with('refresh', () => run(refresh))
+        .with('toggle-only-workspace', () => run(onToggleOnlyWorkspace))
+        // The only command that opens a nested list. Which chart is a pick, and
+        // the rows come from `useSubLists` beside the other two lists.
+        .with('open-gantt-chart', () => ({ effect: 'sub-list', subList: 'charts' }) as const)
         // The five header modals go through the bus. `globalCommands` only
         // offers one whose target is registered, and `open` is a no-op rather
         // than a throw if a route change beats the keypress.
@@ -60,10 +74,11 @@ export function useBoardCommands(state: BoardCommandsState): PaletteCommandSourc
           'manage-tags',
           'bulk-refine',
           'configure-lanes',
-          (target) => () => {
-            const busTarget = COMMAND_TARGETS[target]
-            if (busTarget !== undefined) open(busTarget)
-          },
+          (target) =>
+            run(() => {
+              const busTarget = COMMAND_TARGETS[target]
+              if (busTarget !== undefined) open(busTarget)
+            }),
         )
         .exhaustive(),
     [navigate, refresh, open, onFilterChange, onToggleOnlyWorkspace],
@@ -71,15 +86,15 @@ export function useBoardCommands(state: BoardCommandsState): PaletteCommandSourc
 
   return useCallback(
     (query: string): readonly PaletteCommand[] =>
-      globalCommands({ variant, query, filter, onlyWorkspace, registered }).map(
+      globalCommands({ variant, query, filter, onlyWorkspace, registered, chartCount }).map(
         (descriptor): PaletteCommand => ({
           id: descriptor.id,
           label: descriptor.label,
           synonyms: descriptor.synonyms,
           enabled: true,
-          run: runFor(descriptor.id, query),
+          perform: performFor(descriptor.id, query),
         }),
       ),
-    [variant, filter, onlyWorkspace, registered, runFor],
+    [variant, filter, onlyWorkspace, registered, chartCount, performFor],
   )
 }

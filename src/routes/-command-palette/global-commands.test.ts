@@ -17,6 +17,7 @@ function context(overrides: Partial<GlobalCommandContext> = {}): GlobalCommandCo
     filter: '',
     onlyWorkspace: false,
     registered: ALL_TARGETS,
+    chartCount: 0,
     ...overrides,
   }
 }
@@ -111,9 +112,31 @@ describe('route-scoped legality', () => {
   })
 })
 
+// The one command that opens a nested list rather than acting, and the one
+// whose legality is a fact about the plan rather than about the route
+// (ADR-0012). Gated exactly as `t` is gated on `tagCount`.
+describe('the Open Gantt chart command', () => {
+  it('is offered once a chart exists, on every surface', () => {
+    expect(ids(context({ chartCount: 1 }))).toContain('open-gantt-chart')
+    expect(ids(context({ chartCount: 3, variant: 'explain' }))).toContain('open-gantt-chart')
+    expect(ids(context({ chartCount: 3, variant: 'gantt' }))).toContain('open-gantt-chart')
+  })
+
+  // A nested list with nothing in it is a dead end, and "there is no chart yet"
+  // is the honest answer rather than an empty list to back out of.
+  it('is withheld entirely when there is no chart to open', () => {
+    expect(ids(context({ chartCount: 0 }))).not.toContain('open-gantt-chart')
+  })
+
+  it('is findable by the words someone would actually type', () => {
+    expect(labelFor(context({ chartCount: 1 }), 'open-gantt-chart')).toBe('Open Gantt chart…')
+  })
+})
+
 describe('global command invariants', () => {
   const everyContext: readonly GlobalCommandContext[] = [
     context(),
+    context({ chartCount: 2 }),
     context({ variant: 'watchlist' }),
     context({ query: 'apple' }),
     context({ query: 'apple', filter: 'apple' }),

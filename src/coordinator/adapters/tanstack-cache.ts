@@ -40,6 +40,10 @@ const KEY_GANTT_CHART = (chartId: string) => ['gantt', 'chart', chartId] as cons
 const KEY_GANTT_BODY = (chartId: string, nodeId: string) =>
   ['gantt', 'body', chartId, nodeId] as const
 const KEY_GANTT_CHANGELOG = (chartId: string) => ['gantt', 'changelog', chartId] as const
+// Jira key → where it sits in the plan. One query for every chart at once,
+// because the question the palette asks of it — "is this key anywhere" — is not
+// about any one chart.
+const KEY_GANTT_KEY_INDEX = ['gantt', 'key-index'] as const
 
 export const DASHBOARD_QUERY_KEYS = {
   board: KEY_BOARD,
@@ -60,6 +64,7 @@ export const DASHBOARD_QUERY_KEYS = {
   ganttChart: KEY_GANTT_CHART,
   ganttBody: KEY_GANTT_BODY,
   ganttChangelog: KEY_GANTT_CHANGELOG,
+  ganttKeyIndex: KEY_GANTT_KEY_INDEX,
 } as const
 
 export const DASHBOARD_STALE_TIMES = {
@@ -93,6 +98,10 @@ export const DASHBOARD_STALE_TIMES = {
   ganttChart: 30_000,
   ganttBody: 30_000,
   ganttChangelog: 30_000,
+  // Longer than the other four: the index answers a *membership* question the
+  // palette asks on every open, and a key joining or leaving a chart is an
+  // agent's deliberate write rather than something that drifts.
+  ganttKeyIndex: 60_000,
 } as const
 
 export function createTanstackCacheAdapter(queryClient: QueryClient): Cache {

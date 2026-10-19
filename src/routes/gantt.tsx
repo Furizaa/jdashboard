@@ -8,10 +8,8 @@ export const Route = createFileRoute('/gantt')({
 })
 
 function GanttPage() {
-  // `?issue=` and `?node=` are part of the search contract and are consumed in
-  // slice 96 — the detail panel in the chrome's overlay, and the palette's `g`
-  // hand-off revealing a lane. Validated here from the start so a link written
-  // today survives.
-  const { chart } = Route.useSearch()
-  return <GanttShell chart={chart} />
+  // `?issue=` opens the ticket panel in the chrome's overlay and `?node=` is the
+  // palette's `g` hand-off, revealed on arrival and then consumed with `replace`.
+  const { chart, issue, node } = Route.useSearch()
+  return <GanttShell chart={chart} issue={issue} node={node} />
 }

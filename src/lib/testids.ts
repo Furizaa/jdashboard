@@ -148,6 +148,7 @@ export const testIds = Object.freeze({
   ganttChartList: 'gantt-chart-list',
   ganttChartRow: 'gantt-chart-row',
   ganttRow: 'gantt-row',
+  ganttJiraLane: 'gantt-jira-lane',
   ganttBar: 'gantt-bar',
   ganttChildSpan: 'gantt-child-span',
   ganttArrow: 'gantt-arrow',
@@ -159,6 +160,9 @@ export const testIds = Object.freeze({
   ganttCopySkill: 'gantt-copy-skill',
   ganttSync: 'gantt-sync',
   ganttChangelog: 'gantt-changelog',
+  ganttArchive: 'gantt-archive',
+  ganttArchiveDialog: 'gantt-archive-dialog',
+  ganttArchiveConfirm: 'gantt-archive-confirm',
 } as const)
 
 /** `data-card-kind` discriminator on `ticketCard`. */

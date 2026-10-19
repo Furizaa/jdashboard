@@ -155,13 +155,7 @@ export async function writeChart(chart: GanttChart, deps: GanttStoreDeps): Promi
  * that can drift from it.
  */
 export async function listCharts(deps: GanttStoreDeps): Promise<GanttChartSummary[]> {
-  let entries: readonly string[]
-  try {
-    entries = await deps.readDir(ganttDir(deps.homeDir))
-  } catch {
-    return []
-  }
-  const ids = entries.filter(isChartId).toSorted((a, b) => a.localeCompare(b))
+  const ids = await listChartIds(deps)
   const summaries: GanttChartSummary[] = []
   for (const id of ids) {
     // Sequential on purpose: this is a handful of small local files, and a
@@ -171,6 +165,22 @@ export async function listCharts(deps: GanttStoreDeps): Promise<GanttChartSummar
     if (chart !== null) summaries.push(summarize(chart))
   }
   return summaries
+}
+
+/**
+ * Every chart id on disk, sorted, with a missing `gantt/` directory reading as
+ * the empty list. Extracted from `listCharts` rather than duplicated beside it,
+ * so "which directory entries are charts" has one answer — and the key index,
+ * which needs whole charts rather than summaries, starts from the same list.
+ */
+export async function listChartIds(deps: GanttStoreDeps): Promise<readonly string[]> {
+  let entries: readonly string[]
+  try {
+    entries = await deps.readDir(ganttDir(deps.homeDir))
+  } catch {
+    return []
+  }
+  return entries.filter(isChartId).toSorted((a, b) => a.localeCompare(b))
 }
 
 function isChartId(name: string): boolean {

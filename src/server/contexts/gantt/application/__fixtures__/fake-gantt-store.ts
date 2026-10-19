@@ -50,7 +50,22 @@ export function fakeGanttStore(seed?: Record<string, string>): FakeGanttStore {
       if (names.size === 0) return Promise.reject(new Error('ENOENT'))
       return Promise.resolve([...names])
     },
-    rename: () => Promise.resolve(),
+    // A real move, not a no-op: archiving is a *directory* rename, and a fake
+    // that resolved without moving anything would let a test assert an archive
+    // that never happened.
+    rename: (from, to) => {
+      const moved: [string, string][] = []
+      for (const path of files.keys()) {
+        if (path === from) moved.push([path, to])
+        else if (path.startsWith(`${from}/`)) moved.push([path, `${to}${path.slice(from.length)}`])
+      }
+      if (moved.length === 0) return Promise.reject(new Error('ENOENT'))
+      for (const [was, now] of moved) {
+        files.set(now, files.get(was) as string)
+        files.delete(was)
+      }
+      return Promise.resolve()
+    },
     deleteFile: (path) => {
       if (!files.has(path)) return Promise.reject(new Error('ENOENT'))
       files.delete(path)

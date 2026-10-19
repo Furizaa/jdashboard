@@ -139,8 +139,18 @@ export function useCommandPalette(deps: CommandPaletteDeps): CommandPaletteApi {
       })
       .with({ kind: 'command' }, ({ command }) => {
         if (!command.enabled) return
-        dispatch({ type: 'closed' })
-        command.run()
+        // The same two-case union an action's `perform` carries, for the same
+        // reason: one command opens a nested list instead of acting, and the
+        // palette matches the shape rather than knowing which command that is.
+        match(command.perform)
+          .with({ effect: 'sub-list' }, ({ subList }) => {
+            dispatch({ type: 'enteredSubList', subList })
+          })
+          .with({ effect: 'run' }, ({ run }) => {
+            dispatch({ type: 'closed' })
+            run()
+          })
+          .exhaustive()
       })
       .exhaustive()
   }, [])

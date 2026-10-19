@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Column, GanttChart, GanttEdge, GanttNode, GanttNodeSource } from '~/kernel'
-import { layout, type GanttLayoutOptions } from './gantt-layout'
+import { ancestorsOf, layout, type GanttLayoutOptions } from './gantt-layout'
 
 // The whole geometry, table-tested, with no React anywhere near it — which is
 // the claim the slice exists to make (ADR-0003, ADR-0012 §10).
@@ -394,5 +394,51 @@ describe('layout needsAttention', () => {
       orphaned: [],
       total: 0,
     })
+  })
+})
+
+// What the palette's `g` hand-off unfolds. A lane cannot be scrolled to while a
+// collapsed parent is hiding it, so the reveal has to know the whole chain.
+describe('ancestorsOf', () => {
+  const deep = chart([
+    node('prd'),
+    node('feature', { parentId: 'prd' }),
+    node('task', { parentId: 'feature' }),
+    node('root-lane'),
+  ])
+
+  it('walks the chain nearest first, so unfolding it is one pass', () => {
+    expect(ancestorsOf(deep, 'task')).toEqual(['feature', 'prd'])
+    expect(ancestorsOf(deep, 'feature')).toEqual(['prd'])
+  })
+
+  it('reads a root lane as having none', () => {
+    expect(ancestorsOf(deep, 'root-lane')).toEqual([])
+  })
+
+  // `?node=` is hostile input until proven otherwise: a stale link must land on
+  // the chart rather than throwing.
+  it('reads a node the chart does not have as having none', () => {
+    expect(ancestorsOf(deep, 'ghost')).toEqual([])
+  })
+
+  // The **effective** parent, not the stored one: `buildTree` re-roots a node
+  // whose parent is missing, so the chain that is drawn is the chain to unfold.
+  it('stops where a missing parent re-rooted the lane', () => {
+    const orphanParent = chart([node('child', { parentId: 'nowhere' })])
+    expect(ancestorsOf(orphanParent, 'child')).toEqual([])
+  })
+
+  // A `parentId` cycle is cut by `buildTree` at its first repeat; walking the
+  // cut forest terminates rather than descending forever.
+  it('terminates on a parentId cycle', () => {
+    const cyclic = chart([
+      node('a', { parentId: 'b' }),
+      node('b', { parentId: 'c' }),
+      node('c', { parentId: 'a' }),
+    ])
+    const walked = ancestorsOf(cyclic, 'b')
+    expect(new Set(walked).size).toBe(walked.length)
+    expect(walked.length).toBeLessThan(3)
   })
 })

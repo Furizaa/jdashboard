@@ -78,12 +78,29 @@ function Bar({ row, bar }: { row: GanttRow; bar: GanttBarGeometry }) {
       style={{ left: pct(bar.x), width: pct(bar.width) }}
     >
       {row.hasChildren && <Segments row={row} />}
-      {row.hasChildren && (
-        <span className="text-foreground/90 pointer-events-none absolute inset-0 flex items-center justify-center px-1 text-[10px] leading-none font-medium tabular-nums">
-          {label}
-        </span>
-      )}
+      {row.hasChildren && <ProgressLabel label={label} />}
     </div>
+  )
+}
+
+/**
+ * `n of m done`, on a backdrop rather than straight on the bar.
+ *
+ * The backdrop fixes a real defect, and it is two collisions rather than one.
+ * Every bar tone is translucent, so a **crossing arrow** — the red dashed cycle
+ * edge in particular — shows through the bar and runs horizontally through the
+ * text. And a parent's bar is **segmented**, so the label frequently straddles a
+ * colour boundary and loses half its contrast at the join. A near-opaque chip
+ * under the text answers both at once, and keeps the distribution the label is
+ * reporting visible either side of it.
+ */
+function ProgressLabel({ label }: { label: string }) {
+  return (
+    <span className="pointer-events-none absolute inset-0 flex items-center justify-center px-1">
+      <span className="text-foreground bg-background/85 truncate rounded-[2px] px-1 py-px text-[10px] leading-none font-medium tabular-nums">
+        {label}
+      </span>
+    </span>
   )
 }
 

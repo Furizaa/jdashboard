@@ -90,23 +90,39 @@ export function useIssuePanel(issueKey: string | null, notesOpen: boolean): Issu
 
   // Sibling navigation (prev/next) carries the notes pane along so it stays open
   // while stepping through a column; closing clears both params.
+  //
+  // A **merge** rather than a replacement, and the difference is load-bearing
+  // since the panel grew a third host: the panel owns `issue`, `notes` and `ai`
+  // and nothing else in the URL, but `/gantt` also keeps `?chart=` there
+  // (ADR-0012). Replacing the search would close the chart along with the panel.
+  // `ai` is cleared explicitly for the same reason it used to fall away for free.
+  const panelSearch = useMemo(
+    () => (key: string | null, notes: boolean) => (prev: Record<string, unknown>) => ({
+      ...prev,
+      issue: key ?? undefined,
+      notes: key !== null && notes ? true : undefined,
+      ai: undefined,
+    }),
+    [],
+  )
+
   const navigate = useMemo(
     () => (key: string | null) =>
       navigateFn({
-        // `to: '.'` keeps whichever board the panel was opened from (main or
-        // watchlist) rather than snapping back to the main board route.
+        // `to: '.'` keeps whichever surface the panel was opened from — either
+        // board, or a Gantt chart — rather than snapping back to the main board.
         to: '.',
-        search: key === null ? {} : { issue: key, ...(notesOpen ? { notes: true } : {}) },
+        search: panelSearch(key, notesOpen),
       }),
-    [navigateFn, notesOpen],
+    [navigateFn, notesOpen, panelSearch],
   )
 
   const setNotesOpen = useMemo(
     () => (open: boolean) => {
       if (issueKey === null) return
-      navigateFn({ to: '.', search: { issue: issueKey, ...(open ? { notes: true } : {}) } })
+      navigateFn({ to: '.', search: panelSearch(issueKey, open) })
     },
-    [navigateFn, issueKey],
+    [navigateFn, issueKey, panelSearch],
   )
 
   // Shared with the command palette's `o` / `c` actions so the two surfaces

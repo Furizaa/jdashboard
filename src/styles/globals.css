@@ -211,6 +211,31 @@
   }
 }
 
+/* The lane a `?node=` hand-off pointed at (the palette's `g`), flashed once on
+   arrival so the eye finds it after the scroll — ADR-0012. Same shape as the
+   changed-card pulse above: one keyframe, one data-attribute selector, and a
+   reduced-motion guard that swaps the animation for a steady tint rather than
+   leaving the reveal with no answer at all. */
+@keyframes gantt-row-reveal {
+  0% {
+    background-color: color-mix(in oklab, var(--lavender) 30%, transparent);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+[data-testid='gantt-row'][data-revealed='true'] {
+  animation: gantt-row-reveal 1800ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-testid='gantt-row'][data-revealed='true'] {
+    animation: none;
+    background-color: color-mix(in oklab, var(--lavender) 16%, transparent);
+  }
+}
+
 @keyframes board-skeleton-shimmer {
   0% {
     background-position: -200px 0;

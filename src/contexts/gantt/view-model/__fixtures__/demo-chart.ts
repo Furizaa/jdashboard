@@ -15,6 +15,10 @@ import type { Column, GanttChart, GanttEdge, GanttNode, GanttNodeSource } from '
 //     a window ending 15 Nov and `pricing-ui` runs to 28 Nov, so the derived
 //     child span underlay shows the overrun (ADR-0012 §4);
 //   - **an undated node** — `rate-cards`, a lane with no dates and so no bar;
+//   - **an open-ended node** — `geo-151`, a lane with a `start` and no `end`,
+//     which is the shape a date seeded from status history has while the work
+//     is still in flight, and which draws as a bar that fades out rather than
+//     stopping (ADR-0012 §4);
 //   - **a cross-depth arrow** — `geo-142` (depth 2) blocks `invoice-rewrite`
 //     (depth 1);
 //   - **three arrows that merge under collapse** — three edges from the
@@ -170,6 +174,19 @@ const NODES: readonly GanttNode[] = [
     status: 'In Implementation',
     assignee: 'Sam Okonkwo',
     orphaned: true,
+  }),
+  // Open-ended: started on a known day, with nobody forecasting a finish. This
+  // is what a date seeded from status history looks like for work in flight —
+  // `end` stays null rather than becoming today.
+  jira('geo-151', 'GEO-151', {
+    parentId: 'billing-cutover',
+    order: 3,
+    title: 'Backfill historic invoice lines',
+    start: '2026-11-10',
+    end: null,
+    column: 'In Implementation',
+    status: 'In Implementation',
+    assignee: 'Lena Fischer',
   }),
 
   // The third PRD, one half of the cycle.

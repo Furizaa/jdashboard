@@ -174,6 +174,7 @@ const KNOWN_ROUTES = new Set([
   '/api/gantt/charts',
   '/api/gantt/charts/:chartId',
   '/api/gantt/charts/:chartId/sync',
+  '/api/gantt/charts/:chartId/dates',
   '/api/gantt/charts/:chartId/nodes',
   '/api/gantt/charts/:chartId/nodes/:nodeId',
   '/api/gantt/charts/:chartId/nodes/:nodeId/body',
@@ -240,6 +241,7 @@ const EVERY_VERB = [
   'GET /api/gantt/charts/:chartId',
   'PATCH /api/gantt/charts/:chartId',
   'POST /api/gantt/charts/:chartId/sync',
+  'POST /api/gantt/charts/:chartId/dates',
   'POST /api/gantt/charts/:chartId/nodes',
   'PATCH /api/gantt/charts/:chartId/nodes/:nodeId',
   'DELETE /api/gantt/charts/:chartId/nodes/:nodeId',
@@ -333,6 +335,29 @@ describe('the gantt skill', () => {
     expect(skill).toContain('^[a-z0-9][a-z0-9-]{0,63}$')
     expect(skill).toContain('`YYYY-MM-DD`')
     expect(skill).toContain("**A node id is also its body's filename.**")
+  })
+
+  // The bug this one pins is the only one in this file that shipped *through*
+  // the other tests: an agent followed the skill faithfully and produced 29
+  // correctly parented lanes with `start: null, end: null` on every one, because
+  // the document taught the date format and never said where a date comes from.
+  // Every test above passed throughout — they check that a field is *named*, not
+  // that the agent is told how to *fill* one. So the three sentences that fix it
+  // are asserted literally: the call, the reason it is safe to make, and the
+  // reason it is safe to make twice.
+  it('tells the agent to seed the dates from history, and that doing so is safe', () => {
+    expect(skill).toContain('POST {{BASE_URL}}/api/gantt/charts/{{CHART_ID}}/dates')
+    // An agent that fears clobbering its own planning will never make the call,
+    // so "it only fills blanks" is as load-bearing as the endpoint itself.
+    expect(skill).toContain('**It only fills blanks.**')
+    expect(skill).toContain('**It is safe to re-run.**')
+    // And it is step one, not advice buried later: its absence is what produced
+    // the undated chart, so the working order has to carry it.
+    expect(skill).toContain('**Seed the dates from history**')
+    // Leaving `end` null has to read as a result rather than as an omission, or
+    // the agent invents a date to avoid looking incomplete.
+    expect(skill).toContain('**leave `end` null**')
+    expect(skill).toContain('open-ended bar')
   })
 
   it('tells the agent a cycle is accepted and is the plan talking, not a retry', () => {

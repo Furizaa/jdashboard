@@ -14,9 +14,10 @@ import type { World } from '../world/World'
 //
 // **The fixture is the one from `view-model/__fixtures__`, not a second world.**
 // It was built to exercise every case the surface has to draw — three depths, an
-// overrun, an undated lane, a cross-depth arrow, three arrows that merge under
-// collapse, one that is dropped, a cycle, an orphan, an unplaced ticket — so a
-// case cannot be covered in the layout's table tests and missing here.
+// overrun, an undated lane, an open-ended one, a cross-depth arrow, three
+// arrows that merge under collapse, one that is dropped, a cycle, an orphan, an
+// unplaced ticket — so a case cannot be covered in the layout's table tests and
+// missing here.
 //
 // Mocking happens at the HTTP boundary (ADR-0001), and a chart is the one thing
 // under `~/.clashboard/` with **no** HTTP boundary behind it: the app is its
@@ -57,6 +58,7 @@ const MIRRORED_LANES: ReadonlyArray<readonly [string, string]> = [
   ['GEO-143', 'Tier selector on the quote form'],
   ['GEO-144', 'Price breakdown drawer'],
   ['GEO-150', 'Legacy invoice importer'],
+  ['GEO-151', 'Backfill historic invoice lines'],
   ['GEO-200', 'Audit tier rounding'],
 ]
 

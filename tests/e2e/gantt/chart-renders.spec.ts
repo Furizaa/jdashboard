@@ -58,7 +58,7 @@ test('the chart list offers the chart, and opening one names it in the URL', asy
   // counts come from the store's summary, so "4 of 15 done" is the chart's own
   // arithmetic rather than the renderer's.
   await expect(listRow).toContainText('Pricing rework')
-  await expect(listRow).toContainText('1 of 15 done')
+  await expect(listRow).toContainText('1 of 16 done')
 
   await listRow.click()
   // A chart is a thing the URL names and the back button returns to (ADR-0007).
@@ -87,6 +87,7 @@ test("the tree renders every lane, at its own depth, in the chart's order", asyn
     'invoice-rewrite',
     'dunning',
     'geo-150',
+    'geo-151',
     'legacy-sunset',
     'shutdown-reads',
     'geo-200',
@@ -114,13 +115,20 @@ test('bars are drawn for dated lanes, segmented for parents, and absent for unda
 }) => {
   await openDemoChart(page)
 
-  // Thirteen dated lanes of fifteen. The two without dates have no bar at all,
+  // Fourteen bars of sixteen lanes. The two without dates have no bar at all,
   // which is an ordinary state and not a defect: import makes dates nullable.
-  await expect(bars(page)).toHaveCount(13)
+  await expect(bars(page)).toHaveCount(14)
   await expect(bar(page, 'rate-cards')).toHaveCount(0)
   await expect(bar(page, 'geo-200')).toHaveCount(0)
   await expect(row(page, 'rate-cards')).toHaveAttribute('data-undated', 'true')
   await expect(row(page, 'rate-cards')).toContainText('no dates')
+
+  // A lane with a start and no end is the fourteenth: it has a bar, an
+  // open-ended one, and it is not undated — a known start drawn as a blank row
+  // is the defect that state exists to prevent (ADR-0012 §4).
+  await expect(bar(page, 'geo-151')).toHaveAttribute('data-open-ended', 'true')
+  await expect(row(page, 'geo-151')).toHaveAttribute('data-undated', 'false')
+  await expect(bar(page, 'geo-141')).toHaveAttribute('data-open-ended', 'false')
 
   // A parent states the distribution, not a rolled-up state (ADR-0012 §4).
   const prd = bar(page, 'tier-migration')

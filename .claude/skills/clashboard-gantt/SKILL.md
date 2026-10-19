@@ -83,7 +83,7 @@ Nodes arrive flat and you build the tree yourself from `parentId`. Depth is unbo
 - **`order`** — an integer that orders a lane among its siblings. Gaps are fine; leave room (`0`, `10`, `20`) if you expect to insert.
 - **`title`** — one line, 1–300 characters, and it is **trimmed**, so a title of only whitespace is rejected.
 - **`source`** — `{ "kind": "local" }` for a lane you author, or `{ "kind": "jira", "key": "GEO-134" }` for one that mirrors a ticket. It decides which half of the node you own; see "Mirrored fields" below. You cannot change it after the node exists: a different source is a different node.
-- **`start`** / **`end`** — `YYYY-MM-DD` or `null`. Chart-owned on every node, whatever its source. clashboard reads no dates from Jira and writes none back.
+- **`start`** / **`end`** — `YYYY-MM-DD` or `null`. Chart-owned on every node, whatever its source. clashboard reads no dates from Jira and writes none back. Where each one comes from is **"How to date a lane"** below; the format is the easy half.
 - **`column`** — the progress column, one of `"TO DO"`, `"In Implementation"`, `"In Code Review"`, `"Done"`. Note the casing: `"TO DO"` is upper-case and the other three are not. For a jira node it is derived from the ticket's status; for a local one you declare it.
 - **`status`** — the real status name behind the column (`"In STG"`, `"Reviewed"`), or `null`. Mirrored on a jira node; usually `null` on a local one.
 - **`assignee`** — a display name, or `null`. Mirrored on a jira node.
@@ -121,6 +121,71 @@ You pick them, and you should pick them to be readable: `tier-migration`, not `n
 `start` and `end` are `YYYY-MM-DD` strings, or `null`. The month and the day are range-checked, so `2026-13-01` comes back as an error you can correct rather than as a bar in the wrong year.
 
 They are nullable because a chart bootstrapped from Jira has one node per discovered ticket and no dates at all. An undated lane renders in the tree, dimmed, with no bar. **Do not invent dates to fill them in.** A parent carries its own declared window _and_ an underlay derived from its dated descendants, which is what makes slip visible — a PRD whose features have overrun its declared quarter shows the overrun instead of absorbing it.
+
+That is not permission to leave a chart blank, though. Most of a real chart's dates are already knowable, and the next section is where each one comes from.
+
+## How to date a lane
+
+This is the section whose absence produced a chart of **29 lanes with no dates at all** — correctly parented, every one of its 53 arrows reconciled, and `start: null, end: null` on all twenty-nine. The agent that built it did nothing wrong: it had been taught the date _format_ and never told where a date comes from. A schema is not a procedure. This is the procedure.
+
+### 1. Ask the server for the history first
+
+```bash
+curl -s -X POST {{BASE_URL}}/api/gantt/charts/{{CHART_ID}}/dates
+```
+
+`200` with the whole chart. **No request body**: the ticket keys it needs are already on the chart, exactly as with `sync`.
+
+It reads each mirrored ticket's **status transition history** and dates every lane whose ticket has already started — `start` from the first transition into a status outside the `TO DO` column, `end` from the first transition into a status in the `Done` column. That is the only truthful source of dates in existence for work that has already happened, and clashboard has to be the one to read it: it holds the Jira credentials, and `acli jira workitem view --json` returns no transitions at all.
+
+**Call this straight after creating a chart from epics, before you date anything by hand.** Two properties make that safe, and an agent that doubts either will put the call off forever:
+
+- **It only fills blanks.** A `start` or an `end` already on a lane keeps its value even where history disagrees. There is no path through the verb that can overwrite a date, so it is a source of a first value and never a second writer — it cannot undo your planning, and you are not racing it.
+- **It is safe to re-run.** A second call finds nothing left to fill and reports the same chart the same way. Run it again after a `sync` that discovered new tickets.
+
+On the chart described above it dated 20 of the 29 lanes in under two seconds. Skipping it costs you all twenty and buys nothing.
+
+`404 ChartNotFound` comes back before Jira is asked, so a mistyped chart id is cheap. `503 JiraUnreachable` means Jira answered for **none** of the chart's tickets and `chart.json` was left byte-identical; try later. One ticket Jira will not answer for is not a `503` — it is skipped and counted, and the other lanes still get their dates.
+
+### 2. What it leaves for you
+
+Three kinds of lane come back still blank, and they are the same three every time:
+
+- a ticket that **has not started** — history has nothing to say about the future;
+- the **forecast end of work still in flight** — it gets a real `start` and `end` stays `null`;
+- **the lanes you authored yourself** — a PRD, a feature, an issue has no Jira history to read.
+
+On that chart it was 4, 4 and 5. All three are judgement, which is precisely why the server does not guess at them — a date it invented would be indistinguishable from one you reasoned about.
+
+### 3. Forecasting an end for work in flight
+
+Take the `start` the seed gave you, add the remaining effort you can justify, and **say in the lane's body where the number came from**.
+
+If you cannot justify one, **leave `end` null**. A lane with a start and no end draws as an **open-ended bar** that fades out instead of stopping, and what it says is true: this began on a known day and nobody has forecast a finish. That is a legitimate outcome and not a gap in your work. An invented end is a confident wrong date a reader has no way to tell from a real one, and it is the one mistake here that cannot be spotted from the chart.
+
+### 4. Dating work that has not started
+
+Schedule it from the dependency graph **the chart already holds**. A lane starts no earlier than the latest `end` of everything with a `blocks` edge into it, so: `GET` the chart, read its `edges`, and work forward from the lanes history has already dated. Do not go back to Jira for this — the arrows are on the chart, and the read is cheap because no bodies travel with it.
+
+Where a ticket states its own sequencing in prose, that is a dependency too and it belongs on the chart as an arrow. HDR-20945 says "Start this ticket after the full PRD of HDR-20708 is implemented and released" — declare that edge, so the next reader sees an arrow rather than having to re-read the ticket to work out why the bar sits where it does.
+
+### 5. Duration
+
+Use the estimate the ticket carries, if it carries one. If it does not, pick a default, **apply it consistently, and record it in the body of every lane you applied it to** — "no estimate on this ticket; assumed two weeks" is one line.
+
+A stated assumption is something a human can correct in a sentence. An unstated one is something they have to reverse-engineer from the bar widths, and mostly they will not try.
+
+### 6. Date your own PRD lanes too
+
+The lanes you authored need dates as much as the mirrored ones, and on the real chart they were the five that got missed: dated nowhere while their Jira children were dated from history, so each parent drew the thin derived underlay and no bar of its own.
+
+A parent carries its **own declared span** on purpose. That is what lets "this PRD is Q4" exist before the PRD has been decomposed, and it is what makes the child-span underlay mean anything at all — an overrun is only visible when there is a declared window to overrun. So declare the window you actually mean, and let the underlay disagree with it if the children have slipped. The disagreement is the chart doing its job.
+
+### 7. Never leave a chart silently undated
+
+If you finish and lanes are still undated, **say which, and why**, in your reply. One clause each is enough: "GEO-210 and GEO-211 have no start because nothing has begun on them and nothing dates their blockers yet."
+
+An undated chart renders as an empty grid, and the person who asked for it cannot tell your judgement from your omission. The chart is on your side here — it carries a "needs attention" line counting the undated lanes and the ones in flight with no forecast end, and a chart with nothing dated at all shows a banner naming this very verb. Both exist so the gap is visible; do not make them the way the user finds out.
 
 ## Mirrored fields must not be patched on a jira node
 
@@ -316,10 +381,11 @@ Read it in three parts:
 A chart is built in a handful of passes, and they are cheap because the chart read carries no bodies:
 
 1. **Read the chart** before you write to it, every time you are not certain of its contents. You need the node ids anyway.
-2. **Create the lanes you are adding**, parents before children, so `parentId` always names something that exists.
-3. **Arrange** — `PATCH` `parentId` and `order` to group mirrored tickets under your own PRD lanes. This is the work the server cannot do for you.
-4. **Date** what you honestly know, and leave the rest `null`.
-5. **Declare the arrows**, then read the chart back and look at whether a cycle appeared.
-6. **Write the bodies** last, one `PUT` per lane, as raw markdown.
+2. **Seed the dates from history** — one `POST …/dates`, immediately after a chart is created from epics and before you date anything by hand. It only fills blanks and is safe to re-run, so there is no version of this plan in which deferring it helps.
+3. **Create the lanes you are adding**, parents before children, so `parentId` always names something that exists.
+4. **Arrange** — `PATCH` `parentId` and `order` to group mirrored tickets under your own PRD lanes. This is the work the server cannot do for you.
+5. **Date what the seed left** — the unstarted lanes, the forecast ends, and your own PRD lanes. "How to date a lane" above is how, and leaving an `end` null is one of the answers.
+6. **Declare the arrows**, then read the chart back and look at whether a cycle appeared.
+7. **Write the bodies** last, one `PUT` per lane, as raw markdown.
 
 Each write is one changelog entry the user will read. Make them mean something: a hundred single-field patches that end where three would have is a legible audit trail of you flailing.

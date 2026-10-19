@@ -16,7 +16,7 @@ import type { Locator, Page } from '@playwright/test'
 
 const needsAttention = (page: Page): Locator => page.getByTestId(testIds.ganttNeedsAttention)
 
-test('the three counts render as one line, each naming what it counted', async ({
+test('the four counts render as one line, each naming what it counted', async ({
   page,
   local,
   world,
@@ -28,20 +28,26 @@ test('the three counts render as one line, each naming what it counted', async (
   const line = needsAttention(page)
   await expect(line).toBeVisible()
 
-  // Two lanes with no dates (`rate-cards`, `geo-200`), one nobody placed
-  // (`geo-200`, a childless jira lane still at the root where import dropped
-  // it), and one orphan (`geo-150`).
+  // Two lanes with no dates (`rate-cards`, `geo-200`), one in flight with no
+  // forecast end (`geo-151`), one nobody placed (`geo-200`, a childless jira
+  // lane still at the root where import dropped it), and one orphan
+  // (`geo-150`).
   await expect(line).toContainText('2 undated')
+  // Counted apart from the undated ones, and spelled out: "nobody knows when
+  // this starts" and "nobody has forecast when this finishes" ask for different
+  // work, and reading the second as the first draws a known start as a blank row.
+  await expect(line).toContainText('1 in flight, no forecast end')
   await expect(line).toContainText('1 unplaced')
   await expect(line).toContainText('1 orphaned')
 
   // The total is the **union**, not the sum: `geo-200` is both undated and
   // unplaced, and it is one lane to go and fix.
-  await expect(line).toHaveAttribute('data-total', '3')
+  await expect(line).toHaveAttribute('data-total', '4')
 
   // Each count names the lanes behind it, so the instruction can be written
   // without hunting for them.
   await expect(line).toHaveAttribute('title', /Undated: rate-cards, geo-200/u)
+  await expect(line).toHaveAttribute('title', /In flight: geo-151/u)
   await expect(line).toHaveAttribute('title', /Unplaced: geo-200/u)
   await expect(line).toHaveAttribute('title', /Orphaned: geo-150/u)
 
@@ -53,8 +59,9 @@ test('the three counts render as one line, each naming what it counted', async (
 
 test('a chart with nothing outstanding says nothing at all', async ({ page, local, world }) => {
   seedDemoIssues(world)
-  // Everything placed, everything dated, nothing orphaned: the line is absent
-  // rather than a reassuring "0 undated · 0 unplaced · 0 orphaned".
+  // Everything placed, everything dated — a forecast end included, which is
+  // what the in-flight lane is missing — and nothing orphaned: the line is
+  // absent rather than a reassuring "0 undated · 0 unplaced · 0 orphaned".
   const settled: GanttNode[] = []
   for (const node of demoChart.nodes) {
     // `geo-200` is the unplaced one — a childless jira lane still at the root.
@@ -63,7 +70,9 @@ test('a chart with nothing outstanding says nothing at all', async ({ page, loca
       Object.assign({}, node, {
         orphaned: false,
         start: node.start ?? '2026-10-05',
-        end: node.end ?? '2026-10-24',
+        // After every start in the fixture, `geo-151`'s included, so filling it
+        // in cannot produce a lane that ends before it begins.
+        end: node.end ?? '2026-11-30',
       }),
     )
   }

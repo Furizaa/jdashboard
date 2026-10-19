@@ -100,7 +100,7 @@ test('a fully collapsed chart is a PRD-level dependency graph, with merged arrow
   await expect(arrows(page)).toHaveCount(3)
 
   await page.getByRole('button', { name: 'Expand all lanes' }).click()
-  await expect(rows(page)).toHaveCount(15)
+  await expect(rows(page)).toHaveCount(16)
   await expect(arrows(page)).toHaveCount(6)
 })
 

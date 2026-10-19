@@ -156,6 +156,7 @@ export const testIds = Object.freeze({
   ganttNeedsAttention: 'gantt-needs-attention',
   ganttCycleWarning: 'gantt-cycle-warning',
   ganttZoom: 'gantt-zoom',
+  ganttSync: 'gantt-sync',
   ganttChangelog: 'gantt-changelog',
 } as const)
 

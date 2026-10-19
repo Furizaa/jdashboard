@@ -1,18 +1,16 @@
 import { useMemo } from 'react'
 import { match } from 'ts-pattern'
-import { ChevronLeft, FoldVertical, UnfoldVertical } from 'lucide-react'
+import { ChevronLeft } from 'lucide-react'
 import type { GanttNodeView } from '~/kernel'
 import { cn } from '~/lib/cn'
 import { useGanttChart, type GanttChartApi } from '../presenter'
 import type { GanttLayout } from '../view-model'
-import { ChangelogPopover } from './ChangelogPopover'
+import { ChartHeader } from './GanttChartHeader'
 import { CycleWarning } from './CycleWarning'
 import { GanttArrows } from './GanttArrows'
 import { GanttAxis, GanttGridLines } from './GanttAxis'
 import { GanttChartRow, BAR_REGION_CLASS, ROW_HEIGHT, TREE_COLUMN_CLASS } from './GanttRow'
 import { INFO_BAND_HEIGHT } from './InfoBand'
-import { NeedsAttention } from './NeedsAttention'
-import { ZoomControls } from './ZoomControls'
 
 // The grid frame: CSS grid rows, absolutely positioned bars, one SVG arrow
 // overlay (ADR-0012 §10).
@@ -97,52 +95,6 @@ function Chart({ api, onBack }: { api: ReadyApi; onBack: () => void }) {
         </div>
       </div>
     </div>
-  )
-}
-
-function ChartHeader({ api, onBack }: { api: ReadyApi; onBack: () => void }) {
-  return (
-    <div className="border-border flex h-11 shrink-0 items-center gap-3 border-b px-4">
-      <button
-        type="button"
-        onClick={onBack}
-        aria-label="Back to the chart list"
-        className="text-ink-subtle hover:text-foreground hover:bg-surface-2 focus-visible:ring-ring -ml-1.5 inline-flex h-7 items-center gap-1 rounded-md px-1.5 text-[11px] transition-colors focus-visible:ring-2 focus-visible:outline-none"
-      >
-        <ChevronLeft size={13} aria-hidden />
-        <span>Charts</span>
-      </button>
-      <span className="text-foreground truncate text-[13px] font-medium tracking-[-0.01em]">
-        {api.chart.title}
-      </span>
-      <NeedsAttention needs={api.layout.needsAttention} />
-      <div className="ml-auto flex items-center gap-2">
-        <FoldButton api={api} />
-        <ZoomControls zoom={api.zoom} onZoom={api.setZoom} />
-        <ChangelogPopover chartId={api.chartId} />
-      </div>
-    </div>
-  )
-}
-
-/**
- * One button rather than two. A fully collapsed chart is a PRD-level dependency
- * graph — arguably the most useful view of all (ADR-0012 §10) — and it is worth
- * arriving at and leaving again in one place.
- */
-function FoldButton({ api }: { api: ReadyApi }) {
-  const Icon = api.allCollapsed ? UnfoldVertical : FoldVertical
-  const label = api.allCollapsed ? 'Expand all lanes' : 'Collapse all lanes'
-  return (
-    <button
-      type="button"
-      onClick={api.allCollapsed ? api.expandAll : api.collapseAll}
-      aria-label={label}
-      title={label}
-      className="border-border text-ink-subtle hover:text-foreground hover:bg-surface-2 focus-visible:ring-ring inline-flex h-7 w-7 items-center justify-center rounded-md border transition-colors focus-visible:ring-2 focus-visible:outline-none"
-    >
-      <Icon size={13} aria-hidden />
-    </button>
   )
 }
 

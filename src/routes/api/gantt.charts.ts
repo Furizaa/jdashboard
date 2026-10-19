@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { bootstrapChart } from '~/server/contexts/gantt/application/bootstrap-chart'
 import { loadChartList } from '~/server/contexts/gantt/application/load-chart'
-import { createChart } from '~/server/contexts/gantt/application/mutate-chart'
 import { createChartBody } from '~/server/lib/gantt-schema'
 import { liveGanttWrites, type GanttWrites } from '~/server/lib/gantt-writes'
 import { decodeJsonBody, ganttJson, ganttRespond, type WithRequest } from './-gantt-http'
@@ -9,9 +9,10 @@ import { decodeJsonBody, ganttJson, ganttRespond, type WithRequest } from './-ga
 // first and, on connection-refused, stops and reports that clashboard is not
 // running rather than planning into a socket (ADR-0012 §12).
 //
-// `POST /api/gantt/charts` — create. `jiraSources` is stored here and discovered
-// from in slice 95; import and sync are one code path, which is why there is no
-// separate `import` verb to rot beside it.
+// `POST /api/gantt/charts` — create, and **fill** when `jiraSources` names any
+// epics: the chart comes back already carrying one mirrored node per discovered
+// ticket, flat and undated. Import and sync are one code path, which is why
+// there is no separate `import` verb to rot beside it (ADR-0012 §5).
 //
 // Both methods are sibling keys in one file because that is the shape of a
 // TanStack server route: a path is a file, and the methods live inside it.
@@ -29,7 +30,9 @@ export function ganttChartsHandlers(writes: GanttWrites) {
     POST: async ({ request }: WithRequest) => {
       const body = await decodeJsonBody(request, createChartBody)
       if (!body.ok) return body.response
-      return ganttRespond(ROUTE, createChart(body.value, writes), (chart) => ganttJson(chart, 201))
+      return ganttRespond(ROUTE, bootstrapChart(body.value, writes), (chart) =>
+        ganttJson(chart, 201),
+      )
     },
   }
 }

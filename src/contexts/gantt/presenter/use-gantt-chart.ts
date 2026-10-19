@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import { format } from 'date-fns'
-import { useGanttBody, useGanttChart as useGanttChartQuery } from '~/coordinator'
+import { useGanttBody, useGanttChart as useGanttChartQuery, useSyncGanttChart } from '~/coordinator'
 import type { GanttChart, GanttChartView } from '~/kernel'
 import {
   initialGanttState,
@@ -12,6 +12,7 @@ import {
   type GanttZoom,
 } from '../view-model'
 import { readGanttPreference, writeGanttPreference } from './gantt-preference'
+import { useStaleChartSync } from './use-stale-sync'
 
 // The Gantt's composition root: the server's chart, the reader's view state, and
 // the pure layout function, folded into the one thing the views render. The only
@@ -45,6 +46,15 @@ export type GanttChartApi =
       readonly zoom: GanttZoom
       /** Whether every lane with children is already folded. */
       readonly allCollapsed: boolean
+      /**
+       * Refresh the mirrored half now. The one verb the Gantt surface has that
+       * reaches Jira, and it still writes nothing an agent authored (ADR-0012
+       * §5) — `canSync` is false for a chart with no epics behind it, where
+       * there would be nothing to refresh.
+       */
+      readonly canSync: boolean
+      readonly isSyncing: boolean
+      readonly refresh: () => void
       readonly setZoom: (zoom: GanttZoom) => void
       readonly toggleCollapse: (nodeId: string) => void
       readonly collapseAll: () => void
@@ -77,6 +87,18 @@ export function useGanttChart(chartId: string): GanttChartApi {
 
   const view = result?.ok === true ? result.chart : null
   const chart = useMemo(() => (view === null ? null : toLayoutChart(view)), [view])
+
+  // Opening a chart older than five minutes refreshes its mirrored half, exactly
+  // once — see `use-stale-sync.ts` for why that is a guard rather than an effect.
+  // The same mutation is the header's Refresh, so neither can run while the
+  // other is.
+  const { sync, isPending: isSyncing } = useSyncGanttChart()
+  useStaleChartSync({ chartId, chart: view, sync, isPending: isSyncing })
+  const refresh = useCallback(() => {
+    void sync(chartId).catch(() => {
+      // Held by the mutation; a sync that fails leaves the chart as it was.
+    })
+  }, [sync, chartId])
 
   // Set during render when the chart arrives or the reader opens a different
   // one, which is React's own answer to "state derived from a prop": the
@@ -144,6 +166,9 @@ export function useGanttChart(chartId: string): GanttChartApi {
     layout: laidOut,
     zoom: state.zoom,
     allCollapsed: everyParentCollapsed(laidOut),
+    canSync: view.jiraSources.length > 0,
+    isSyncing,
+    refresh,
     titleOf,
     ...actions,
   }

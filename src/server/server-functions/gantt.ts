@@ -7,8 +7,9 @@ import {
   type GanttChangelogEntry,
   type GanttChangelogStoreDeps,
 } from '../lib/gantt-changelog-store'
-import { assertChartId, assertNodeId } from '../lib/gantt-schema'
+import { assertChartId, assertNodeId, type GanttChart } from '../lib/gantt-schema'
 import type { GanttChartSummary, GanttStoreDeps } from '../lib/gantt-store'
+import { liveGanttWrites } from '../lib/gantt-writes'
 import {
   loadChart,
   loadChartList,
@@ -16,15 +17,22 @@ import {
   type GanttBodyView,
   type GanttChartView,
 } from '../contexts/gantt/application/load-chart'
-import { ChartNotFound, NodeNotFound } from '../contexts/gantt/errors'
+import { syncChart } from '../contexts/gantt/application/sync-chart'
+import {
+  ChartNotFound,
+  InvalidChartPayload,
+  JiraUnreachable,
+  NodeNotFound,
+} from '../contexts/gantt/errors'
 import type { WireResult } from '../wire/to-wire'
 import { runWire } from './run-wire'
 
-// The Gantt surface's **read side**, and only its read side (ADR-0012 §8). The
-// UI is read-only by design: the agent is the chart's one writer and it writes
-// over the REST contract in `routes/api/`, so there is no mutation here to
-// serialise against it. Sync and archive — the two lifecycle verbs the human
-// owns rather than the agent — arrive in later slices.
+// The Gantt surface's **read side**, plus `syncGanttChart` (ADR-0012 §8). The
+// UI is read-only about chart *content*: the agent is the chart's one writer and
+// it writes over the REST contract in `routes/api/`. Sync is not an exception to
+// that — it writes nothing the agent authored, only the mirrored half Jira owns,
+// and it is one of the two lifecycle verbs the **human** owns rather than the
+// agent (archive is the other, and arrives with slice 96).
 //
 // Ordinary ADR-0005 JSON-RPC: the use-cases live in
 // `server/contexts/gantt/application/load-chart.ts` because the REST routes call
@@ -49,6 +57,16 @@ export type GetGanttBodyResult = WireResult<
 >
 
 export type GetGanttChangelogResult = { readonly entries: readonly GanttChangelogEntry[] }
+
+export type SyncGanttChartResult = WireResult<
+  { readonly chart: GanttChart },
+  | ChartNotFoundWire
+  | Schema.Schema.Encoded<typeof JiraUnreachable>
+  | Schema.Schema.Encoded<typeof InvalidChartPayload>
+>
+
+/** The three a sync can fail with — Jira silent, chart gone, chart unwritable. */
+const SyncGanttChartError = Schema.Union(ChartNotFound, JiraUnreachable, InvalidChartPayload)
 
 /** A node's body needs the chart to exist before "no body" means anything. */
 const GetGanttBodyError = Schema.Union(ChartNotFound, NodeNotFound)
@@ -142,3 +160,24 @@ export const getGanttChangelog = createServerFn({ method: 'GET' })
       entries: await readChartChangelog(data.chartId, changelogDeps()),
     }),
   )
+
+/**
+ * Refresh the mirrored half of one chart — the header's Refresh, and the
+ * stale-on-open trigger five minutes after a chart was last synced (ADR-0012
+ * §5). The same application service the REST route calls, which is the whole
+ * point of it living in `application/` (ADR-0012 §7).
+ *
+ * This one hands the **live write queue** rather than the read-only deps above:
+ * a sync writes, and it must serialise against whatever the agent is doing to
+ * the same chart. That is the one queue in the process, so it does.
+ */
+export const syncGanttChart = createServerFn({ method: 'POST' })
+  .inputValidator((data: { chartId: string }) => ({
+    chartId: requireChartId('syncGanttChart', data?.chartId),
+  }))
+  .handler(({ data }): Promise<SyncGanttChartResult> => {
+    const program = syncChart(data.chartId, liveGanttWrites()).pipe(
+      Effect.map((chart) => ({ chart })),
+    )
+    return runWire(program, SyncGanttChartError, 'syncGanttChart')
+  })

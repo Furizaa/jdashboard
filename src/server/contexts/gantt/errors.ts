@@ -95,6 +95,22 @@ export class MirroredFieldPatch extends Schema.TaggedError<MirroredFieldPatch>()
 ) {}
 
 /**
+ * Jira did not answer a sync's one search — any of unauthorized, rejected, or a
+ * transport failure, because from the caller's side they are one fact: the
+ * mirrored half of this chart could not be read just now. A `503`, and the
+ * chart is left **byte-identical**: nothing is reconciled from a search that did
+ * not happen, since a sync that discovered nothing would mark every mirrored
+ * node in the chart `orphaned`.
+ *
+ * Unlike the rest of this file this is not something the caller got wrong, so
+ * it carries only what happened. Retrying later is the whole remedy.
+ */
+export class JiraUnreachable extends Schema.TaggedError<JiraUnreachable>()('JiraUnreachable', {
+  chartId: Schema.String,
+  message: Schema.String,
+}) {}
+
+/**
  * Every failure a gantt route maps to a status. Declared as a union so the map
  * in `-gantt-http.ts` can be exhaustive: a new error is then a compile error at
  * the one place that decides what the agent sees, rather than a silent `500`.
@@ -108,3 +124,4 @@ export type GanttError =
   | DuplicateEdgeId
   | InvalidChartPayload
   | MirroredFieldPatch
+  | JiraUnreachable

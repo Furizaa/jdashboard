@@ -1,4 +1,4 @@
-import { Effect } from 'effect'
+import { Effect, type ManagedRuntime } from 'effect'
 import { match } from 'ts-pattern'
 import { z } from 'zod'
 import { createChartBody, toIssues, type GanttIssue } from '~/server/lib/gantt-schema'
@@ -130,8 +130,9 @@ export async function decodeJsonBody<S extends z.ZodType>(
  * failure to the application service is a compile error here rather than a
  * silent `500` at the one place the agent is reading.
  *
- * `503` is absent on purpose: it belongs to Jira-unreachable during sync, which
- * is slice 95's.
+ * `503` is `JiraUnreachable`, and it is the one arm here that is not the
+ * caller's fault: sync could not read the mirrored half, the chart was left
+ * exactly as it was, and trying again later is the whole remedy.
  */
 export function ganttFailureResponse(error: GanttError): Response {
   return match(error)
@@ -168,6 +169,13 @@ export function ganttFailureResponse(error: GanttError): Response {
         `chart "${e.chartId}" already has an edge "${e.edgeId}"`,
       ),
     )
+    .with({ _tag: 'JiraUnreachable' }, (e) =>
+      ganttErrorResponse(
+        503,
+        'JiraUnreachable',
+        `${e.message}, so chart "${e.chartId}" was left exactly as it was`,
+      ),
+    )
     .with({ _tag: 'MirroredFieldPatch' }, (e) =>
       ganttErrorResponse(
         422,
@@ -190,13 +198,21 @@ export function ganttDefectResponse(route: string, defect: unknown): Response {
 }
 
 /**
+ * What `appRuntime` can satisfy. Sync needs `JiraGateway` in its `R` channel, so
+ * the helper takes any program the one process-scoped runtime can run rather
+ * than only the `R = never` ones the pure-disk writes produce. Spelled exactly
+ * as `server-functions/run-wire.ts` spells it, for the same reason.
+ */
+type AppContext = ManagedRuntime.ManagedRuntime.Context<typeof appRuntime>
+
+/**
  * Run one application-service program and turn it into a `Response`: the success
  * shape the route chooses, the status map above for a tagged failure, and a
  * logged `500` for a defect — the same three arms `jira-media.$id.ts` has.
  */
-export function ganttRespond<A, E extends GanttError>(
+export function ganttRespond<A, E extends GanttError, R extends AppContext>(
   route: string,
-  program: Effect.Effect<A, E>,
+  program: Effect.Effect<A, E, R>,
   onSuccess: (value: A) => Response,
 ): Promise<Response> {
   return appRuntime.runPromise(

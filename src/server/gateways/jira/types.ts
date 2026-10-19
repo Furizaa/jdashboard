@@ -103,26 +103,6 @@ export const RawLinkedRefSchema = Schema.Struct({
 })
 export type RawLinkedRef = Schema.Schema.Type<typeof RawLinkedRefSchema>
 
-export const RawIssueSchema = Schema.Struct({
-  id: Schema.String,
-  key: Schema.String,
-  fields: Schema.Struct({
-    summary: Schema.String,
-    status: StatusFieldSchema,
-    labels: Schema.optional(Schema.Array(Schema.String)),
-    issuetype: Schema.optional(Schema.Struct({ name: Schema.String })),
-    parent: Schema.optional(Schema.NullOr(RawLinkedRefSchema)),
-  }),
-})
-export type RawIssue = Schema.Schema.Type<typeof RawIssueSchema>
-
-export const RawSearchResponseSchema = Schema.Struct({
-  issues: Schema.Array(RawIssueSchema),
-  nextPageToken: Schema.optional(Schema.String),
-  isLast: Schema.optional(Schema.Boolean),
-})
-export type RawSearchResponse = Schema.Schema.Type<typeof RawSearchResponseSchema>
-
 export const RawIssueLinkSchema = Schema.Struct({
   id: Schema.String,
   type: Schema.Struct({
@@ -134,6 +114,33 @@ export const RawIssueLinkSchema = Schema.Struct({
   outwardIssue: Schema.optional(RawLinkedRefSchema),
 })
 export type RawIssueLink = Schema.Schema.Type<typeof RawIssueLinkSchema>
+
+// `assignee` and `issuelinks` are **optional**: a caller gets them only when it
+// asks for them in the `fields` array, and `Schema.Struct` drops what the
+// response does not carry. Gantt's sync asks for both (one search covering the
+// mirrored fields and the whole epic's links together, ADR-0012 §6); the board
+// and the watchlist do not, and are unaffected.
+export const RawIssueSchema = Schema.Struct({
+  id: Schema.String,
+  key: Schema.String,
+  fields: Schema.Struct({
+    summary: Schema.String,
+    status: StatusFieldSchema,
+    labels: Schema.optional(Schema.Array(Schema.String)),
+    issuetype: Schema.optional(Schema.Struct({ name: Schema.String })),
+    parent: Schema.optional(Schema.NullOr(RawLinkedRefSchema)),
+    assignee: Schema.optional(Schema.NullOr(Schema.Struct({ displayName: Schema.String }))),
+    issuelinks: Schema.optional(Schema.Array(RawIssueLinkSchema)),
+  }),
+})
+export type RawIssue = Schema.Schema.Type<typeof RawIssueSchema>
+
+export const RawSearchResponseSchema = Schema.Struct({
+  issues: Schema.Array(RawIssueSchema),
+  nextPageToken: Schema.optional(Schema.String),
+  isLast: Schema.optional(Schema.Boolean),
+})
+export type RawSearchResponse = Schema.Schema.Type<typeof RawSearchResponseSchema>
 
 // `body` carries ADF; ADF validation is a separate concern and the walker
 // tolerates malformed structures, so we leave it Schema.Unknown here.

@@ -11,7 +11,7 @@ import {
 } from './__fixtures__/fake-gantt-store'
 
 describe('loadChartList', () => {
-  it('summarises every chart on disk and reads the empty list when there are none', () =>
+  it.effect('summarises every chart on disk and reads the empty list when there are none', () =>
     Effect.gen(function* () {
       const { deps } = fakeGanttStore({
         ...seedChart(aChart({ id: 'plan', nodes: [aNode('a'), aNode('b', { column: 'Done' })] })),
@@ -24,11 +24,12 @@ describe('loadChartList', () => {
       ])
 
       expect(yield* loadChartList(fakeGanttStore().deps)).toEqual([])
-    }))
+    }),
+  )
 })
 
 describe('loadChart', () => {
-  it('derives hasBody from the files on disk rather than from a stored flag', () =>
+  it.effect('derives hasBody from the files on disk rather than from a stored flag', () =>
     Effect.gen(function* () {
       const { deps } = fakeGanttStore({
         ...seedChart(aChart({ nodes: [aNode('api'), aNode('ui')] })),
@@ -39,17 +40,19 @@ describe('loadChart', () => {
         ['api', true],
         ['ui', false],
       ])
-    }))
+    }),
+  )
 
-  it('fails with ChartNotFound for a chart that is not there', () =>
+  it.effect('fails with ChartNotFound for a chart that is not there', () =>
     Effect.gen(function* () {
       const failure = yield* loadChart('ghost', fakeGanttStore().deps).pipe(Effect.flip)
       expect(failure._tag).toBe('ChartNotFound')
-    }))
+    }),
+  )
 })
 
 describe('loadNodeBody', () => {
-  it('reads the markdown, and null for a node that simply has none', () =>
+  it.effect('reads the markdown, and null for a node that simply has none', () =>
     Effect.gen(function* () {
       const { deps } = fakeGanttStore({
         ...seedChart(aChart({ nodes: [aNode('api'), aNode('ui')] })),
@@ -61,14 +64,16 @@ describe('loadNodeBody', () => {
         markdown: '# the API',
       })
       expect((yield* loadNodeBody('plan', 'ui', deps)).markdown).toBeNull()
-    }))
+    }),
+  )
 
   // "No body" and "no such node" must not look the same: a typo'd node id
   // reading as an empty PRD is silence an agent cannot correct.
-  it('fails with NodeNotFound for a node the chart does not have', () =>
+  it.effect('fails with NodeNotFound for a node the chart does not have', () =>
     Effect.gen(function* () {
       const { deps } = fakeGanttStore(seedChart(aChart()))
       const failure = yield* loadNodeBody('plan', 'ghost', deps).pipe(Effect.flip)
       expect(failure._tag).toBe('NodeNotFound')
-    }))
+    }),
+  )
 })

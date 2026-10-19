@@ -43,4 +43,5 @@ export type {
   GetGanttChangelogResult,
   GetGanttChartResult,
   ListGanttChartsResult,
+  SyncGanttChartResult,
 } from '~/server/server-functions/gantt'

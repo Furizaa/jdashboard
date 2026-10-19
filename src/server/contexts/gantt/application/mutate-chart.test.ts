@@ -40,7 +40,7 @@ const NODE_BODY = {
 }
 
 describe('createChart', () => {
-  it('writes a new chart with the server-owned fields filled in', () =>
+  it.effect('writes a new chart with the server-owned fields filled in', () =>
     Effect.gen(function* () {
       const { writes, deps } = fakeGanttStore()
       const chart = yield* createChart(
@@ -59,9 +59,10 @@ describe('createChart', () => {
         edges: [],
       })
       expect(yield* Effect.promise(() => readChart('plan', deps))).toEqual(chart)
-    }))
+    }),
+  )
 
-  it('appends exactly one changelog entry, naming the actor', () =>
+  it.effect('appends exactly one changelog entry, naming the actor', () =>
     Effect.gen(function* () {
       const { writes, deps } = fakeGanttStore()
       yield* createChart({ id: 'plan', title: 'The plan', jiraSources: [] }, writes)
@@ -70,9 +71,10 @@ describe('createChart', () => {
       expect(log).toHaveLength(1)
       expect(log[0]).toMatchObject({ at: FAKE_NOW, actor: 'agent' })
       expect(log[0]?.summary).toContain('created chart "plan"')
-    }))
+    }),
+  )
 
-  it('refuses a chart id that is already taken', () =>
+  it.effect('refuses a chart id that is already taken', () =>
     Effect.gen(function* () {
       const { writes } = fakeGanttStore(seedChart(aChart()))
       const failure = yield* createChart(
@@ -80,52 +82,58 @@ describe('createChart', () => {
         writes,
       ).pipe(Effect.flip)
       expect(failure._tag).toBe('DuplicateChartId')
-    }))
+    }),
+  )
 })
 
 describe('patchChart', () => {
-  it('patches the title and jiraSources and nothing else', () =>
+  it.effect('patches the title and jiraSources and nothing else', () =>
     Effect.gen(function* () {
       const { writes } = fakeGanttStore(seedChart(aChart({ nodes: [aNode('api')] })))
       const patched = yield* patchChart('plan', { title: 'Renamed' }, writes)
       expect(patched.title).toBe('Renamed')
       expect(patched.createdAt).toBe(FAKE_NOW)
       expect(patched.nodes.map((node) => node.id)).toEqual(['api'])
-    }))
+    }),
+  )
 
-  it('is a 404 for a chart that is not there', () =>
+  it.effect('is a 404 for a chart that is not there', () =>
     Effect.gen(function* () {
       const { writes } = fakeGanttStore()
       const failure = yield* patchChart('ghost', { title: 'x' }, writes).pipe(Effect.flip)
       expect(failure._tag).toBe('ChartNotFound')
-    }))
+    }),
+  )
 })
 
 describe('createNode', () => {
-  it('appends the node with orphaned false — a fact sync observes, not a claim', () =>
+  it.effect('appends the node with orphaned false — a fact sync observes, not a claim', () =>
     Effect.gen(function* () {
       const { writes, deps } = fakeGanttStore(seedChart(aChart()))
       const node = yield* createNode('plan', NODE_BODY, writes)
       expect(node.orphaned).toBe(false)
       const stored = yield* Effect.promise(() => readChart('plan', deps))
       expect(stored?.nodes.map((n) => n.id)).toEqual(['api'])
-    }))
+    }),
+  )
 
-  it('refuses a duplicate node id', () =>
+  it.effect('refuses a duplicate node id', () =>
     Effect.gen(function* () {
       const { writes } = fakeGanttStore(seedChart(aChart({ nodes: [aNode('api')] })))
       const failure = yield* createNode('plan', NODE_BODY, writes).pipe(Effect.flip)
       expect(failure._tag).toBe('DuplicateNodeId')
-    }))
+    }),
+  )
 
-  it('refuses a parentId naming a node that does not exist', () =>
+  it.effect('refuses a parentId naming a node that does not exist', () =>
     Effect.gen(function* () {
       const { writes } = fakeGanttStore(seedChart(aChart()))
       const failure = yield* createNode('plan', { ...NODE_BODY, parentId: 'ghost' }, writes).pipe(
         Effect.flip,
       )
       expect(failure._tag).toBe('NodeNotFound')
-    }))
+    }),
+  )
 })
 
 describe('patchNode', () => {
@@ -133,7 +141,7 @@ describe('patchNode', () => {
     nodes: [aNode('geo-120', { source: { kind: 'jira', key: 'GEO-120' }, title: 'Mirrored' })],
   })
 
-  it('refuses a mirrored field on a jira-sourced node, naming the fields', () =>
+  it.effect('refuses a mirrored field on a jira-sourced node, naming the fields', () =>
     Effect.gen(function* () {
       const { writes } = fakeGanttStore(seedChart(jiraChart))
       const failure = yield* patchNode('plan', 'geo-120', { title: 'Mine now' }, writes).pipe(
@@ -141,24 +149,27 @@ describe('patchNode', () => {
       )
       expect(failure._tag).toBe('MirroredFieldPatch')
       expect(failure).toMatchObject({ nodeId: 'geo-120', fields: ['title'] })
-    }))
+    }),
+  )
 
-  it('accepts a chart-owned field on the same node', () =>
+  it.effect('accepts a chart-owned field on the same node', () =>
     Effect.gen(function* () {
       const { writes } = fakeGanttStore(seedChart(jiraChart))
       const patched = yield* patchNode('plan', 'geo-120', { start: '2026-11-02' }, writes)
       expect(patched.start).toBe('2026-11-02')
       expect(patched.title).toBe('Mirrored')
-    }))
+    }),
+  )
 
-  it('accepts a mirrored field on a local node — nothing will overwrite it', () =>
+  it.effect('accepts a mirrored field on a local node — nothing will overwrite it', () =>
     Effect.gen(function* () {
       const { writes } = fakeGanttStore(seedChart(aChart({ nodes: [aNode('api')] })))
       const patched = yield* patchNode('plan', 'api', { title: 'Renamed' }, writes)
       expect(patched.title).toBe('Renamed')
-    }))
+    }),
+  )
 
-  it('is a 404 for an unknown node and for an unknown new parent', () =>
+  it.effect('is a 404 for an unknown node and for an unknown new parent', () =>
     Effect.gen(function* () {
       const { writes } = fakeGanttStore(seedChart(aChart({ nodes: [aNode('api')] })))
       expect((yield* patchNode('plan', 'ghost', {}, writes).pipe(Effect.flip))._tag).toBe(
@@ -167,7 +178,8 @@ describe('patchNode', () => {
       expect(
         (yield* patchNode('plan', 'api', { parentId: 'ghost' }, writes).pipe(Effect.flip))._tag,
       ).toBe('NodeNotFound')
-    }))
+    }),
+  )
 })
 
 describe('deleteNode', () => {
@@ -182,7 +194,7 @@ describe('deleteNode', () => {
     edges: [anEdge('e1', 'feature', 'other'), anEdge('e2', 'other', 'task-a')],
   })
 
-  it('reparents the children to the deleted node’s parent and removes its edges', () =>
+  it.effect('reparents the children to the deleted node’s parent and removes its edges', () =>
     Effect.gen(function* () {
       const body = bodyFilePath(FAKE_HOME, 'plan', 'feature')
       const prev = bodyPrevFilePath(FAKE_HOME, 'plan', 'feature')
@@ -211,26 +223,29 @@ describe('deleteNode', () => {
       expect(stored?.edges.map((e) => e.id)).toEqual(['e2'])
       expect(files.has(body)).toBe(false)
       expect(files.has(prev)).toBe(false)
-    }))
+    }),
+  )
 
-  it('reparents a root node’s children to the root', () =>
+  it.effect('reparents a root node’s children to the root', () =>
     Effect.gen(function* () {
       const { writes, deps } = fakeGanttStore(seedChart(tree))
       yield* deleteNode('plan', 'prd', writes)
       const stored = yield* Effect.promise(() => readChart('plan', deps))
       expect(stored?.nodes.find((n) => n.id === 'feature')?.parentId).toBeNull()
-    }))
+    }),
+  )
 
-  it('is a 404 for a node that is not there', () =>
+  it.effect('is a 404 for a node that is not there', () =>
     Effect.gen(function* () {
       const { writes } = fakeGanttStore(seedChart(tree))
       const failure = yield* deleteNode('plan', 'ghost', writes).pipe(Effect.flip)
       expect(failure._tag).toBe('NodeNotFound')
-    }))
+    }),
+  )
 })
 
 describe('putBody', () => {
-  it('writes the markdown and snapshots the predecessor to .md.prev', () =>
+  it.effect('writes the markdown and snapshots the predecessor to .md.prev', () =>
     Effect.gen(function* () {
       const { writes, deps, files } = fakeGanttStore(seedChart(aChart({ nodes: [aNode('api')] })))
 
@@ -243,35 +258,40 @@ describe('putBody', () => {
       expect(yield* Effect.promise(() => readBody('plan', 'api', deps))).toBe('# second')
       expect(files.get(bodyPrevFilePath(FAKE_HOME, 'plan', 'api'))).toBe('# first')
       expect(yield* Effect.promise(() => readChartChangelog('plan', deps))).toHaveLength(2)
-    }))
+    }),
+  )
 
-  it('is a 404 for a node the chart does not have', () =>
+  it.effect('is a 404 for a node the chart does not have', () =>
     Effect.gen(function* () {
       const { writes } = fakeGanttStore(seedChart(aChart()))
       const failure = yield* putBody('plan', 'ghost', '# x', writes).pipe(Effect.flip)
       expect(failure._tag).toBe('NodeNotFound')
-    }))
+    }),
+  )
 })
 
 describe('createEdge', () => {
   const two = aChart({ nodes: [aNode('a'), aNode('b')] })
 
-  it('records an edge that closes a cycle — the API never refuses a declared dependency', () =>
-    Effect.gen(function* () {
-      const { writes, deps } = fakeGanttStore(
-        seedChart(aChart({ nodes: two.nodes, edges: [anEdge('ab', 'a', 'b')] })),
-      )
-      const edge = yield* createEdge(
-        'plan',
-        { id: 'ba', from: 'b', to: 'a', source: { kind: 'local' } },
-        writes,
-      )
-      expect(edge.id).toBe('ba')
-      const stored = yield* Effect.promise(() => readChart('plan', deps))
-      expect(stored?.edges.map((e) => e.id)).toEqual(['ab', 'ba'])
-    }))
+  it.effect(
+    'records an edge that closes a cycle — the API never refuses a declared dependency',
+    () =>
+      Effect.gen(function* () {
+        const { writes, deps } = fakeGanttStore(
+          seedChart(aChart({ nodes: two.nodes, edges: [anEdge('ab', 'a', 'b')] })),
+        )
+        const edge = yield* createEdge(
+          'plan',
+          { id: 'ba', from: 'b', to: 'a', source: { kind: 'local' } },
+          writes,
+        )
+        expect(edge.id).toBe('ba')
+        const stored = yield* Effect.promise(() => readChart('plan', deps))
+        expect(stored?.edges.map((e) => e.id)).toEqual(['ab', 'ba'])
+      }),
+  )
 
-  it('refuses an edge naming a node that does not exist', () =>
+  it.effect('refuses an edge naming a node that does not exist', () =>
     Effect.gen(function* () {
       const { writes } = fakeGanttStore(seedChart(two))
       const failure = yield* createEdge(
@@ -280,24 +300,28 @@ describe('createEdge', () => {
         writes,
       ).pipe(Effect.flip)
       expect(failure._tag).toBe('NodeNotFound')
-    }))
+    }),
+  )
 
-  it('refuses a duplicate edge id — an id is a handle, and DELETE needs it unambiguous', () =>
-    Effect.gen(function* () {
-      const { writes } = fakeGanttStore(
-        seedChart(aChart({ nodes: two.nodes, edges: [anEdge('ab', 'a', 'b')] })),
-      )
-      const failure = yield* createEdge(
-        'plan',
-        { id: 'ab', from: 'b', to: 'a', source: { kind: 'local' } },
-        writes,
-      ).pipe(Effect.flip)
-      expect(failure._tag).toBe('DuplicateEdgeId')
-    }))
+  it.effect(
+    'refuses a duplicate edge id — an id is a handle, and DELETE needs it unambiguous',
+    () =>
+      Effect.gen(function* () {
+        const { writes } = fakeGanttStore(
+          seedChart(aChart({ nodes: two.nodes, edges: [anEdge('ab', 'a', 'b')] })),
+        )
+        const failure = yield* createEdge(
+          'plan',
+          { id: 'ab', from: 'b', to: 'a', source: { kind: 'local' } },
+          writes,
+        ).pipe(Effect.flip)
+        expect(failure._tag).toBe('DuplicateEdgeId')
+      }),
+  )
 })
 
 describe('deleteEdge', () => {
-  it('removes the edge and leaves both its nodes alone', () =>
+  it.effect('removes the edge and leaves both its nodes alone', () =>
     Effect.gen(function* () {
       const { writes, deps } = fakeGanttStore(
         seedChart(aChart({ nodes: [aNode('a'), aNode('b')], edges: [anEdge('ab', 'a', 'b')] })),
@@ -307,21 +331,23 @@ describe('deleteEdge', () => {
       const stored = yield* Effect.promise(() => readChart('plan', deps))
       expect(stored?.edges).toEqual([])
       expect(stored?.nodes.map((n) => n.id)).toEqual(['a', 'b'])
-    }))
+    }),
+  )
 
-  it('is a 404 for an edge id the chart does not have', () =>
+  it.effect('is a 404 for an edge id the chart does not have', () =>
     Effect.gen(function* () {
       const { writes } = fakeGanttStore(seedChart(aChart()))
       const failure = yield* deleteEdge('plan', 'ghost', writes).pipe(Effect.flip)
       expect(failure._tag).toBe('EdgeNotFound')
-    }))
+    }),
+  )
 })
 
 describe('every mutation', () => {
   // The audit trail is the third of the three things ADR-0012 §1's exception is
   // paid for with, so "one entry per write" is asserted over the whole surface
   // rather than per use-case.
-  it('appends exactly one changelog entry', () =>
+  it.effect('appends exactly one changelog entry', () =>
     Effect.gen(function* () {
       const { writes, deps } = fakeGanttStore()
       yield* createChart({ id: 'plan', title: 'The plan', jiraSources: [] }, writes)
@@ -341,5 +367,6 @@ describe('every mutation', () => {
       const log = yield* Effect.promise(() => readChartChangelog('plan', deps))
       expect(log).toHaveLength(9)
       expect(log.every((entry) => entry.actor === 'agent')).toBe(true)
-    }))
+    }),
+  )
 })

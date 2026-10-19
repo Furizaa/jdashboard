@@ -209,6 +209,12 @@ export const demoChart: GanttChart = {
   version: 1,
   id: DEMO_CHART_ID,
   title: 'Pricing rework',
+  // Fake epic keys, deliberately: every test that touches sync does so against a
+  // faked gateway. Note the hazard if you ever write this fixture to a real
+  // `~/.clashboard/gantt/<id>/` while a dev server is up — the stale-on-open
+  // trigger will sync it against *real* Jira, find nothing behind these keys, and
+  // (before the `authoritative` guard in `sync-chart.ts`) orphan every mirrored
+  // node. The on-disk demo chart therefore carries no sources at all.
   jiraSources: ['GEO-120', 'GEO-130'],
   lastSyncedAt: '2026-10-19T07:30:00.000Z',
   createdAt: '2026-10-01T09:00:00.000Z',

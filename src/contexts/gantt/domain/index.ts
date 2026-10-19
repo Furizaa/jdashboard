@@ -10,6 +10,7 @@ export {
 export { blockedStateFor, type GanttBlockedState } from './blocked'
 export { findCycles, type GanttCycle, type GanttCycles } from './cycles'
 export { progressFor, NO_PROGRESS, type ColumnDistribution, type GanttProgress } from './progress'
+export { isSyncStale, SYNC_STALE_AFTER_MS, type SyncStaleness } from './staleness'
 export {
   childSpanFor,
   datedExtentOf,

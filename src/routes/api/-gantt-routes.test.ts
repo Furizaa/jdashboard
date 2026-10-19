@@ -16,6 +16,9 @@ import { ganttEdgesHandlers } from './gantt.charts.$chartId.edges'
 import { ganttNodeBodyHandlers } from './gantt.charts.$chartId.nodes.$nodeId.body'
 import { ganttNodeHandlers } from './gantt.charts.$chartId.nodes.$nodeId'
 import { ganttNodesHandlers } from './gantt.charts.$chartId.nodes'
+import { ganttSyncHandlers } from './gantt.charts.$chartId.sync'
+import { ganttFailureResponse } from './-gantt-http'
+import { JiraUnreachable } from '~/server/contexts/gantt/errors'
 
 // Named with the `-` prefix so TanStack's route generator does not look for a
 // `Route` export in it — the convention `-explain-stream.test.ts` established,
@@ -360,6 +363,41 @@ describe('/api/gantt/charts/:chartId/edges', () => {
     const missing = await handlers.DELETE({ params: { chartId: 'plan', edgeId: 'api-blocks-geo' } })
     expect(missing.status).toBe(404)
     expect((await errorBodyOf(missing)).error).toBe('EdgeNotFound')
+  })
+})
+
+describe('POST /api/gantt/charts/:chartId/sync', () => {
+  // The happy path needs a Jira, and these handlers run on the real
+  // `appRuntime`, so it belongs in `sync-chart.test.ts` against a faked gateway.
+  // What is route-shaped is the two refusals that happen before Jira is asked —
+  // and the status the third one maps to.
+  it('is a 404 for a chart that is not there, without reaching Jira', async () => {
+    const { writes } = withSeed()
+    const response = await ganttSyncHandlers(writes).POST({ params: { chartId: 'ghost' } })
+    expect(response.status).toBe(404)
+    expect((await errorBodyOf(response)).error).toBe('ChartNotFound')
+  })
+
+  it('is a 400 for a chart id outside the slug charset', async () => {
+    const { writes } = withSeed()
+    const response = await ganttSyncHandlers(writes).POST({ params: { chartId: '../escape' } })
+    expect(response.status).toBe(400)
+  })
+
+  it('maps JiraUnreachable to a 503 that says the chart was left alone', async () => {
+    const response = ganttFailureResponse(
+      new JiraUnreachable({ chartId: 'plan', message: 'Jira did not answer' }),
+    )
+    expect(response.status).toBe(503)
+    const body = await errorBodyOf(response)
+    expect(body.error).toBe('JiraUnreachable')
+    expect(body.message).toContain('left exactly as it was')
+  })
+
+  it('has only POST — a sync is a verb, never a side effect of a read', () => {
+    const { writes } = withSeed()
+    const handlers: Record<string, unknown> = ganttSyncHandlers(writes)
+    expect(Object.keys(handlers)).toEqual(['POST'])
   })
 })
 

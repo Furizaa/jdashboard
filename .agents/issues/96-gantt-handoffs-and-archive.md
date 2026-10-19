@@ -20,6 +20,13 @@ The ways in and the one way out.
 - **`?node=` reveal** — on arrival, expand every ancestor of the node, scroll it into view, and highlight it briefly; then **consume the param with `replace`**, exactly as `AppShell` consumes `?ai=`, so a refresh does not re-trigger the reveal and the back button does not land on it.
 - **`ArchiveChartDialog.tsx`** + `archiveGanttChart` server function + `useArchiveGanttChart`. A confirmed action naming the chart; on success, navigate to `/gantt` and invalidate the list. **No `DELETE` is added to the REST surface** — re-read ADR-0012 §8 before touching `routes/api/`.
 
+## Two visual defects from slice 92, to fix here
+
+Both were found by reading slice 92's own screenshots, and both undercut something ADR-0012 states, so they are not optional polish.
+
+- **The merged-arrow count is nearly illegible.** When arrows re-anchor onto one pair they merge and carry a `count` — and in the collapsed quarter view that count renders as a bare grey `3` a few pixels tall at the arrow's elbow. ADR-0012 §10 makes the count *the information* in a collapsed chart, so it needs to read as a badge: a filled pill with a contrasting foreground, sized like the other chips on the surface, placed so it does not sit on the arrow's corner.
+- **Bar labels and arrows collide.** The red dashed cycle arrow passes horizontally straight through the `0 of 3 done` and `0 of 1 done` labels, and in the month view `1 of 2 done` straddles an amber/green segment boundary. Give the `n of m done` label a backdrop (or move it clear of the bar) so it survives both a colour boundary underneath it and an arrow crossing it.
+
 ## Acceptance criteria
 
 - [ ] `g` on a ticket that appears on a chart offers "Show in Gantt"; on one that does not, the action is absent (not disabled).
@@ -32,6 +39,8 @@ The ways in and the one way out.
 - [ ] Closing the panel returns to the chart with collapse and zoom state intact.
 - [ ] Archive asks for confirmation, moves the folder to `.archive/`, navigates to `/gantt`, and the chart is gone from the list.
 - [ ] **`grep -rn "DELETE" src/routes/api/gantt.charts.\$chartId.ts` finds no chart-level delete handler.**
+- [ ] The merged-arrow count reads as a badge at a glance in the collapsed quarter view, verified by screenshot.
+- [ ] `n of m done` stays legible over a segment colour boundary and under a crossing cycle arrow, verified by screenshot.
 - [ ] `pnpm typecheck`, `pnpm lint`, `pnpm depcruise`, `pnpm test` pass.
 
 ## Blocked by

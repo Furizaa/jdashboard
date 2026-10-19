@@ -71,7 +71,8 @@ async function chartView(chart: GanttChart, deps: GanttStoreDeps): Promise<Gantt
  * response as a chart read saw `undefined` on a key the SKILL promises is there.
  *
  * A combinator over the program rather than a second derivation beside it, so the
- * three responses cannot drift: there is one `chartView` and three callers of it.
+ * five responses cannot drift: there is one `chartView` and every route that
+ * answers with a whole chart goes through it.
  */
 export function withBodyFlags<E, R>(
   program: Effect.Effect<GanttChart, E, R>,

@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { loadChart } from '~/server/contexts/gantt/application/load-chart'
+import { loadChart, withBodyFlags } from '~/server/contexts/gantt/application/load-chart'
 import { patchChart } from '~/server/contexts/gantt/application/mutate-chart'
 import { patchChartBody } from '~/server/lib/gantt-schema'
 import { liveGanttWrites, type GanttWrites } from '~/server/lib/gantt-writes'
@@ -62,8 +62,10 @@ export function ganttChartHandlers(writes: GanttWrites) {
       if (!decoded.ok) return decoded.response
       const body = await decodeJsonBody(request, patchChartBody)
       if (!body.ok) return body.response
-      return ganttRespond(ROUTE, patchChart(decoded.value.chartId, body.value, writes), (chart) =>
-        ganttJson(chart, 200),
+      return ganttRespond(
+        ROUTE,
+        withBodyFlags(patchChart(decoded.value.chartId, body.value, writes), writes.deps),
+        (chart) => ganttJson(chart, 200),
       )
     },
   }

@@ -435,6 +435,46 @@ describe('every route that answers with a whole chart carries hasBody', () => {
     }
   }
 
+  // Five routes answer with a whole chart, and the first version of this suite
+  // pinned three of them — which is how `PATCH` and `sync` kept returning a chart
+  // whose `hasBody` key was **missing** for a slice after the hole was "closed".
+  // Enumerated rather than spot-checked, so a sixth such route cannot be added
+  // without either going through `withBodyFlags` or failing here.
+  it('agrees across every route that answers with a whole chart', async () => {
+    const disk = {
+      ...seedChart(predated),
+      [bodyFilePath(FAKE_HOME, 'plan', 'api')]: '# the API',
+    }
+    const chartOf = async (response: Response) => (await response.json()) as ChartShape
+    const responses = {
+      get: await chartOf(
+        await ganttChartHandlers(fakeGanttStore(disk).writes).GET({
+          params: { chartId: 'plan' },
+        }),
+      ),
+      dates: await chartOf(
+        await ganttDatesHandlers(fakeGanttStore(disk).writes).POST({
+          params: { chartId: 'plan' },
+        }),
+      ),
+      patch: await chartOf(
+        await ganttChartHandlers(fakeGanttStore(disk).writes).PATCH({
+          params: { chartId: 'plan' },
+          request: json({ title: 'Renamed' }),
+        }),
+      ),
+      sync: await chartOf(
+        await ganttSyncHandlers(fakeGanttStore(disk).writes).POST({
+          params: { chartId: 'plan' },
+        }),
+      ),
+    }
+    for (const [name, chart] of Object.entries(responses)) {
+      expect(chart.nodes.length, `${name} returned no nodes`).toBeGreaterThan(0)
+      expectPresentAndFalse(chart, ['api'])
+    }
+  })
+
   it('agrees between GET /charts/:chartId and POST /charts/:chartId/dates', async () => {
     const { writes } = fakeGanttStore({
       ...seedChart(predated),

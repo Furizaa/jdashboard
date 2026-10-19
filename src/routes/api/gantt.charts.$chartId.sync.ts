@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { withBodyFlags } from '~/server/contexts/gantt/application/load-chart'
 import { syncChart } from '~/server/contexts/gantt/application/sync-chart'
 import { liveGanttWrites, type GanttWrites } from '~/server/lib/gantt-writes'
 import { chartParams, decodeParams, ganttJson, ganttRespond, type ChartCtx } from './-gantt-http'
@@ -15,7 +16,9 @@ import { chartParams, decodeParams, ganttJson, ganttRespond, type ChartCtx } fro
 // already on the chart, and a body would be a second place to put them.
 //
 // The response is the whole synced chart rather than the counts, so the common
-// case ("sync, then read") is one call. `503` means Jira did not answer and the
+// case ("sync, then read") is one call — which is exactly why it goes through
+// `withBodyFlags`: a response that invites being read as a chart read has to
+// have the shape of one, `hasBody` included. `503` means Jira did not answer and the
 // chart is byte-identical; nothing else here can fail that the other routes
 // cannot.
 
@@ -26,8 +29,10 @@ export function ganttSyncHandlers(writes: GanttWrites) {
     POST: ({ params }: ChartCtx) => {
       const decoded = decodeParams(chartParams, params)
       if (!decoded.ok) return decoded.response
-      return ganttRespond(ROUTE, syncChart(decoded.value.chartId, writes), (chart) =>
-        ganttJson(chart, 200),
+      return ganttRespond(
+        ROUTE,
+        withBodyFlags(syncChart(decoded.value.chartId, writes), writes.deps),
+        (chart) => ganttJson(chart, 200),
       )
     },
   }

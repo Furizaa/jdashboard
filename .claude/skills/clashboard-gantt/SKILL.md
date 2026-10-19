@@ -281,7 +281,7 @@ Deleting a lane **reparents its children to its own parent** — it neither casc
 
 ## There is no way to delete a chart
 
-**`DELETE /api/gantt/charts/:chartId` does not exist, and it is not an oversight.** Do not look for it, do not try other spellings of it, and do not approximate it by deleting every node.
+**`DELETE /api/gantt/charts/:chartId` answers `405 MethodNotAllowed`, and that is not an oversight.** Do not look for another spelling of it, and do not approximate it by deleting every node. The refusal is written down rather than left to a missing handler precisely so you get a straight answer: an unhandled method here would fall through to the app's HTML and hand you a `200` you could mistake for a deletion that never happened.
 
 Removing a chart is **archiving**, it moves the folder to `gantt/.archive/`, and it is a confirmed action the user takes in the UI. Single-writer is a rule about a chart's _contents_; a chart's _lifecycle_ is a different question, and the irreversible verb over the only copy of a quarter of planning belongs with a human rather than with a process acting on a paraphrased instruction.
 

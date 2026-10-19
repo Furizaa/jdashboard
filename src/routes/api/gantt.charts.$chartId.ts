@@ -7,6 +7,7 @@ import {
   chartParams,
   decodeJsonBody,
   decodeParams,
+  ganttErrorResponse,
   ganttJson,
   ganttRespond,
   type ChartCtx,
@@ -21,12 +22,19 @@ import {
 // endpoints, because a whole-chart write would make every concurrent edit a
 // conflict (ADR-0012 §8).
 //
-// **There is no `DELETE` here, and its absence is asserted by a test**
-// (`-gantt-routes.test.ts`). Archiving a chart is a confirmed UI action:
-// single-writer is a rule about chart *content*, and the irreversible verb over
-// a system of record belongs with the human rather than with a process acting on
-// paraphrased instructions (ADR-0012 §8). An endpoint that was never written is
-// indistinguishable from one deleted by accident, so the test is the difference.
+// `DELETE /api/gantt/charts/:chartId` — **refuses, explicitly, with a `405`.**
+// Archiving a chart is a confirmed UI action: single-writer is a rule about chart
+// *content*, and the irreversible verb over a system of record belongs with the
+// human rather than with a process acting on paraphrased instructions
+// (ADR-0012 §8).
+//
+// The refusal is written rather than merely absent because of what absence
+// actually does here: with no handler the request falls through to the SSR
+// document route and comes back `200` with an HTML shell, which an agent can
+// read as success and report as a deletion that never happened. A `405` naming
+// the reason is the answer ADR-0012 §9 asks for — an error the consumer can act
+// on — and it is a stronger guarantee than an absent key, because the test can
+// now assert the thing that matters: that a `DELETE` does not delete.
 
 const ROUTE = '/api/gantt/charts/$chartId'
 
@@ -39,6 +47,15 @@ export function ganttChartHandlers(writes: GanttWrites) {
         ganttJson(chart, 200),
       )
     },
+
+    // Takes no params and reads no body: there is no request shape that would
+    // make this succeed, so decoding one would imply there is.
+    DELETE: () =>
+      ganttErrorResponse(
+        405,
+        'MethodNotAllowed',
+        'A chart cannot be deleted through the API. Archiving is a confirmed action in the clashboard UI, because the irreversible verb over a system of record belongs with the human (ADR-0012 §8).',
+      ),
 
     PATCH: async ({ params, request }: ChartCtx & WithRequest) => {
       const decoded = decodeParams(chartParams, params)

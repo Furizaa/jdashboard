@@ -189,14 +189,26 @@ describe('/api/gantt/charts/:chartId', () => {
     expect(await response.json()).toMatchObject({ title: 'Renamed' })
   })
 
-  // An endpoint that was never written is indistinguishable from one that was
-  // deleted by accident, so the absence is asserted rather than assumed
-  // (ADR-0012 §8). Archiving is a confirmed UI action, not an API verb.
-  it('has no DELETE — chart lifecycle belongs with the human, not the agent', () => {
+  // Archiving is a confirmed UI action, not an API verb (ADR-0012 §8). The
+  // refusal is explicit rather than absent because an unhandled DELETE falls
+  // through to the SSR document and answers `200` with an HTML shell, which an
+  // agent can read as a deletion that never happened.
+  it('refuses DELETE with a 405 that names the reason', async () => {
     const { writes } = withSeed()
-    const handlers: Record<string, unknown> = ganttChartHandlers(writes)
-    expect(Object.keys(handlers).toSorted()).toEqual(['GET', 'PATCH'])
-    expect(handlers['DELETE']).toBeUndefined()
+    const response = await ganttChartHandlers(writes).DELETE()
+    expect(response.status).toBe(405)
+    const body = (await response.json()) as { error: string; message: string }
+    expect(body.error).toBe('MethodNotAllowed')
+    expect(body.message).toContain('Archiving')
+  })
+
+  // The assertion that actually matters, and the one an absent key could not
+  // make: a DELETE does not delete.
+  it('leaves the chart readable after a refused DELETE', async () => {
+    const { writes } = withSeed()
+    await ganttChartHandlers(writes).DELETE()
+    const after = await ganttChartHandlers(writes).GET({ params: { chartId: 'plan' } })
+    expect(after.status).toBe(200)
   })
 })
 

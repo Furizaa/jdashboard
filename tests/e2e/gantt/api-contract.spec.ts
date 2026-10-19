@@ -16,9 +16,8 @@ import { expect, test } from '../fixtures/test'
 //
 // What it pins, in order: that an agent can build a chart from nothing, that an
 // error names the field it got wrong, that the chart it reads back is the chart
-// it wrote, and that **`DELETE /charts/:chartId` is not there** — an endpoint
-// that was never written is indistinguishable from one deleted by accident, so
-// its absence is only a decision while something asserts it.
+// it wrote, and that **`DELETE /charts/:chartId` refuses with a `405`** rather
+// than deleting — and that asking does not change the chart.
 
 const CHART = 'e2e-plan'
 const CHARTS = '/api/gantt/charts'
@@ -171,7 +170,7 @@ test('a rejected write names the field, so the next call can correct it', async 
   expect(mirroredError.issues[0]?.path).toBe('title')
 })
 
-test('DELETE /charts/:chartId is not routed, and the chart survives asking', async ({
+test('DELETE /charts/:chartId is refused with a 405, and the chart survives asking', async ({
   request,
 }) => {
   await request.post(CHARTS, { data: { id: CHART, title: 'E2E plan' } })
@@ -181,13 +180,15 @@ test('DELETE /charts/:chartId is not routed, and the chart survives asking', asy
   // with the human rather than with a process acting on paraphrased
   // instructions (ADR-0012 §8). So there is no verb here for an agent to reach.
   const attempted = await request.delete(`${CHARTS}/${CHART}`)
-  // The route file declares `GET` and `PATCH` and no `DELETE`, so the request is
-  // not answered by this API at all — it falls through to the SSR document
-  // handler and comes back as the app's HTML shell. That is why the assertion is
-  // on the **shape** of the answer rather than on a status: there is no `405`
-  // here to pin, and `expect(ok()).toBe(false)` would be asserting a behaviour
-  // the framework never promised.
-  expect(attempted.headers()['content-type']).not.toContain('application/json')
+  // The refusal is **written**, not merely absent. With no handler the request
+  // falls through to the SSR document route and comes back `200` with an HTML
+  // shell, which an agent can read as a deletion that never happened — so the
+  // route answers a `405` naming the reason instead (ADR-0012 §9: an error the
+  // consumer can act on).
+  expect(attempted.status()).toBe(405)
+  const refusal: ErrorBody = await attempted.json()
+  expect(refusal.error).toBe('MethodNotAllowed')
+  expect(refusal.message).toContain('Archiving')
 
   // The assertion that matters is not the status code but that nothing happened.
   const survived = await request.get(`${CHARTS}/${CHART}`)

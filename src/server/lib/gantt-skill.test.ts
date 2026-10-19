@@ -321,8 +321,11 @@ describe('the gantt skill', () => {
     expect(skill).toContain('Do not write `~/.clashboard/gantt/` directly.')
   })
 
-  it('says there is no way to delete a chart', () => {
-    expect(skill).toContain('`DELETE /api/gantt/charts/:chartId` does not exist')
+  // The refusal is a written `405` rather than an absent handler, so the skill
+  // must name the status an agent will actually get back — "does not exist"
+  // would send it looking for another spelling.
+  it('says a chart cannot be deleted, and names the 405 it will get if it tries', () => {
+    expect(skill).toContain('`DELETE /api/gantt/charts/:chartId` answers `405 MethodNotAllowed`')
     expect(skill).toContain('archiving')
   })
 

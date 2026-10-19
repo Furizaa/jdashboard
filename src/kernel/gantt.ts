@@ -42,6 +42,7 @@ export type {
   GetGanttBodyResult,
   GetGanttChangelogResult,
   GetGanttChartResult,
+  GetGanttSkillResult,
   ListGanttChartsResult,
   SyncGanttChartResult,
 } from '~/server/server-functions/gantt'

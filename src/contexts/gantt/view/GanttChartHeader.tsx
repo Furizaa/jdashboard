@@ -3,10 +3,11 @@ import { cn } from '~/lib/cn'
 import { testIds } from '~/lib/testids'
 import type { GanttChartApi } from '../presenter'
 import { ChangelogPopover } from './ChangelogPopover'
+import { CopySkillButton } from './CopySkillButton'
 import { NeedsAttention } from './NeedsAttention'
 import { ZoomControls } from './ZoomControls'
 
-// The chart's own header strip: where it is, what needs attention, and the four
+// The chart's own header strip: where it is, what needs attention, and the five
 // controls a reader has over it.
 //
 // Its own file because `GanttChartView.tsx` sits at the repo's fifteen-import
@@ -14,8 +15,9 @@ import { ZoomControls } from './ZoomControls'
 // The split is along the obvious seam — the frame draws rows, bars and arrows;
 // the header draws none of them.
 //
-// **Nothing here writes to the plan.** Refresh reaches Jira and refreshes the
-// mirrored half; the other three are the reader's own view state (ADR-0012 §8).
+// **Nothing here writes to the plan.** Copy SKILL hands an agent its brief and
+// Refresh refreshes the mirrored half Jira owns; the other three are the
+// reader's own view state (ADR-0012 §8).
 
 type ReadyApi = Extract<GanttChartApi, { phase: 'ready' }>
 
@@ -36,6 +38,7 @@ export function ChartHeader({ api, onBack }: { api: ReadyApi; onBack: () => void
       </span>
       <NeedsAttention needs={api.layout.needsAttention} />
       <div className="ml-auto flex items-center gap-2">
+        <CopySkillButton chartId={api.chartId} />
         <RefreshButton api={api} />
         <FoldButton api={api} />
         <ZoomControls zoom={api.zoom} onZoom={api.setZoom} />

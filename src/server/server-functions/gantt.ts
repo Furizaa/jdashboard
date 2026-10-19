@@ -1,6 +1,7 @@
 import { readdir, readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { createServerFn } from '@tanstack/react-start'
+import { getRequestUrl } from '@tanstack/react-start/server'
 import { Effect, Schema } from 'effect'
 import {
   readChartChangelog,
@@ -8,6 +9,7 @@ import {
   type GanttChangelogStoreDeps,
 } from '../lib/gantt-changelog-store'
 import { assertChartId, assertNodeId, type GanttChart } from '../lib/gantt-schema'
+import { renderGanttSkill } from '../lib/gantt-skill'
 import type { GanttChartSummary, GanttStoreDeps } from '../lib/gantt-store'
 import { liveGanttWrites } from '../lib/gantt-writes'
 import {
@@ -58,6 +60,9 @@ export type GetGanttBodyResult = WireResult<
 
 export type GetGanttChangelogResult = { readonly entries: readonly GanttChangelogEntry[] }
 
+/** The parameterised SKILL, as the text the copy button puts on the clipboard. */
+export type GetGanttSkillResult = { readonly skill: string }
+
 export type SyncGanttChartResult = WireResult<
   { readonly chart: GanttChart },
   | ChartNotFoundWire
@@ -100,6 +105,20 @@ function changelogDeps(): GanttChangelogStoreDeps {
     readFile: (p) => readFile(p, 'utf8'),
     writeFile: refuse,
     mkdir: refuse,
+  }
+}
+
+/**
+ * Where this server can be reached, as the browser just reached it. `null`
+ * outside a request context, which is the test and prerender case rather than
+ * anything a user can provoke; `renderGanttSkill` then uses its documented
+ * localhost fallback.
+ */
+function requestOrigin(): string | null {
+  try {
+    return getRequestUrl().origin
+  } catch {
+    return null
   }
 }
 
@@ -181,3 +200,25 @@ export const syncGanttChart = createServerFn({ method: 'POST' })
     )
     return runWire(program, SyncGanttChartError, 'syncGanttChart')
   })
+
+/**
+ * The SKILL that teaches the REST contract, with this server's origin and the
+ * open chart's id already substituted (ADR-0012 §12). The header's copy button
+ * is the only caller; `GET /api/gantt/skill` serves the same text to an agent
+ * that would rather fetch it.
+ *
+ * The origin comes from the request rather than from a constant, because the
+ * one thing a pasted SKILL must get right is the URL the agent will call — and
+ * the only authority on that is the request the browser just made. It is read
+ * defensively: outside a request context there is nothing to read, and a
+ * documented localhost fallback is better than a failed copy.
+ */
+export const getGanttSkill = createServerFn({ method: 'GET' })
+  .inputValidator((data: { chartId: string }) => ({
+    chartId: requireChartId('getGanttSkill', data?.chartId),
+  }))
+  .handler(
+    async ({ data }): Promise<GetGanttSkillResult> => ({
+      skill: await renderGanttSkill({ baseUrl: requestOrigin(), chartId: data.chartId }),
+    }),
+  )

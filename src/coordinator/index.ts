@@ -30,6 +30,7 @@ export {
   useGanttChangelog,
   useGanttChart,
   useGanttCharts,
+  useGanttSkill,
   useSyncGanttChart,
 } from './gantt-hooks'
 export type { CreateIssueSnapshot } from './coordinator'

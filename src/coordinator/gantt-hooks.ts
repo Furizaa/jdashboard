@@ -3,6 +3,7 @@ import type {
   GetGanttBodyResult,
   GetGanttChangelogResult,
   GetGanttChartResult,
+  GetGanttSkillResult,
   ListGanttChartsResult,
   SyncGanttChartResult,
 } from '~/kernel'
@@ -10,6 +11,7 @@ import {
   getGanttBody,
   getGanttChangelog,
   getGanttChart,
+  getGanttSkill,
   listGanttCharts,
   syncGanttChart,
 } from '~/server/server-functions/gantt'
@@ -19,7 +21,7 @@ import { DASHBOARD_QUERY_KEYS, DASHBOARD_STALE_TIMES } from './adapters/tanstack
 // reason `explain-hooks.ts` does — that file is already the app's longest and a
 // surface's whole read side belongs together.
 //
-// Four reads and **one** write, and the one write is not an exception to the
+// Five reads and **one** write, and the one write is not an exception to the
 // agent being the chart's only writer (ADR-0012 §8): sync touches only the
 // mirrored half Jira owns, never a lane, a date or a body an agent authored.
 //
@@ -111,6 +113,30 @@ export function useSyncGanttChart(): {
   })
   return {
     sync: (chartId) => mutation.mutateAsync({ chartId }),
+    isPending: mutation.isPending,
+  }
+}
+
+/**
+ * The SKILL that teaches the REST API, fetched **on demand** rather than held in
+ * the cache: it is one file read on the server, nobody looks at it until the
+ * copy button is pressed, and a cached copy would be a second answer to "what is
+ * the contract" the moment the document is edited.
+ *
+ * A mutation rather than a query for the same reason the Explain surface's
+ * one-shot calls are: the work starts when the user asks for it, and `isPending`
+ * is the button's disabled state. Nothing is invalidated — this reads a file and
+ * writes nothing.
+ */
+export function useGanttSkill(): {
+  readSkill: (chartId: string) => Promise<GetGanttSkillResult>
+  isPending: boolean
+} {
+  const mutation = useMutation<GetGanttSkillResult, Error, { chartId: string }>({
+    mutationFn: (data) => getGanttSkill({ data }),
+  })
+  return {
+    readSkill: (chartId) => mutation.mutateAsync({ chartId }),
     isPending: mutation.isPending,
   }
 }

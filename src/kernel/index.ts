@@ -126,6 +126,7 @@ export type {
   GetGanttBodyResult,
   GetGanttChangelogResult,
   GetGanttChartResult,
+  GetGanttSkillResult,
   ListGanttChartsResult,
   SyncGanttChartResult,
 } from './gantt'

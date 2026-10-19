@@ -23,7 +23,7 @@ The documentation the architecture claims depend on, and the end-to-end coverage
   - `needs-attention.spec.ts` — undated, unplaced and orphaned counts render.
   - `detail-panel-over-chart.spec.ts` — clicking a jira row opens the panel and ⌘K still works.
   - `palette-show-in-gantt.spec.ts` — `g` from a ticket reveals its node.
-  - `api-contract.spec.ts` — the REST surface over the real server: create a chart, add nodes and an edge, patch a date, read it back, and assert `DELETE /charts/:id` is **not** routed.
+  - `api-contract.spec.ts` — the REST surface over the real server: create a chart, add nodes and an edge, patch a date, read it back, and assert `DELETE /charts/:id` is **not** routed. **Also cover `GET /api/gantt/skill`**: slice 94 verified its three behaviours (a `text/markdown` body, `?chart=` substituted with no `{{` left, and a `400` with `issues[0].path === 'chart'` on a non-slug) against a live server but pinned none of them in a test, and a live check is not a regression test.
 
 Where a spec needs a chart on disk, use the committed fixture from slice 92 — do not write to the developer's real `~/.clashboard/`.
 

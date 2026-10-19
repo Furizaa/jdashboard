@@ -228,6 +228,42 @@ module.exports = {
       },
     },
     {
+      name: 'gantt-domain-only-imports-kernel',
+      comment:
+        "gantt's domain layer is pure: the tree, the derived blocked state, cycle detection, the progress rollup and the child-span overflow may only import ~/kernel and its own peers. Every fact the chart shows beyond its stored fields is computed here.",
+      severity: 'error',
+      from: { path: '^src/contexts/gantt/domain/' },
+      to: {
+        path: '^src/',
+        pathNot: '^(src/contexts/gantt/domain/|src/kernel/)',
+      },
+    },
+    {
+      name: 'gantt-application-only-imports-kernel-and-self',
+      comment:
+        'gantt has no context-local application service (as in explain and bulk-refine, both halves are coordinator hooks over server functions) — but the rule is declared from inception so one cannot appear without the boundary already enforced.',
+      severity: 'error',
+      from: {
+        path: '^src/contexts/gantt/application/',
+        pathNot: '/__fixtures__/',
+      },
+      to: {
+        path: '^src/',
+        pathNot: '^(src/contexts/gantt/application/|src/kernel/)',
+      },
+    },
+    {
+      name: 'gantt-view-model-only-imports-kernel-and-domain',
+      comment:
+        "gantt's view-model is framework-free, and this is the rule the Gantt exists to demonstrate (ADR-0003, ADR-0012 §10): the whole geometry — rows, bars, ticks, re-anchored arrows — is a pure function of a chart and a viewport. It may only import ~/kernel, its own domain, and its own peers. A React import here is the claim failing.",
+      severity: 'error',
+      from: { path: '^src/contexts/gantt/view-model/' },
+      to: {
+        path: '^src/',
+        pathNot: '^(src/contexts/gantt/view-model/|src/contexts/gantt/domain/|src/kernel/)',
+      },
+    },
+    {
       name: 'explain-domain-only-imports-kernel',
       comment:
         "explain's domain layer is pure: the altitude rules (severity ordering, group-by-system) and the staleness rule may only import ~/kernel and its own peers.",
@@ -390,7 +426,7 @@ module.exports = {
     {
       name: 'api-routes-cant-import-server-functions',
       comment:
-        'src/routes/api/* are HTTP-shaped binary endpoints — they must not import the JSON-RPC server-functions/ layer. If the same Effect is needed in both shapes, it lives in server/contexts/<name>/application/ and both call sites import from there. (ADR-0006)',
+        'src/routes/api/* are HTTP-shaped endpoints — a binary proxy, an SSE channel, and the gantt REST contract an external agent drives (ADR-0012 §7) — and they must not import the JSON-RPC server-functions/ layer. If the same Effect is needed in both shapes, it lives in server/contexts/<name>/application/ and both call sites import from there. (ADR-0006)',
       severity: 'error',
       from: { path: '^src/routes/api/' },
       to: { path: '^src/server/server-functions/' },

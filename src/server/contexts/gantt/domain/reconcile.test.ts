@@ -32,15 +32,16 @@ type Equal<A, B> =
 type Expect<T extends true> = T
 
 describe('reconcile — the return type cannot express a node move or a node delete', () => {
-  it('has exactly six fields, none of which is a removal or a reparent', () => {
+  it('has exactly seven fields, none of which is a removal or a reparent', () => {
     // If a `nodeRemovals` or a `moves` field is ever added, this stops compiling
     // before it stops passing.
-    type SixFields = Expect<
+    type SevenFields = Expect<
       Equal<
         keyof Reconciliation,
         | 'mirrorUpdates'
         | 'additions'
         | 'orphanedIds'
+        | 'discoveredIds'
         | 'edgeAdditions'
         | 'edgeRemovals'
         | 'edgePromotions'
@@ -54,13 +55,14 @@ describe('reconcile — the return type cannot express a node move or a node del
     type NothingThatMoves = Expect<
       Equal<Extract<keyof MirroredFields, 'id' | 'parentId' | 'order' | 'start' | 'end'>, never>
     >
-    const asserted: [SixFields, FourMirroredFields, NothingThatMoves] = [true, true, true]
+    const asserted: [SevenFields, FourMirroredFields, NothingThatMoves] = [true, true, true]
     expect(asserted).toEqual([true, true, true])
 
     // And the same statement at run time, so the shape is pinned for a reader
     // who is not reading the types.
     expect(Object.keys(reconcile(aChart(), [])).toSorted()).toEqual([
       'additions',
+      'discoveredIds',
       'edgeAdditions',
       'edgePromotions',
       'edgeRemovals',
@@ -200,6 +202,86 @@ describe('reconcile — departures are marked, never removed', () => {
   })
 })
 
+// The real release gate for a front-end epic frequently lives in a **different**
+// epic, so no discovery search for this chart will ever return it. Orphaning it
+// would say it "left the epic", which is a lie, and the workaround — a local lane
+// with a hand-copied status — goes stale silently and forever.
+describe('reconcile — a node no discovery search has ever returned', () => {
+  const blocker = aNode('hdr-19244', {
+    source: { kind: 'jira', key: 'HDR-19244' },
+    // What `POST /nodes` leaves: a real ticket, never in a search's scope.
+    discovered: false,
+    title: 'Groups API ships',
+    status: 'In Implementation',
+    column: 'In Implementation',
+  })
+  const chart = aChart({
+    jiraSources: ['HDR-20708'],
+    nodes: [blocker, aNode('hdr-20709', { source: { kind: 'jira', key: 'HDR-20709' } })],
+  })
+
+  it('is never orphaned, however complete the search was', () => {
+    // A search that returned the chart's other lane and nothing else: authoritative
+    // by any measure, and still no evidence at all about this key.
+    const change = reconcile(chart, [anIssue('HDR-20709')])
+    expect(change.orphanedIds).toEqual([])
+    expect(applyReconciliation(chart, change).nodes[0]).toMatchObject({
+      id: 'hdr-19244',
+      orphaned: false,
+      discovered: false,
+    })
+  })
+
+  it('still has its mirrored half refreshed from a read by key', () => {
+    const change = reconcile(
+      chart,
+      [],
+      [anIssue('HDR-19244', { title: 'Groups API ships', status: 'In STG' })],
+    )
+    const next = applyReconciliation(chart, change)
+    expect(next.nodes[0]).toMatchObject({
+      id: 'hdr-19244',
+      status: 'In STG',
+      column: 'Done',
+      orphaned: false,
+      // A read by key is not a search, so it cannot make a node orphan-eligible.
+      discovered: false,
+    })
+  })
+
+  it('adds no node and no edge from a read by key, whatever that ticket says', () => {
+    const change = reconcile(
+      chart,
+      [],
+      [
+        anIssue('HDR-19244'),
+        // A ticket this chart has never heard of, arriving by key. It must not
+        // become a lane: a read by key is not discovery.
+        anIssue('HDR-40000'),
+      ],
+    )
+    expect(change.additions).toEqual([])
+    expect(change.edgeAdditions).toEqual([])
+    expect(change.discoveredIds).toEqual([])
+  })
+
+  it('becomes orphan-eligible the first time a search does return its key', () => {
+    const found = applyReconciliation(chart, reconcile(chart, [anIssue('HDR-19244')]))
+    expect(found.nodes[0]).toMatchObject({ discovered: true, orphaned: false })
+
+    // And from then on it is an ordinary mirrored lane: gone from the search is
+    // gone from the epic.
+    const gone = applyReconciliation(found, reconcile(found, [anIssue('HDR-20709')]))
+    expect(gone.nodes[0]).toMatchObject({ discovered: true, orphaned: true })
+  })
+
+  it('never un-discovers a node, because discoveredIds is or-ed and not assigned', () => {
+    const found = applyReconciliation(chart, reconcile(chart, [anIssue('HDR-19244')]))
+    const later = applyReconciliation(found, reconcile(found, []))
+    expect(later.nodes[0]?.discovered).toBe(true)
+  })
+})
+
 describe('reconcile — newly discovered tickets', () => {
   it('adds them flat and undated, under their Jira parent when it is a node here', () => {
     const chart = aChart({
@@ -222,6 +304,9 @@ describe('reconcile — newly discovered tickets', () => {
         column: 'In Implementation',
         status: 'In Implementation',
         assignee: 'Ada Lovelace',
+        // A search is the only thing that can produce an addition, so the flag
+        // that records "a search returned this key" is true by construction.
+        discovered: true,
         orphaned: false,
       },
       expect.objectContaining({ id: 'geo-122', parentId: null, order: 1 }),

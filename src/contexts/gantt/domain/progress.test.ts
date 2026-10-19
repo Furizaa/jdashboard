@@ -20,6 +20,7 @@ function node(id: string, column: Column, parentId: string | null = null): Gantt
     column,
     status: null,
     assignee: null,
+    discovered: false,
     orphaned: false,
   }
 }

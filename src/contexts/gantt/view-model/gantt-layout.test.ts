@@ -31,6 +31,7 @@ function node(id: string, spec: NodeSpec = {}): GanttNode {
     column: spec.column ?? 'TO DO',
     status: null,
     assignee: null,
+    discovered: false,
     orphaned: spec.orphaned ?? false,
   }
 }

@@ -28,14 +28,12 @@ import {
 } from '../errors'
 
 // The write use-cases: everything an agent can do to a chart, each one a single
-// read-modify-write inside `withChartLock` with exactly one changelog entry
-// appended in the same critical section.
+// read-modify-write inside `withChartLock`, with one changelog entry beside it.
 //
 // Two consumers, one service (ADR-0006, ADR-0012 §7): the REST routes an agent
-// drives, and — for sync and the lifecycle verbs — the UI's server functions.
-// Neither layer may import the other, so the use-case lives here. Every refusal
-// is a **tagged error**, never a thrown one, because the consumer is an agent
-// that has to correct its next call from what comes back.
+// drives and — for sync and the lifecycle verbs — the UI's server functions, with
+// neither layer able to import the other. Every refusal is a **tagged error**,
+// never thrown: the consumer is an agent correcting its next call from what it got.
 
 /**
  * What one critical section produced. The lock is promise-shaped, so a refusal
@@ -77,9 +75,8 @@ function locked<A, E>(
 /**
  * Persist the chart and record what was done to it, in that order, inside the
  * caller's critical section. The schema check guards the system of record:
- * `readChart` treats an invalid `chart.json` as **absent**, so a mutation that
- * wrote a chart the schema rejects would not corrupt the chart — it would make it
- * disappear, which a plan nobody has another copy of must not be able to do.
+ * `readChart` treats an invalid `chart.json` as **absent**, so a write the schema
+ * would reject must not land — it would not corrupt the plan, it would vanish it.
  */
 async function commit(
   writes: GanttWrites,
@@ -129,9 +126,8 @@ function definedOnly(body: PatchNodeBody): Partial<GanttNode> {
 // ---------------------------------------------------------------------------
 
 /**
- * `POST /charts`. `jiraSources` is stored but not yet discovered from — the
- * bootstrap that fills a chart with one mirrored node per discovered ticket is
- * slice 95, and shares this code path rather than adding an `import` verb.
+ * `POST /charts`. Stores `jiraSources`; the discovery that fills the chart from
+ * them is `bootstrap-chart.ts`, over this same code path (ADR-0012 §5).
  */
 export function createChart(
   body: CreateChartBody,
@@ -194,9 +190,10 @@ export function createNode(
     if (body.parentId !== null && nodeIn(chart, body.parentId) === undefined) {
       return no(new NodeNotFound({ chartId, nodeId: body.parentId }))
     }
-    // `orphaned` is absent from the body on purpose: a fact sync observes about a
-    // Jira key, not a claim a caller gets to make.
-    const node: GanttNode = { ...body, orphaned: false }
+    // `orphaned` and `discovered` are facts sync observes, not claims a caller
+    // makes. Starting **un-discovered** is what lets a blocker in another epic be
+    // the real ticket it is: mirrored, never orphaned (ADR-0012 §5).
+    const node: GanttNode = { ...body, discovered: false, orphaned: false }
     const committed = await commit(
       writes,
       { ...chart, nodes: [...chart.nodes, node] },
@@ -218,10 +215,8 @@ export function patchNode(
     const chart = loaded.value
     const node = nodeIn(chart, nodeId)
     if (node === undefined) return no(new NodeNotFound({ chartId, nodeId }))
-    // The half `gantt-schema.ts` could not express: *which* fields are mirrored is
-    // a property of the schema, but whether **this node's** are depends on the
-    // target node's source, which no body schema can look up (ADR-0012 §3). The
-    // next sync would overwrite the write, so accepting it would be a lie.
+    // The half `gantt-schema.ts` could not express: whether **this node's** fields
+    // are mirrored depends on its own source, which no body schema can look up (§3).
     if (node.source.kind === 'jira' && patchTouchesMirroredFields(body)) {
       return no(
         new MirroredFieldPatch({
@@ -255,10 +250,9 @@ export type DeleteNodeOk = {
 }
 
 /**
- * Children are **reparented** to the deleted node's own parent — neither cascaded
- * nor orphaned: a cascade would make one mistyped id delete a subtree of PRDs, and
- * an orphan is a lane the tree cannot place. Every edge touching the node goes
- * too, as do its body and its `.prev`.
+ * Children are **reparented** to the deleted node's own parent, neither cascaded nor
+ * orphaned: a cascade makes one mistyped id delete a subtree of PRDs, an orphan is a
+ * lane the tree cannot place. The node's edges, body and `.prev` go with it.
  */
 export function deleteNode(
   chartId: string,
@@ -278,8 +272,7 @@ export function deleteNode(
       ...chart,
       nodes: chart.nodes
         .filter((n) => n.id !== nodeId)
-        // A reparented copy; mutating the node read off disk would be a write
-        // nobody asked for.
+        // A reparented copy: mutating the node off disk is a write nobody asked for.
         // oxlint-disable-next-line no-map-spread -- see comment above
         .map((n) => (n.parentId === nodeId ? { ...n, parentId: node.parentId } : n)),
       edges: chart.edges.filter((e) => e.from !== nodeId && e.to !== nodeId),
@@ -347,9 +340,11 @@ export function putBody(
 // ---------------------------------------------------------------------------
 
 /**
- * An edge that closes a **cycle is accepted**: the API never refuses to record a
- * dependency someone declared (ADR-0012 §6). A plan that is impossible should look
- * impossible rather than be impossible to write down.
+ * **A dependency's identity is its endpoint pair, not its id**, so a pair the chart
+ * already has is refused — a `local` one over a pair already mirrored as `jira`
+ * included, which is the common case. A **reversed** pair is a different dependency
+ * and is accepted, as is any edge closing a cycle: the API never refuses to record
+ * a declared dependency. Both rules, and why each one: ADR-0012 §6.
  */
 export function createEdge(
   chartId: string,
@@ -362,6 +357,12 @@ export function createEdge(
     const chart = loaded.value
     if (chart.edges.some((edge) => edge.id === body.id)) {
       return no(new DuplicateEdgeId({ chartId, edgeId: body.id }))
+    }
+    // Directional, so the reversed pair stays writable; `edgeId` is the incumbent's.
+    const declared = chart.edges.find((e) => e.from === body.from && e.to === body.to)
+    if (declared !== undefined) {
+      const pair = { from: declared.from, to: declared.to }
+      return no(new DuplicateEdgeId({ chartId, edgeId: declared.id, pair }))
     }
     for (const end of [body.from, body.to]) {
       if (nodeIn(chart, end) === undefined) {

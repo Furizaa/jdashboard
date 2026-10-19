@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { bootstrapChart } from '~/server/contexts/gantt/application/bootstrap-chart'
-import { loadChartList } from '~/server/contexts/gantt/application/load-chart'
+import { loadChartList, withBodyFlags } from '~/server/contexts/gantt/application/load-chart'
 import { createChartBody } from '~/server/lib/gantt-schema'
 import { liveGanttWrites, type GanttWrites } from '~/server/lib/gantt-writes'
 import { decodeJsonBody, ganttJson, ganttRespond, type WithRequest } from './-gantt-http'
@@ -30,8 +30,13 @@ export function ganttChartsHandlers(writes: GanttWrites) {
     POST: async ({ request }: WithRequest) => {
       const body = await decodeJsonBody(request, createChartBody)
       if (!body.ok) return body.response
-      return ganttRespond(ROUTE, bootstrapChart(body.value, writes), (chart) =>
-        ganttJson(chart, 201),
+      // Through `withBodyFlags`, like every other route that answers with a whole
+      // chart: the key is `false` rather than missing, so an agent can read this
+      // response as a chart read (ADR-0012 §11).
+      return ganttRespond(
+        ROUTE,
+        withBodyFlags(bootstrapChart(body.value, writes), writes.deps),
+        (chart) => ganttJson(chart, 201),
       )
     },
   }

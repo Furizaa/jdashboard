@@ -1,6 +1,7 @@
 import { describe, expect, it } from '@effect/vitest'
 import { Effect } from 'effect'
 import { readChartChangelog } from '../../../lib/gantt-changelog-store'
+import type { DuplicateEdgeId } from '../errors'
 import { bodyFilePath, bodyPrevFilePath, readBody, readChart } from '../../../lib/gantt-store'
 import {
   createChart,
@@ -316,7 +317,77 @@ describe('createEdge', () => {
           writes,
         ).pipe(Effect.flip)
         expect(failure._tag).toBe('DuplicateEdgeId')
+        expect(failure).toMatchObject({ edgeId: 'ab' })
+        // No pair, so the message can say "rename and retry" rather than "stop".
+        expect((failure as DuplicateEdgeId).pair).toBeUndefined()
       }),
+  )
+
+  // The hole a blind agent run found: bootstrap mirrors every Jira link, so an
+  // agent re-declaring the dependencies it read from the epic under ids of its own
+  // had every one accepted and silently doubled the graph.
+  it.effect('refuses a duplicate from/to pair under a fresh id, and names the incumbent', () =>
+    Effect.gen(function* () {
+      const { writes, deps } = fakeGanttStore(
+        seedChart(aChart({ nodes: two.nodes, edges: [anEdge('ab', 'a', 'b')] })),
+      )
+      const failure = yield* createEdge(
+        'plan',
+        { id: 'a-blocks-b', from: 'a', to: 'b', source: { kind: 'local' } },
+        writes,
+      ).pipe(Effect.flip)
+      expect(failure._tag).toBe('DuplicateEdgeId')
+      // The **incumbent's** id, not the one just sent: that is how an agent tells
+      // "already declared" from "name collision" and stops rather than retrying.
+      expect(failure).toMatchObject({ edgeId: 'ab', pair: { from: 'a', to: 'b' } })
+      const stored = yield* Effect.promise(() => readChart('plan', deps))
+      expect(stored?.edges.map((e) => e.id)).toEqual(['ab'])
+    }),
+  )
+
+  // ADR-0012 §6's promotion rule already says one pair is one edge, and this is
+  // the case it is about: the dependency is mirrored, and the agent declares it.
+  it.effect('refuses a local edge over a pair already mirrored as a jira link', () =>
+    Effect.gen(function* () {
+      const { writes } = fakeGanttStore(
+        seedChart(
+          aChart({
+            nodes: two.nodes,
+            edges: [
+              { id: 'jira-10432', from: 'a', to: 'b', source: { kind: 'jira', linkId: '10432' } },
+            ],
+          }),
+        ),
+      )
+      const failure = yield* createEdge(
+        'plan',
+        { id: 'a-blocks-b', from: 'a', to: 'b', source: { kind: 'local' } },
+        writes,
+      ).pipe(Effect.flip)
+      expect(failure).toMatchObject({ _tag: 'DuplicateEdgeId', edgeId: 'jira-10432' })
+    }),
+  )
+
+  // The pair is **directional**. `A blocks B` plus `B blocks A` is a cycle, and
+  // §6 says a cycle is recorded and surfaced rather than refused — so narrowing
+  // the duplicate rule must not quietly become a cycle guard.
+  it.effect('accepts the reversed pair, because that is a cycle and a cycle is recorded', () =>
+    Effect.gen(function* () {
+      const { writes, deps } = fakeGanttStore(
+        seedChart(aChart({ nodes: two.nodes, edges: [anEdge('ab', 'a', 'b')] })),
+      )
+      const edge = yield* createEdge(
+        'plan',
+        { id: 'b-blocks-a', from: 'b', to: 'a', source: { kind: 'local' } },
+        writes,
+      )
+      expect(edge).toMatchObject({ from: 'b', to: 'a' })
+      const stored = yield* Effect.promise(() => readChart('plan', deps))
+      expect(stored?.edges.map((e) => [e.from, e.to])).toEqual([
+        ['a', 'b'],
+        ['b', 'a'],
+      ])
+    }),
   )
 })
 

@@ -13,23 +13,19 @@ import type {
 // property of the type rather than of the code below.** There is no field for a
 // removal, no field for a reparent, and `MirrorUpdate.fields` is
 // `Pick<GanttNode, …MIRRORED_NODE_FIELDS>`, so `parentId`, `order`, `start` and
-// `end` are not nameable in one. A careless sync is the thing this slice exists
-// to make impossible: a Jira-backed node carries local children, a body,
-// declared edges and hand-set dates, and deleting it because its ticket left the
-// epic would destroy all of that, silently, in the background (ADR-0012 §5).
+// `end` are not nameable in one. What a careless sync would destroy, and why
+// that makes this the shape it is: ADR-0012 §5.
 //
 // So sync **refreshes** mirrored fields, **adds** newly discovered keys, and
-// **marks** departures `orphaned`. Jira's parent is used once, at import, as the
-// initial placement; after that the chart owns the tree forever.
+// **marks** as `orphaned` only the departures it had previously discovered.
 //
 // Pure, and the only way to apply a reconciliation is `applyReconciliation`
 // below — the diff and its interpretation live in one file so neither can drift
 // from the invariant the other states.
 
 /**
- * One discovered ticket, as the search saw it. The gateway's raw shape is
- * flattened into this by the application layer, so everything here is a plain
- * fact about a Jira issue and this module never meets an HTTP response.
+ * One discovered ticket, as the search saw it. The application layer flattens the
+ * gateway's raw shape into this, so this module never meets an HTTP response.
  */
 export type DiscoveredIssue = {
   readonly key: string
@@ -43,10 +39,9 @@ export type DiscoveredIssue = {
 }
 
 /**
- * A `blocks` relationship, **normalised to one direction**: Jira reports the
- * same link as `outward` on the blocker and `inward` on the blocked issue, and
- * an epic's search returns both ends, so without normalisation one dependency
- * would arrive twice and be drawn twice.
+ * A `blocks` relationship, **normalised to one direction**: Jira reports the same
+ * link as `outward` on the blocker and `inward` on the blocked issue and a search
+ * returns both ends, so unnormalised, a dependency arrives and is drawn twice.
  */
 export type DiscoveredLink = {
   readonly linkId: string
@@ -59,8 +54,7 @@ export type MirroredFields = Pick<GanttNode, (typeof MIRRORED_NODE_FIELDS)[numbe
 
 /**
  * A refresh of one node's mirrored half. `fields` is the whole payload and its
- * type is the schema's own list, so a reviewer checking "can sync move a node"
- * reads one line and is done.
+ * type is the schema's own list, so "can sync move a node" is one line to check.
  */
 export type MirrorUpdate = {
   readonly nodeId: string
@@ -69,14 +63,14 @@ export type MirrorUpdate = {
 
 /**
  * A newly discovered ticket, **flat and undated**: `start` and `end` are `null`
- * literals rather than `string | null` because an addition is never dated —
- * dates are chart-owned and import fabricates none (ADR-0012 §4) — and
- * `orphaned` is `false` for the same reason.
+ * literals, not `string | null`, because an addition is never dated (ADR-0012 §4);
+ * `orphaned` is `false` and `discovered` `true` because only a search makes one.
  */
-export type NodeAddition = Omit<GanttNode, 'start' | 'end' | 'orphaned'> & {
+export type NodeAddition = Omit<GanttNode, 'start' | 'end' | 'orphaned' | 'discovered'> & {
   readonly start: null
   readonly end: null
   readonly orphaned: false
+  readonly discovered: true
 }
 
 /** A local edge Jira now reports as a real link: promoted, not duplicated. */
@@ -86,18 +80,25 @@ export type EdgePromotion = {
 }
 
 /**
- * The complete output. Six fields, and the two that could destroy a plan —
+ * The complete output. Seven fields, and the two that could destroy a plan —
  * a node removal and a node reparent — are **absent**, not merely unused.
  */
 export type Reconciliation = {
   readonly mirrorUpdates: readonly MirrorUpdate[]
   readonly additions: readonly NodeAddition[]
   /**
-   * Every mirrored node whose key the search did not return — the **set**, not
-   * the delta. A ticket that comes back to its epic therefore loses its badge
-   * on the next sync, which a delta could not express.
+   * Every **already-discovered** mirrored node whose key the search did not return
+   * — the **set**, not the delta, so a ticket that comes back loses its badge. A
+   * node still `discovered: false` is never here, however complete the search.
    */
   readonly orphanedIds: readonly string[]
+  /**
+   * Node ids whose key **this** search returned. Or-ed in, never assigned, because
+   * `discovered` is sticky: dropping out of a later search is orphaning, not
+   * un-discovery. Kept even when the search was not authoritative — it argues from
+   * presence, where `orphanedIds` argues from absence.
+   */
+  readonly discoveredIds: readonly string[]
   readonly edgeAdditions: readonly GanttEdge[]
   /** Edge ids. **Jira-sourced only** — a local edge is never removed by sync. */
   readonly edgeRemovals: readonly string[]
@@ -109,6 +110,7 @@ export const NO_RECONCILIATION: Reconciliation = {
   mirrorUpdates: [],
   additions: [],
   orphanedIds: [],
+  discoveredIds: [],
   edgeAdditions: [],
   edgeRemovals: [],
   edgePromotions: [],
@@ -140,10 +142,9 @@ const differs = (node: GanttNode, next: MirroredFields): boolean =>
   node.assignee !== next.assignee
 
 /**
- * Where a newly discovered ticket lands: under its Jira parent when that parent
- * is itself a node — one already in the chart, or one this same reconcile is
- * adding — and at the root otherwise. This is the **only** time Jira's hierarchy
- * is consulted, and it is a suggestion rather than a mirror.
+ * Where a newly discovered ticket lands: under its Jira parent when that parent is
+ * itself a node — already in the chart, or added by this same reconcile — and at
+ * the root otherwise. The **only** time Jira's hierarchy is read, as a suggestion.
  */
 function placementFor(
   issue: DiscoveredIssue,
@@ -165,8 +166,10 @@ function nextOrderUnder(
 function reconcileNodes(
   chart: GanttChart,
   discovered: readonly DiscoveredIssue[],
-): Pick<Reconciliation, 'mirrorUpdates' | 'additions' | 'orphanedIds'> {
+  mirrorOnly: readonly DiscoveredIssue[],
+): Pick<Reconciliation, 'mirrorUpdates' | 'additions' | 'orphanedIds' | 'discoveredIds'> {
   const byKey = new Map(discovered.map((issue) => [issue.key.toUpperCase(), issue]))
+  const mirrorOnlyByKey = new Map(mirrorOnly.map((issue) => [issue.key.toUpperCase(), issue]))
   const nodeIdByKey = new Map<string, string>()
   for (const node of chart.nodes) {
     const key = keyOf(node)
@@ -175,21 +178,23 @@ function reconcileNodes(
 
   const mirrorUpdates: MirrorUpdate[] = []
   const orphanedIds: string[] = []
+  const discoveredIds: string[] = []
   for (const node of chart.nodes) {
     const key = keyOf(node)
     if (key === null) continue
-    const issue = byKey.get(key)
-    if (issue === undefined) {
-      orphanedIds.push(node.id)
-      continue
-    }
+    const found = byKey.get(key)
+    // Absent from the search is orphaned **only if a search ever returned it**: a
+    // key never in scope cannot have departed. Still a real ticket, so still mirrored.
+    if (found === undefined && node.discovered) orphanedIds.push(node.id)
+    if (found !== undefined) discoveredIds.push(node.id)
+    const issue = found ?? mirrorOnlyByKey.get(key)
+    if (issue === undefined) continue
     const fields = mirroredOf(issue)
     if (differs(node, fields)) mirrorUpdates.push({ nodeId: node.id, fields })
   }
 
-  // Placement reads the nodes already placed *plus* the ones placed earlier in
-  // this same loop, so a batch import nests a discovered child under its
-  // discovered parent rather than dropping both at the root.
+  // Placement reads the nodes already placed *plus* those placed earlier in this
+  // same loop, so a batch import nests a discovered child under its parent.
   const placed: { parentId: string | null; order: number }[] = chart.nodes.map((node) => ({
     parentId: node.parentId,
     order: node.order,
@@ -208,13 +213,14 @@ function reconcileNodes(
       start: null,
       end: null,
       orphaned: false,
+      discovered: true,
       ...mirroredOf(issue),
     })
     nodeIdByKey.set(issue.key.toUpperCase(), id)
     placed.push({ parentId, order })
   }
 
-  return { mirrorUpdates, additions, orphanedIds }
+  return { mirrorUpdates, additions, orphanedIds, discoveredIds }
 }
 
 // ---------------------------------------------------------------------------
@@ -272,19 +278,16 @@ function reconcileEdges(
     const pair = pairOf(edge.from, edge.to)
     const link = linkByPair.get(pair)
     if (edge.source.kind === 'local') {
-      // The one reconciliation rule for a local edge: a pair Jira now reports as
-      // a real link is **promoted**, so the dependency is drawn once rather than
-      // twice (ADR-0012 §6). Nothing else sync does can touch it — not even
-      // between two Jira tickets, which is the common and important case.
+      // The one rule for a local edge: a pair Jira now reports as a real link is
+      // **promoted**, drawn once and not twice. Nothing else touches it (§6).
       if (link !== undefined) {
         edgePromotions.push({ edgeId: edge.id, source: { kind: 'jira', linkId: link.linkId } })
       }
       continue
     }
     if (link !== undefined) continue
-    // A jira edge whose link the search no longer reports. Only removed when
-    // both of its tickets were actually looked at: an endpoint that has left the
-    // epic is an absence of evidence, not evidence the link was deleted.
+    // A jira edge whose link the search no longer reports. Removed only when both
+    // tickets were looked at: a departed endpoint is absence of evidence, not proof.
     if (wasLookedAt(edge.from) && wasLookedAt(edge.to)) edgeRemovals.push(edge.id)
   }
 
@@ -309,33 +312,39 @@ function reconcileEdges(
 // The verb
 // ---------------------------------------------------------------------------
 
-/** What this chart and this search disagree about, and nothing more. */
+/**
+ * What this chart and this search disagree about, and nothing more. `mirrorOnly`
+ * is the tickets sync read **by key** — jira nodes no search returns, such as a
+ * gate in another epic. Being no evidence about epic membership, they refresh a
+ * node's mirrored half and cannot add one, flip `discovered`, or carry an edge.
+ */
 export function reconcile(
   chart: GanttChart,
   discovered: readonly DiscoveredIssue[],
+  mirrorOnly: readonly DiscoveredIssue[] = [],
 ): Reconciliation {
-  const nodes = reconcileNodes(chart, discovered)
+  const nodes = reconcileNodes(chart, discovered, mirrorOnly)
   return { ...nodes, ...reconcileEdges(chart, discovered, nodes.additions) }
 }
 
 /**
- * The reconciliation applied — the only interpretation of one there is.
- *
- * Every existing node keeps its identity, its place in the tree, its order, its
- * dates and its body: the spread writes `fields` and `orphaned` and there is
- * nothing else in a `MirrorUpdate` to write. A local node is not touched at all,
- * because sync has no opinion about a lane the chart is the only copy of.
+ * The reconciliation applied — the only interpretation of one there is. Every
+ * existing node keeps its identity, place, order, dates and body: `refresh` writes
+ * the mirrored `fields`, `orphaned` and `discovered`, and a `MirrorUpdate` names
+ * nothing else. A local node is not touched — sync has no opinion about a lane the
+ * chart is the only copy of.
  */
 export function applyReconciliation(chart: GanttChart, change: Reconciliation): GanttChart {
   const updates = new Map(change.mirrorUpdates.map((update) => [update.nodeId, update.fields]))
   const orphaned = new Set(change.orphanedIds)
+  const seen = new Set(change.discoveredIds)
   const removed = new Set(change.edgeRemovals)
   const promoted = new Map(change.edgePromotions.map((p) => [p.edgeId, p.source]))
 
   return {
     ...chart,
     nodes: [
-      ...chart.nodes.map((node) => refresh(node, updates.get(node.id), orphaned.has(node.id))),
+      ...chart.nodes.map((n) => refresh(n, updates.get(n.id), orphaned.has(n.id), seen.has(n.id))),
       ...change.additions,
     ],
     edges: [
@@ -348,17 +357,20 @@ export function applyReconciliation(chart: GanttChart, change: Reconciliation): 
 }
 
 /**
- * A refreshed **copy** of one node — the node read off disk is never mutated.
- * A local node comes back untouched, and `orphaned` is assigned from the set
- * rather than or-ed into it, so a ticket that returns to its epic loses the
- * badge. Nothing else can be written: `fields` is the whole of a `MirrorUpdate`.
+ * A refreshed **copy**: the node off disk is never mutated and a local one is
+ * never touched. `orphaned` is **assigned** from the set, so a ticket that returns
+ * to its epic loses the badge; `discovered` is **or-ed**, since nothing can make
+ * it untrue that a search once returned the key. Nothing else is writable here —
+ * `fields` is the whole of a `MirrorUpdate`.
  */
 function refresh(
   node: GanttNode,
   fields: MirroredFields | undefined,
   orphaned: boolean,
+  discovered: boolean,
 ): GanttNode {
-  return node.source.kind === 'jira' ? { ...node, ...fields, orphaned } : node
+  const sticky = node.discovered || discovered
+  return node.source.kind === 'jira' ? { ...node, ...fields, orphaned, discovered: sticky } : node
 }
 
 /** A promoted copy, or the edge itself — never a mutation of the stored one. */

@@ -18,6 +18,7 @@ function node(id: string, overrides: Partial<GanttNode> = {}): GanttNode {
     column: 'TO DO',
     status: null,
     assignee: null,
+    discovered: false,
     orphaned: false,
     ...overrides,
   }

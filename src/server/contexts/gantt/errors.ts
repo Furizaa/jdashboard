@@ -46,14 +46,26 @@ export class DuplicateNodeId extends Schema.TaggedError<DuplicateNodeId>()('Dupl
 }) {}
 
 /**
- * The edge-shaped half of the same rule. An id is a **handle**: a duplicate edge
- * id makes `DELETE /edges/:edgeId` ambiguous, which is why `ganttChartSchema`
- * refuses a chart containing one — and why accepting the write would store a
- * chart the store then reads as absent.
+ * The edge-shaped half of the same rule, and **one tag over two refusals**.
+ *
+ * An id is a **handle**: a duplicate edge id makes `DELETE /edges/:edgeId`
+ * ambiguous, which is why `ganttChartSchema` refuses a chart containing one —
+ * and why accepting the write would store a chart the store then reads as
+ * absent. But a dependency's *identity* is its **endpoint pair** (ADR-0012 §6,
+ * whose promotion rule already says one pair is one edge), so a second edge over
+ * a pair the chart already has is the same refusal wearing different clothes:
+ * bootstrap mirrors every Jira link, and an agent re-declaring what it read from
+ * the epic under ids of its own would otherwise double the graph silently.
+ *
+ * `edgeId` is always the **incumbent's** id, never the one the caller sent, and
+ * `pair` is what separates "already declared — stop" from "name collision —
+ * rename and retry". Both are `409`.
  */
 export class DuplicateEdgeId extends Schema.TaggedError<DuplicateEdgeId>()('DuplicateEdgeId', {
   chartId: Schema.String,
   edgeId: Schema.String,
+  /** Set only for a pair collision; absent for an id collision. */
+  pair: Schema.optional(Schema.Struct({ from: Schema.String, to: Schema.String })),
 }) {}
 
 /** One field the caller got wrong, in the shape `toIssues` produces. */

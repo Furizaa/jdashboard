@@ -104,6 +104,7 @@ function chart(overrides: Partial<GanttChart> = {}): GanttChart {
         column: 'In Implementation',
         status: null,
         assignee: null,
+        discovered: false,
         orphaned: false,
       },
       {
@@ -117,6 +118,7 @@ function chart(overrides: Partial<GanttChart> = {}): GanttChart {
         column: 'Done',
         status: 'In STG',
         assignee: 'Andreas Hoffmann',
+        discovered: false,
         orphaned: false,
       },
     ],
@@ -127,6 +129,22 @@ function chart(overrides: Partial<GanttChart> = {}): GanttChart {
 
 function chartFile(value: GanttChart): Record<string, string> {
   return { [chartFilePath(HOME, value.id)]: JSON.stringify(value) }
+}
+
+/**
+ * A chart exactly as it sat on disk before `discovered` existed. Two real charts
+ * were in `~/.clashboard/gantt/` when the field was added, and `readChart` treats
+ * an invalid chart as **absent** — so a migration that failed would not raise, it
+ * would make a plan nobody has another copy of disappear from the app.
+ */
+function withoutDiscovered(value: GanttChart): Record<string, unknown> {
+  return {
+    ...value,
+    nodes: value.nodes.map((node) => {
+      const { discovered: _discovered, ...rest } = node
+      return rest
+    }),
+  }
 }
 
 describe('paths', () => {
@@ -178,6 +196,12 @@ describe('readChart', () => {
       JSON.stringify({ ...chart(), id: 'other' }),
       false,
     ],
+    // The schema addition that could have made two real charts vanish.
+    [
+      'a chart.json written before nodes had a discovered flag',
+      JSON.stringify(withoutDiscovered(chart())),
+      true,
+    ],
   ])('reads %s as %s', async (_label, raw, expected) => {
     const { deps } = fakeStore({ [chartFilePath(HOME, 'tier-migration')]: raw })
     expect((await readChart('tier-migration', deps)) !== null).toBe(expected)
@@ -192,6 +216,21 @@ describe('readChart', () => {
     const { deps } = fakeStore(chartFile(chart()))
     const read = await readChart('tier-migration', deps)
     expect(read).toEqual(chart())
+  })
+
+  // Loading is half of it: the field has to arrive, and arrive `false`, or every
+  // mirrored lane on a pre-existing chart would be orphan-eligible on the first
+  // sync on the strength of a key `undefined`.
+  it('fills discovered with false on a chart written before the field existed', async () => {
+    const { deps } = fakeStore({
+      [chartFilePath(HOME, 'tier-migration')]: JSON.stringify(withoutDiscovered(chart())),
+    })
+    const read = await readChart('tier-migration', deps)
+    expect(read?.nodes.map((node) => [node.id, node.discovered])).toEqual([
+      ['prd-tiering', false],
+      ['geo-412', false],
+    ])
+    expect(read?.nodes.every((node) => Object.hasOwn(node, 'discovered'))).toBe(true)
   })
 
   it('rejects an unguarded chart id before it reaches the filesystem', async () => {

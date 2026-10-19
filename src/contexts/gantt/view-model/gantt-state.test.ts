@@ -19,6 +19,7 @@ function node(id: string, start: string | null = null, end: string | null = null
     column: 'TO DO',
     status: null,
     assignee: null,
+    discovered: false,
     orphaned: false,
   }
 }

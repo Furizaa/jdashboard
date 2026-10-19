@@ -2,7 +2,7 @@ import { describe, expect, it } from '@effect/vitest'
 import { Effect, Layer } from 'effect'
 import { JiraTransportError, JiraUnauthorized } from '../../../gateways/jira/errors'
 import { JiraGateway } from '../../../gateways/jira/port'
-import type { RawIssue, RawSearchResponse } from '../../../gateways/jira/types'
+import type { RawDetailedIssue, RawIssue, RawSearchResponse } from '../../../gateways/jira/types'
 import { readChartChangelog } from '../../../lib/gantt-changelog-store'
 import { chartFilePath } from '../../../lib/gantt-store'
 import {
@@ -206,6 +206,92 @@ describe('syncChart', () => {
       const chart = yield* withJira(fakeJiraGateway({}))(syncChart('plan', writes))
       expect(chart.nodes[0]).toMatchObject({ id: 'geo-9', orphaned: false })
       expect(chart.lastSyncedAt).toBe(FAKE_NOW)
+    }),
+  )
+})
+
+// The cross-epic blocker: a jira node an agent created with `POST /nodes` for a
+// ticket that lives in another epic, so no discovery search for this chart will
+// ever return it. Mirroring it is a `getIssue`, not a search, and that read is
+// what makes modelling it as the real ticket honest — the alternative an agent
+// reached for was a local lane with a hand-copied status.
+describe('syncChart — the lanes discovery cannot reach', () => {
+  /** A chart whose second lane is a release gate in a different epic. */
+  const withBlocker = aChart({
+    jiraSources: ['HDR-20708'],
+    nodes: [
+      aNode('hdr-20709', { source: { kind: 'jira', key: 'HDR-20709' } }),
+      aNode('hdr-19244', {
+        source: { kind: 'jira', key: 'HDR-19244' },
+        discovered: false,
+        title: 'Groups API ships',
+        status: 'In Implementation',
+        column: 'In Implementation',
+      }),
+    ],
+  })
+
+  it.effect('survives a search that returns nothing, mirrored and not orphaned', () =>
+    Effect.gen(function* () {
+      const asked: string[] = []
+      const jira = fakeJiraGateway({
+        searchIssues: () => Effect.succeed(found([])),
+        getIssue: (key) => {
+          asked.push(key)
+          return Effect.succeed(
+            anIssue('HDR-19244', { status: { name: 'In STG' } }) as RawDetailedIssue,
+          )
+        },
+      })
+      const { writes } = fakeGanttStore(seedChart(withBlocker))
+      const chart = yield* withJira(jira)(syncChart('plan', writes))
+
+      // Only the un-discovered key, and only because the search did not answer
+      // for it: `hdr-20709` is already `discovered`, so it costs nothing.
+      expect(asked).toEqual(['HDR-19244'])
+      expect(chart.nodes[1]).toMatchObject({
+        id: 'hdr-19244',
+        status: 'In STG',
+        orphaned: false,
+        discovered: false,
+      })
+    }),
+  )
+
+  it.effect('asks for nothing once the search itself returns the key', () =>
+    Effect.gen(function* () {
+      let asked = 0
+      const jira = fakeJiraGateway({
+        searchIssues: () => Effect.succeed(found([anIssue('HDR-19244')])),
+        getIssue: () => {
+          asked += 1
+          return Effect.succeed(anIssue('HDR-19244') as RawDetailedIssue)
+        },
+      })
+      const { writes } = fakeGanttStore(seedChart(withBlocker))
+      const chart = yield* withJira(jira)(syncChart('plan', writes))
+      expect(asked).toBe(0)
+      // And the flag flips, so from now on it is an ordinary mirrored lane.
+      expect(chart.nodes[1]).toMatchObject({ id: 'hdr-19244', discovered: true })
+    }),
+  )
+
+  // One cross-epic lane whose mirrored half could not be read must not cost the
+  // sync its write — the judgement `seed-dates.ts` makes per ticket.
+  it.effect('skips a key Jira will not answer for rather than failing the sync', () =>
+    Effect.gen(function* () {
+      const jira = fakeJiraGateway({
+        searchIssues: () => Effect.succeed(found([anIssue('HDR-20709')])),
+        getIssue: () => Effect.fail(new JiraTransportError({ message: 'socket hang up' })),
+      })
+      const { writes } = fakeGanttStore(seedChart(withBlocker))
+      const chart = yield* withJira(jira)(syncChart('plan', writes))
+      expect(chart.lastSyncedAt).toBe(FAKE_NOW)
+      expect(chart.nodes[1]).toMatchObject({
+        id: 'hdr-19244',
+        status: 'In Implementation',
+        orphaned: false,
+      })
     }),
   )
 })

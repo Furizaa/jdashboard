@@ -1,7 +1,7 @@
 import { Effect } from 'effect'
 import type { JiraGatewayError } from '../../../gateways/jira/errors'
 import { JiraGateway } from '../../../gateways/jira/port'
-import type { RawIssue, RawIssueLink } from '../../../gateways/jira/types'
+import type { RawDetailedIssue, RawIssue, RawIssueLink } from '../../../gateways/jira/types'
 import { ganttChartSchema, toIssues, type GanttChart } from '../../../lib/gantt-schema'
 import { readChart, writeChart } from '../../../lib/gantt-store'
 import { recordChange, type GanttWrites } from '../../../lib/gantt-writes'
@@ -50,6 +50,18 @@ export const GANTT_SYNC_FIELDS = [
   'issuelinks',
 ] as const
 
+/**
+ * The fields a **mirror-by-key** read needs, which is the mirrored half and
+ * nothing else. No `issuelinks`: a ticket outside this chart's epics is not
+ * evidence about the epic's dependency graph. No `parent` either — Jira's parent
+ * is a one-time import suggestion (ADR-0012 §5) and a node reached this way was
+ * placed by the agent that created it.
+ */
+export const GANTT_MIRROR_FIELDS = ['summary', 'status', 'assignee'] as const
+
+/** How many mirror-by-key reads are in flight at once. `seed-dates.ts`'s five. */
+export const GANTT_MIRROR_CONCURRENCY = 5
+
 /** Jira's name for the relationship a Gantt arrow draws. Compared case-folded. */
 const BLOCKS_LINK_TYPE = 'blocks'
 
@@ -80,6 +92,23 @@ function toDiscoveredIssue(issue: RawIssue): DiscoveredIssue {
     assignee: issue.fields.assignee?.displayName ?? null,
     parentKey: issue.fields.parent?.key ?? null,
     links: toDiscoveredLinks(issue.key, issue.fields.issuelinks ?? []),
+  }
+}
+
+/**
+ * One ticket read by key rather than found by a search. `links` is `[]` and
+ * `parentKey` is `null` as a matter of type rather than of the response: neither
+ * was asked for, and `reconcile` must not read a cross-epic ticket as evidence
+ * about this chart's epic.
+ */
+function toMirroredIssue(issue: RawDetailedIssue): DiscoveredIssue {
+  return {
+    key: issue.key,
+    title: issue.fields.summary,
+    status: issue.fields.status.name,
+    assignee: issue.fields.assignee?.displayName ?? null,
+    parentKey: null,
+    links: [],
   }
 }
 
@@ -138,6 +167,62 @@ export function discoverIssues(
   })
 }
 
+/**
+ * The jira keys sync has to read **by key**, because no discovery search for this
+ * chart will return them: a node whose `discovered` is still `false` and whose key
+ * this search did not return either. That is the cross-epic blocker — a release
+ * gate living in a different epic is the normal case for a front-end epic waiting
+ * on a backend — accepted through `POST /nodes`, mirrored like any other ticket,
+ * and never orphaned (ADR-0012 §5, as narrowed).
+ *
+ * An **already-discovered** node that has dropped out of the search is not here.
+ * It has its `orphaned` badge, which is the answer to "where did this go", and
+ * paying a round-trip per departed ticket on every sync to refresh a lane the
+ * chart is already telling you has left is a cost nobody asked for.
+ *
+ * Computed **after** the search, so a chart whose nodes the search did return
+ * costs nothing extra — which is what keeps a freshly migrated chart, where every
+ * node starts `discovered: false`, from paying a `getIssue` per lane.
+ */
+function mirrorOnlyKeys(chart: GanttChart, discovery: Discovery): readonly string[] {
+  const returned = new Set(discovery.issues.map((issue) => issue.key.toUpperCase()))
+  const keys = new Set<string>()
+  for (const node of chart.nodes) {
+    if (node.source.kind !== 'jira' || node.discovered) continue
+    if (returned.has(node.source.key.toUpperCase())) continue
+    keys.add(node.source.key)
+  }
+  return [...keys]
+}
+
+/**
+ * One `getIssue` per such key, five at a time, and **a failure per key rather
+ * than for the run**: one cross-epic lane whose mirrored half could not be read
+ * must not cost the sync its write, which is the judgement `seed-dates.ts` makes
+ * per ticket. A key Jira will not answer for is simply absent from the result,
+ * and the node keeps the fields it had.
+ *
+ * `never` in the error channel is the point: nothing here can fail the sync.
+ */
+function readMirrorOnly(
+  keys: readonly string[],
+): Effect.Effect<readonly DiscoveredIssue[], never, JiraGateway> {
+  if (keys.length === 0) return Effect.succeed([])
+  return Effect.gen(function* () {
+    const jira = yield* JiraGateway
+    const read = yield* Effect.forEach(
+      keys,
+      (key) =>
+        jira.getIssue(key, GANTT_MIRROR_FIELDS).pipe(
+          Effect.map((issue): DiscoveredIssue | null => toMirroredIssue(issue)),
+          Effect.catchAll(() => Effect.succeed(null)),
+        ),
+      { concurrency: GANTT_MIRROR_CONCURRENCY },
+    )
+    return read.filter((issue): issue is DiscoveredIssue => issue !== null)
+  })
+}
+
 const unreachable = (chartId: string, error: JiraGatewayError): JiraUnreachable =>
   new JiraUnreachable({
     chartId,
@@ -179,6 +264,7 @@ function writeSynced(
   writes: GanttWrites,
   chartId: string,
   discovery: Discovery,
+  mirrorOnly: readonly DiscoveredIssue[],
 ): Effect.Effect<GanttChart, ChartNotFound | InvalidChartPayload> {
   return Effect.promise<Outcome>(() =>
     writes.withChartLock(chartId, async (): Promise<Outcome> => {
@@ -187,6 +273,9 @@ function writeSynced(
       // No sources means no search, and a reconciliation against an empty
       // discovery would orphan every mirrored node in the chart. The chart still
       // gets its `lastSyncedAt`: it was synced, there was simply nothing to ask.
+      // A chart with no epics can still carry jira lanes an agent created by key,
+      // though, and those were read: mirroring them is the whole point of the
+      // read, so a mirror-only result is a reason to reconcile after all.
       //
       // When the search was not authoritative (truncated, or empty against real
       // sources — see `Discovery`) everything it positively saw is still applied
@@ -195,7 +284,9 @@ function writeSynced(
       // destruction that promise is about. `orphanedIds: []` is expressible in
       // the type, which is why this needs no second code path.
       const full =
-        chart.jiraSources.length === 0 ? NO_RECONCILIATION : reconcile(chart, discovery.issues)
+        chart.jiraSources.length === 0 && mirrorOnly.length === 0
+          ? NO_RECONCILIATION
+          : reconcile(chart, discovery.issues, mirrorOnly)
       const change = discovery.authoritative ? full : { ...full, orphanedIds: [] }
       const next: GanttChart = {
         ...applyReconciliation(chart, change),
@@ -234,12 +325,15 @@ export function syncChart(
   chartId: string,
   writes: GanttWrites,
 ): Effect.Effect<GanttChart, SyncChartError, JiraGateway> {
-  return Effect.promise(() => readChart(chartId, writes.deps)).pipe(
-    Effect.flatMap((chart) =>
-      chart === null
-        ? Effect.fail<SyncChartError>(new ChartNotFound({ chartId }))
-        : discoverIssues(chartId, chart.jiraSources),
-    ),
-    Effect.flatMap((discovery) => writeSynced(writes, chartId, discovery)),
-  )
+  return Effect.gen(function* () {
+    const chart = yield* Effect.promise(() => readChart(chartId, writes.deps))
+    if (chart === null) return yield* Effect.fail<SyncChartError>(new ChartNotFound({ chartId }))
+    // Discover, then mirror what discovery cannot reach, then write. Still one
+    // write downstream of every read, so `JiraUnreachable` leaves `chart.json`
+    // byte-identical — and the mirror reads come second so they can be asked only
+    // about the keys the search did not already answer for.
+    const discovery = yield* discoverIssues(chartId, chart.jiraSources)
+    const mirrorOnly = yield* readMirrorOnly(mirrorOnlyKeys(chart, discovery))
+    return yield* writeSynced(writes, chartId, discovery, mirrorOnly)
+  })
 }

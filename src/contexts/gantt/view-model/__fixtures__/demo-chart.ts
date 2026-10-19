@@ -46,6 +46,7 @@ type NodeSpec = {
   readonly source?: GanttNodeSource
   readonly status?: string | null
   readonly assignee?: string | null
+  readonly discovered?: boolean
   readonly orphaned?: boolean
 }
 
@@ -61,6 +62,9 @@ function node(id: string, spec: NodeSpec): GanttNode {
     column: spec.column ?? 'TO DO',
     status: spec.status ?? null,
     assignee: spec.assignee ?? null,
+    // A mirrored lane in the demo was found by a search, as one on a real chart
+    // would have been; a local lane has no key for a search to return.
+    discovered: spec.discovered ?? spec.source?.kind === 'jira',
     orphaned: spec.orphaned ?? false,
   }
 }

@@ -117,6 +117,8 @@ const ganttNodeSchema = z.object({
   status: line.nullable(),
   /** Mirrored. */
   assignee: line.nullable(),
+  /** Whether discovery ever returned this key — sync's to set, sticky (ADR-0012 §5). */
+  discovered: z.boolean().default(false),
   /**
    * Set by sync when the key left the epic. A departed ticket is **marked, not
    * removed** (ADR-0012 §5): it carries local children, a body, declared edges
@@ -348,8 +350,8 @@ export const patchChartBody = z.object({
 })
 
 /**
- * `POST /api/gantt/charts/:chartId/nodes`. `orphaned` is absent on purpose: a
- * fact sync observes about a Jira key, not a claim a caller gets to make.
+ * `POST /api/gantt/charts/:chartId/nodes`. `orphaned` and `discovered` are absent
+ * on purpose: facts sync observes about a Jira key, not claims a caller holds.
  */
 export const createNodeBody = z.object({
   id: slug,

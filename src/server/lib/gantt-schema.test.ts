@@ -306,6 +306,13 @@ describe('request bodies', () => {
     expect('orphaned' in parsed).toBe(false)
   })
 
+  // The other fact sync observes. A caller that could set it could make its own
+  // node orphan-eligible — or claim a key had been in a search that never ran.
+  it('createNodeBody does not let a caller claim a node has been discovered', () => {
+    const parsed = createNodeBody.parse({ id: 'n', title: 't', discovered: true })
+    expect('discovered' in parsed).toBe(false)
+  })
+
   it('createEdgeBody defaults to a local edge', () => {
     expect(createEdgeBody.parse({ id: 'e1', from: 'a', to: 'b' }).source).toEqual({
       kind: 'local',

@@ -103,6 +103,10 @@ export function aNode(id: string, overrides: Partial<GanttNode> = {}): GanttNode
     column: 'TO DO',
     status: null,
     assignee: null,
+    // A jira lane in a fixture is one a discovery search returned, which is how
+    // bootstrap and every later sync leave one. A test about the cross-epic
+    // blocker — the case `discovered` exists for — says `discovered: false`.
+    discovered: overrides.source?.kind === 'jira',
     orphaned: false,
     ...overrides,
   }

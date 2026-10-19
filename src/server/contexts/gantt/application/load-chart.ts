@@ -46,6 +46,41 @@ export function loadChartList(
 }
 
 /**
+ * The **one** `hasBody` derivation, and the only place it is written.
+ *
+ * One directory read for the whole chart rather than one stat per node, and a
+ * copy of each node on purpose: the node read off disk must not grow a field the
+ * schema does not have.
+ */
+async function chartView(chart: GanttChart, deps: GanttStoreDeps): Promise<GanttChartView> {
+  const withBody = new Set(await bodyNodeIds(chart.id, deps))
+  return {
+    ...chart,
+    // oxlint-disable-next-line no-map-spread -- see the note above
+    nodes: chart.nodes.map((node) => ({ ...node, hasBody: withBody.has(node.id) })),
+  } satisfies GanttChartView
+}
+
+/**
+ * **Every route that answers with a whole chart answers with the same shape.**
+ *
+ * `GET /charts/:chartId` is not the only one: `POST /charts` answers with the
+ * bootstrapped chart and `POST /charts/:chartId/dates` with the seeded one, and
+ * both used to hand back the raw `GanttChart` their application service returns —
+ * where `hasBody` was not `false`, it was **missing**, so an agent reading either
+ * response as a chart read saw `undefined` on a key the SKILL promises is there.
+ *
+ * A combinator over the program rather than a second derivation beside it, so the
+ * three responses cannot drift: there is one `chartView` and three callers of it.
+ */
+export function withBodyFlags<E, R>(
+  program: Effect.Effect<GanttChart, E, R>,
+  deps: GanttStoreDeps,
+): Effect.Effect<GanttChartView, E, R> {
+  return program.pipe(Effect.flatMap((chart) => Effect.promise(() => chartView(chart, deps))))
+}
+
+/**
  * One chart's skeleton. The bodies are **not** here: `GET /charts/:chartId`
  * returns the tree with a `hasBody` flag per node and bodies are fetched one at
  * a time, so an agent looking up a node id pays nothing for PRD prose.
@@ -54,21 +89,11 @@ export function loadChart(
   chartId: string,
   deps: GanttStoreDeps,
 ): Effect.Effect<GanttChartView, ChartNotFound> {
-  return Effect.promise(async () => {
-    const chart = await readChart(chartId, deps)
-    if (chart === null) return null
-    // One directory read for the whole chart rather than one stat per node.
-    const withBody = new Set(await bodyNodeIds(chartId, deps))
-    return {
-      ...chart,
-      // A copy on purpose: the node read off disk must not grow a field the schema
-      // does not have.
-      // oxlint-disable-next-line no-map-spread -- see comment above
-      nodes: chart.nodes.map((node) => ({ ...node, hasBody: withBody.has(node.id) })),
-    } satisfies GanttChartView
-  }).pipe(
+  return Effect.promise(() => readChart(chartId, deps)).pipe(
     Effect.flatMap((chart) =>
-      chart === null ? Effect.fail(new ChartNotFound({ chartId })) : Effect.succeed(chart),
+      chart === null
+        ? Effect.fail(new ChartNotFound({ chartId }))
+        : Effect.promise(() => chartView(chart, deps)),
     ),
   )
 }

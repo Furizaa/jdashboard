@@ -1,3 +1,4 @@
+import { makeIssue } from '../fixtures/factories'
 import { expect, test } from '../fixtures/test'
 
 // The REST contract an agent drives, over the real server (ADR-0012 §7).
@@ -237,4 +238,38 @@ test('GET /api/gantt/skill serves the parameterised document', async ({ request,
   const unparameterised = await request.get('/api/gantt/skill')
   expect(unparameterised.status()).toBe(200)
   expect(await unparameterised.text()).not.toContain('{{')
+})
+
+// `hasBody` was derived on `GET /charts/:chartId` and **missing** from the two
+// other routes that answer with a whole chart, so an agent reading a bootstrap
+// response as a chart read saw `undefined` on a key the SKILL promises is there.
+// This is the arm a unit test cannot reach: `POST /charts` only comes back with
+// lanes when it bootstrapped from an epic, which needs a Jira to discover from.
+test('POST /charts bootstraps lanes that already carry hasBody', async ({ request, world }) => {
+  const epic = { key: 'GEO-900', summary: 'Tiering', issuetype: 'Epic' }
+  world.seedIssues([
+    makeIssue({ key: 'GEO-901', summary: 'Quote endpoint returns tiers', parent: epic }),
+    makeIssue({ key: 'GEO-902', summary: 'Tier selector on the quote form', parent: epic }),
+  ])
+
+  const created = await request.post(CHARTS, {
+    data: { id: 'e2e-bootstrap', title: 'Bootstrapped', jiraSources: ['GEO-900'] },
+  })
+  expect(created.status()).toBe(201)
+  const chart = await created.json()
+  expect(chart.nodes.map((node: { id: string }) => node.id)).toEqual(['geo-901', 'geo-902'])
+
+  // The key **exists** and is `false`, not merely falsy — the distinction the
+  // hole was made of.
+  for (const node of chart.nodes as Record<string, unknown>[]) {
+    expect(Object.hasOwn(node, 'hasBody')).toBe(true)
+    expect(node.hasBody).toBe(false)
+    // And a lane a search returned is `discovered`, which is what makes it
+    // orphan-eligible later (ADR-0012 §5).
+    expect(node.discovered).toBe(true)
+  }
+
+  // The same chart read back agrees, which is the whole claim: one shape.
+  const read = await (await request.get(`${CHARTS}/e2e-bootstrap`)).json()
+  expect(read.nodes).toEqual(chart.nodes)
 })

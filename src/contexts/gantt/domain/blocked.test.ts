@@ -17,6 +17,7 @@ function node(id: string, column: Column = 'TO DO'): GanttNode {
     column,
     status: null,
     assignee: null,
+    discovered: false,
     orphaned: false,
   }
 }

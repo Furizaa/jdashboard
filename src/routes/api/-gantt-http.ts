@@ -2,7 +2,7 @@ import { Effect, type ManagedRuntime } from 'effect'
 import { match } from 'ts-pattern'
 import { z } from 'zod'
 import { createChartBody, toIssues, type GanttIssue } from '~/server/lib/gantt-schema'
-import type { GanttError } from '~/server/contexts/gantt/errors'
+import type { DuplicateEdgeId, GanttError } from '~/server/contexts/gantt/errors'
 import { appRuntime } from '~/server/runtime/app-runtime'
 
 // The plumbing every `/api/gantt/*` route shares: decoding a path parameter and
@@ -126,6 +126,23 @@ export async function decodeJsonBody<S extends z.ZodType>(
 // ---------------------------------------------------------------------------
 
 /**
+ * `DuplicateEdgeId` is **one tag over two refusals**, and the message is what
+ * separates them: `edgeId` is the incumbent edge's id either way, so an agent
+ * reading only "already has an edge" could not tell a name collision it should
+ * rename past from a dependency it has already declared and must stop
+ * re-declaring. A pair collision names the pair; an id collision does not.
+ */
+function duplicateEdgeMessage(error: DuplicateEdgeId): string {
+  const { chartId, edgeId, pair } = error
+  if (pair === undefined) return `chart "${chartId}" already has an edge "${edgeId}"`
+  return (
+    `chart "${chartId}" already has edge "${edgeId}" declaring that "${pair.from}" blocks ` +
+    `"${pair.to}" — a dependency is identified by its endpoint pair, not by its id, so there ` +
+    `is nothing to add under another id`
+  )
+}
+
+/**
  * One tag, one status, one message — exhaustive over `GanttError`, so adding a
  * failure to the application service is a compile error here rather than a
  * silent `500` at the one place the agent is reading.
@@ -163,11 +180,7 @@ export function ganttFailureResponse(error: GanttError): Response {
       ),
     )
     .with({ _tag: 'DuplicateEdgeId' }, (e) =>
-      ganttErrorResponse(
-        409,
-        'DuplicateEdgeId',
-        `chart "${e.chartId}" already has an edge "${e.edgeId}"`,
-      ),
+      ganttErrorResponse(409, 'DuplicateEdgeId', duplicateEdgeMessage(e)),
     )
     .with({ _tag: 'JiraUnreachable' }, (e) =>
       ganttErrorResponse(

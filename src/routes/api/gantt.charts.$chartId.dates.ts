@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { withBodyFlags } from '~/server/contexts/gantt/application/load-chart'
 import { seedDatesFromHistory } from '~/server/contexts/gantt/application/seed-dates'
 import { liveGanttWrites, type GanttWrites } from '~/server/lib/gantt-writes'
 import { chartParams, decodeParams, ganttJson, ganttRespond, type ChartCtx } from './-gantt-http'
@@ -30,8 +31,12 @@ export function ganttDatesHandlers(writes: GanttWrites) {
     POST: ({ params }: ChartCtx) => {
       const decoded = decodeParams(chartParams, params)
       if (!decoded.ok) return decoded.response
-      return ganttRespond(ROUTE, seedDatesFromHistory(decoded.value.chartId, writes), (chart) =>
-        ganttJson(chart, 200),
+      // Through `withBodyFlags`, like every other route that answers with a whole
+      // chart: the key is `false` rather than missing (ADR-0012 §11).
+      return ganttRespond(
+        ROUTE,
+        withBodyFlags(seedDatesFromHistory(decoded.value.chartId, writes), writes.deps),
+        (chart) => ganttJson(chart, 200),
       )
     },
   }

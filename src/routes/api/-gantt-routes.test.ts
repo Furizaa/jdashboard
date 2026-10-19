@@ -363,7 +363,31 @@ describe('/api/gantt/charts/:chartId/edges', () => {
     const { writes } = withSeed()
     const response = await post(writes, { id: 'api-blocks-geo', from: 'geo-120', to: 'api' })
     expect(response.status).toBe(409)
-    expect((await errorBodyOf(response)).error).toBe('DuplicateEdgeId')
+    const body = await errorBodyOf(response)
+    expect(body.error).toBe('DuplicateEdgeId')
+    expect(body.message).toContain('already has an edge "api-blocks-geo"')
+    expect(body.message).not.toContain('endpoint pair')
+  })
+
+  // One tag, two refusals, and the message is what separates them: an agent that
+  // cannot tell "already declared" from "name collision" either stops when it
+  // should rename, or renames and retries when it should stop — and retrying is
+  // how the dependency graph silently doubled.
+  it('POST is a 409 naming the incumbent edge for a pair already declared', async () => {
+    const { writes } = withSeed()
+    const response = await post(writes, { id: 'a-fresh-id', from: 'api', to: 'geo-120' })
+    expect(response.status).toBe(409)
+    const body = await errorBodyOf(response)
+    expect(body.error).toBe('DuplicateEdgeId')
+    expect(body.message).toContain('"api-blocks-geo"')
+    expect(body.message).toContain('endpoint pair')
+    expect(body.message).not.toContain('"a-fresh-id"')
+  })
+
+  it('POST is a 201 for the reversed pair — that is a cycle, and a cycle is recorded', async () => {
+    const { writes } = withSeed()
+    const response = await post(writes, { id: 'geo-blocks-api-2', from: 'geo-120', to: 'api' })
+    expect(response.status).toBe(201)
   })
 
   it('DELETE is a 200 carrying the withdrawn edge, and a 404 for an unknown one', async () => {
@@ -376,6 +400,74 @@ describe('/api/gantt/charts/:chartId/edges', () => {
     const missing = await handlers.DELETE({ params: { chartId: 'plan', edgeId: 'api-blocks-geo' } })
     expect(missing.status).toBe(404)
     expect((await errorBodyOf(missing)).error).toBe('EdgeNotFound')
+  })
+})
+
+// The SKILL promises that a chart read carries `hasBody` per node. `GET` derived
+// it; `POST /charts` and `POST /charts/:chartId/dates` answered with the raw
+// `GanttChart` their application service returns, where the key was not `false`
+// but **missing** — so an agent treating either response as a chart read saw
+// `undefined`. All three now go through `withBodyFlags`, the one derivation.
+describe('every route that answers with a whole chart carries hasBody', () => {
+  // The jira lane is already dated, so `seedDatesFromHistory` has nothing to ask
+  // Jira for and the dates route's happy path is reachable without a gateway.
+  const predated = aChart({
+    nodes: [
+      aNode('prd'),
+      aNode('api', { parentId: 'prd' }),
+      aNode('geo-120', {
+        source: { kind: 'jira', key: 'GEO-120' },
+        start: '2026-10-01',
+        end: '2026-10-09',
+      }),
+    ],
+  })
+
+  type NodeShape = { id: string; hasBody: boolean }
+  type ChartShape = { nodes: NodeShape[] }
+
+  /** The key **exists** and is `false` — not merely that it is falsy. */
+  function expectPresentAndFalse(chart: ChartShape, withBody: readonly string[]): void {
+    expect(chart.nodes.length).toBeGreaterThan(0)
+    for (const node of chart.nodes) {
+      expect(Object.hasOwn(node, 'hasBody')).toBe(true)
+      expect(node.hasBody).toBe(withBody.includes(node.id))
+    }
+  }
+
+  it('agrees between GET /charts/:chartId and POST /charts/:chartId/dates', async () => {
+    const { writes } = fakeGanttStore({
+      ...seedChart(predated),
+      [bodyFilePath(FAKE_HOME, 'plan', 'api')]: '# the API',
+    })
+    const read = (await (
+      await ganttChartHandlers(writes).GET({ params: { chartId: 'plan' } })
+    ).json()) as ChartShape
+    const dated = (await (
+      await ganttDatesHandlers(writes).POST({ params: { chartId: 'plan' } })
+    ).json()) as ChartShape
+
+    expectPresentAndFalse(read, ['api'])
+    expectPresentAndFalse(dated, ['api'])
+    // Not just both present — the same answer for the same chart.
+    expect(dated.nodes).toEqual(read.nodes)
+  })
+
+  // `POST /charts` can only be driven without a Jira when it names no epics, and
+  // such a chart is created empty — so what is assertable here is that the
+  // response is the same *shape* as a read, down to its keys. The per-node half
+  // of this route's promise is `tests/e2e/gantt/api-contract.spec.ts`, which
+  // bootstraps from a mocked epic and gets real lanes back.
+  it('answers POST /charts with the same keys a chart read has', async () => {
+    const { writes } = fakeGanttStore()
+    const created = (await (
+      await ganttChartsHandlers(writes).POST({ request: json({ id: 'plan', title: 'The plan' }) })
+    ).json()) as Record<string, unknown>
+    const read = (await (
+      await ganttChartHandlers(writes).GET({ params: { chartId: 'plan' } })
+    ).json()) as Record<string, unknown>
+    expect(Object.keys(created).toSorted()).toEqual(Object.keys(read).toSorted())
+    expect(created).toEqual(read)
   })
 })
 

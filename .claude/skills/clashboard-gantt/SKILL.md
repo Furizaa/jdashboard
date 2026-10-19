@@ -74,6 +74,7 @@ Nodes arrive flat and you build the tree yourself from `parentId`. Depth is unbo
   "column": "In Implementation",
   "status": null,
   "assignee": null,
+  "discovered": false,
   "orphaned": false
 }
 ```
@@ -87,7 +88,8 @@ Nodes arrive flat and you build the tree yourself from `parentId`. Depth is unbo
 - **`column`** — the progress column, one of `"TO DO"`, `"In Implementation"`, `"In Code Review"`, `"Done"`. Note the casing: `"TO DO"` is upper-case and the other three are not. For a jira node it is derived from the ticket's status; for a local one you declare it.
 - **`status`** — the real status name behind the column (`"In STG"`, `"Reviewed"`), or `null`. Mirrored on a jira node; usually `null` on a local one.
 - **`assignee`** — a display name, or `null`. Mirrored on a jira node.
-- **`orphaned`** — `true` when sync found that this node's Jira key has left the epic. Set by sync, never by you, and absent from every request body. A departed ticket is **marked, not removed**, because it may carry local children, a body, arrows and dates.
+- **`discovered`** — `true` once a discovery search over the chart's `jiraSources` has returned this node's key. Set by sync, never by you, and absent from every request body. It is **not** "is in the epic" — that is what `orphaned` answers — it is "was this key ever in scope at all", and it is sticky: once true it stays true. A jira node you create yourself with `POST /nodes` starts `false`, which is how you model **a blocker that lives in a different epic**: sync still mirrors its title, status and assignee, because it is a real ticket, and it is never marked `orphaned`, because no search it was absent from ever had it in scope. Create the real jira node; do not hand-copy a ticket's status into a local lane, which goes stale the moment it is written.
+- **`orphaned`** — `true` when sync found that this node's Jira key has left the epic. Set by sync, never by you, and absent from every request body. Only a node whose `discovered` is `true` can ever be marked: a key that was never in a search cannot be reported as having departed. A departed ticket is **marked, not removed**, because it may carry local children, a body, arrows and dates.
 
 There is no `blocked` field and no percent. Blocked is derived from the arrows at read time, so it cannot go stale when the blocker ships, and a parent lane summarises its descendants as a distribution ("7 of 11 done") rather than as one averaged state.
 
@@ -107,6 +109,8 @@ There is no `blocked` field and no percent. Blocked is derived from the arrows a
 - **`source`** — `{ "kind": "local" }` for a dependency you declare, or `{ "kind": "jira", "linkId": "10432" }` for one mirrored from a Jira issue link. Default `local`, and `local` is the common case: the dependency an architect knows about is frequently not linked in Jira at all — including between two Jira tickets.
 
 Both endpoints must already be nodes in the chart. An edge naming a node that is not there is refused, because the chart cannot draw an arrow to nothing.
+
+**A dependency is identified by its `from`/`to` pair, not by its `id`.** The id is only the handle you delete it by. A second edge over a pair the chart already has is refused with `409`, whatever id you give it and whatever `source` — including a `local` edge over a pair already mirrored as `jira`, which is the common case, because bootstrap mirrors every Jira link before you start. **Read the chart's `edges` before you declare one**, and treat a `409` naming an incumbent id you did not send as "already declared, move on", not as "rename and retry". The reverse pair is a different dependency and is accepted: `A blocks B` plus `B blocks A` is a cycle, and a cycle is recorded rather than refused — see below.
 
 ## Ids are slugs you choose
 
@@ -320,7 +324,9 @@ curl -s -X POST {{BASE_URL}}/api/gantt/charts/{{CHART_ID}}/edges \
   -d '{"id":"api-blocks-tier-migration","from":"gantt-api","to":"tier-migration","source":{"kind":"local"}}'
 ```
 
-`201` with the created edge. `source` may be omitted and defaults to `{ "kind": "local" }`. `409 DuplicateEdgeId` for a taken id; `404 NodeNotFound` if either endpoint is not a node in the chart.
+`201` with the created edge. `source` may be omitted and defaults to `{ "kind": "local" }`. `404 NodeNotFound` if either endpoint is not a node in the chart.
+
+`409 DuplicateEdgeId` covers **both** refusals, and the message tells them apart. For a taken **id** it names the id you sent. For a `from`/`to` pair the chart already has it names the **incumbent** edge's id and the pair, because that dependency is already recorded and there is nothing to add under another id — do not retry it with a fresh id, which would double the arrow.
 
 **An edge that closes a cycle is accepted, with a `201`.** The API never refuses to record a dependency you declared: a chart built incrementally will contain loops you mean to resolve two calls later, and a plan that is impossible should _look_ impossible rather than be impossible to write down. The chart then names the loop in a warning and draws its edges dashed, and every lane in it reads as unresolvable.
 
@@ -368,7 +374,7 @@ Every failure comes back as JSON, whatever the route:
 
 Read it in three parts:
 
-- **The status is the category.** `400` the body or an id in the URL did not match the schema · `404` no such chart, node or edge · `409` an id you chose is taken · `422` you patched a mirrored field on a jira node · `503` Jira did not answer during a sync · `500` a bug on the server, which is not yours to fix.
+- **The status is the category.** `400` the body or an id in the URL did not match the schema · `404` no such chart, node or edge · `409` an id you chose is taken, or a dependency you declared is already there · `422` you patched a mirrored field on a jira node · `503` Jira did not answer during a sync · `500` a bug on the server, which is not yours to fix.
 - **`error` is the tag** — `InvalidChartPayload`, `ChartNotFound`, `NodeNotFound`, `EdgeNotFound`, `DuplicateChartId`, `DuplicateNodeId`, `DuplicateEdgeId`, `MirroredFieldPatch`, `JiraUnreachable`, `InternalError`. Switch on this, not on the prose.
 - **`issues[]` names the field.** Each entry has a `path` addressing the field in the body you just sent (`nodes.2.start`, `source.kind`, or `(root)`), an `expected`, and the `received` value as the server saw it.
 

@@ -88,6 +88,8 @@ type GanttEdge = {
 }
 ```
 
+The `readonly` annotations above state intent. Zod infers `nodes` / `edges` as **mutable** arrays, and that is left alone deliberately: adding `.readonly()` would ripple through every builder in the write surface for a guarantee nothing in the codebase needs, since the protection that matters is that no code mutates them. Treat them as readonly; the compiler will not make you.
+
 `hasBody` is **derived at read time** from the presence of `bodies/<id>.md`, never stored — a stored flag is a second source of truth for a file's existence. There is no `kind` on an edge: every edge is `from blocks to`, and a second relation is additive.
 
 **Mirrored fields are marked above with a bullet.** Sync writes exactly those and nothing else. Everything unmarked is chart-owned on every node regardless of source.

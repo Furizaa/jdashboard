@@ -24,7 +24,7 @@ The ways in and the one way out.
 
 Both were found by reading slice 92's own screenshots, and both undercut something ADR-0012 states, so they are not optional polish.
 
-- **The merged-arrow count is nearly illegible.** When arrows re-anchor onto one pair they merge and carry a `count` — and in the collapsed quarter view that count renders as a bare grey `3` a few pixels tall at the arrow's elbow. ADR-0012 §10 makes the count *the information* in a collapsed chart, so it needs to read as a badge: a filled pill with a contrasting foreground, sized like the other chips on the surface, placed so it does not sit on the arrow's corner.
+- **The merged-arrow count is nearly illegible.** When arrows re-anchor onto one pair they merge and carry a `count` — and in the collapsed quarter view that count renders as a bare grey `3` a few pixels tall at the arrow's elbow. ADR-0012 §10 makes the count _the information_ in a collapsed chart, so it needs to read as a badge: a filled pill with a contrasting foreground, sized like the other chips on the surface, placed so it does not sit on the arrow's corner.
 - **Bar labels and arrows collide.** The red dashed cycle arrow passes horizontally straight through the `0 of 3 done` and `0 of 1 done` labels, and in the month view `1 of 2 done` straddles an amber/green segment boundary. Give the `n of m done` label a backdrop (or move it clear of the bar) so it survives both a colour boundary underneath it and an arrow crossing it.
 
 ## Acceptance criteria

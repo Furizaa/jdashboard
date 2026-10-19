@@ -11,6 +11,7 @@ import { GanttArrows } from './GanttArrows'
 import { GanttAxis, GanttGridLines } from './GanttAxis'
 import { GanttChartRow, BAR_REGION_CLASS, ROW_HEIGHT, TREE_COLUMN_CLASS } from './GanttRow'
 import { INFO_BAND_HEIGHT } from './InfoBand'
+import { NoDatesBanner } from './NoDatesBanner'
 
 // The grid frame: CSS grid rows, absolutely positioned bars, one SVG arrow
 // overlay (ADR-0012 §10).
@@ -95,6 +96,9 @@ function Chart({
     <div className="flex h-full min-h-0 flex-col">
       <ChartHeader api={api} onBack={onBack} />
       <CycleWarning cycles={laidOut.cycles} titleOf={api.titleOf} />
+      {/* After the cycle warning: a plan that cannot execute is the more urgent
+          of the two, and an undated chart is not a fault at all. */}
+      {laidOut.nothingDated && <NoDatesBanner chartId={api.chartId} />}
       {/* The axis strip sits outside the scroll area so it stays put while the
           lanes scroll, and its left spacer is exactly the tree column's width. */}
       <div className="border-border bg-background flex shrink-0 border-b">

@@ -151,6 +151,132 @@ describe('layout rows and bars', () => {
   })
 })
 
+// A lane with a start and **no end** is work that has demonstrably begun and
+// that nobody has forecast a finish for. It gets a bar to today, flagged
+// `openEnded` so the view can draw it unterminated — not a blank row, and not a
+// bar that looks like it ends today.
+describe('layout open-ended bars', () => {
+  it('draws a bar from the start to today and flags it', () => {
+    const result = layout(
+      chart([node('running', { start: '2026-10-05' })]),
+      opts({ zoom: 'month', today: '2026-10-07' }),
+    )
+
+    // October, 31 days: the 5th to the 7th inclusive is three days from the 4th.
+    expect(result.bars.get('running')).toMatchObject({
+      x: 4 / 31,
+      width: 3 / 31,
+      openEnded: true,
+    })
+  })
+
+  it('marks a fully dated bar as not open-ended', () => {
+    const result = layout(chart(TWO_PRDS), opts())
+
+    expect(result.bars.get('a1')).toMatchObject({ openEnded: false })
+  })
+
+  it('is not an undated row, and an undated row is still bar-less', () => {
+    const result = layout(
+      chart([node('running', { start: '2026-10-05' }), node('nothing')]),
+      opts(),
+    )
+
+    expect(result.rows.find((row) => row.node.id === 'running')).toMatchObject({ undated: false })
+    expect(result.rows.find((row) => row.node.id === 'nothing')).toMatchObject({ undated: true })
+    expect(result.bars.has('nothing')).toBe(false)
+  })
+
+  it('reads an end with no start as undated rather than open-ended', () => {
+    // Half-dated the other way round: there is nothing to draw from.
+    const result = layout(chart([node('backwards', { end: '2026-10-31' })]), opts())
+
+    expect(result.rows[0]).toMatchObject({ undated: true })
+    expect(result.bars.size).toBe(0)
+  })
+
+  it('builds the axis from an open-ended start, and runs the bar to the axis end', () => {
+    // A chart of nothing but in-flight work: without the start in the extent
+    // there is no domain at all. 2026-09-14 is a Monday, so the padded week
+    // zoom axis is exactly that week — which today is well past.
+    const result = layout(
+      chart([node('running', { start: '2026-09-14' })]),
+      opts({ zoom: 'week', today: '2026-10-07' }),
+    )
+
+    expect(result.ticks[0]?.key).toBe('2026-09-14')
+    expect(result.todayX).toBeNull()
+    expect(result.bars.get('running')).toMatchObject({ x: 0, width: 1, openEnded: true })
+  })
+
+  it('is one day wide when today has not reached the start yet', () => {
+    const result = layout(
+      chart([node('future', { start: '2026-10-20' })]),
+      opts({ zoom: 'month', today: '2026-10-07' }),
+    )
+
+    expect(result.bars.get('future')).toMatchObject({ x: 19 / 31, width: 1 / 31 })
+  })
+
+  it('carries the column tone and the blocked state like any other bar', () => {
+    const result = layout(
+      chart(
+        [
+          node('blocker', { start: '2026-10-01', end: '2026-10-05' }),
+          node('running', { start: '2026-10-06', column: 'In Implementation' }),
+        ],
+        ['blocker>running'],
+      ),
+      opts(),
+    )
+
+    expect(result.bars.get('running')).toMatchObject({
+      column: 'In Implementation',
+      blocked: 'blocked',
+      openEnded: true,
+    })
+  })
+})
+
+// An axis, a today line and a screenful of empty rows reads as a broken chart
+// rather than as one waiting to be dated — so the layout states which it is.
+describe('layout nothingDated', () => {
+  it('is true for a chart where no lane has even started', () => {
+    const result = layout(chart([node('a'), node('b'), node('c', { end: '2026-10-31' })]), opts())
+
+    expect(result.nothingDated).toBe(true)
+  })
+
+  it('is false once one lane is dated', () => {
+    const result = layout(
+      chart([node('a'), node('dated', { start: '2026-10-01', end: '2026-10-05' })]),
+      opts(),
+    )
+
+    expect(result.nothingDated).toBe(false)
+  })
+
+  it('is false when the only dated lane is open-ended', () => {
+    expect(layout(chart([node('running', { start: '2026-10-05' })]), opts()).nothingDated).toBe(
+      false,
+    )
+  })
+
+  it('is a fact about the chart rather than about the window', () => {
+    // A dated lane collapsed out of view, or windowed out of it, is still a
+    // dated lane.
+    const nodes = [
+      node('prd'),
+      node('child', { parentId: 'prd', start: '2026-10-01', end: '2026-10-05' }),
+    ]
+
+    expect(layout(chart(nodes), opts({ collapsed: new Set(['prd']) })).nothingDated).toBe(false)
+    expect(layout(chart(nodes), opts({ visibleRange: { first: 0, count: 1 } })).nothingDated).toBe(
+      false,
+    )
+  })
+})
+
 describe('layout windowing', () => {
   it('returns only the windowed rows, still carrying their absolute index', () => {
     const result = layout(chart(TWO_PRDS), opts({ visibleRange: { first: 3, count: 2 } }))
@@ -337,6 +463,26 @@ describe('layout needsAttention', () => {
     expect(result.needsAttention.undated).toEqual(['b1', 'b2', 'b3'])
   })
 
+  it('counts the in-flight rows apart from the undated ones', () => {
+    // The distinction the header exists to make: "nobody knows when this
+    // starts" and "nobody has forecast when this ends" ask for different work.
+    const result = layout(
+      chart([
+        node('done', { start: '2026-10-01', end: '2026-10-05' }),
+        node('running', { start: '2026-10-06' }),
+        node('also-running', { start: '2026-10-07' }),
+        node('nothing'),
+      ]),
+      opts(),
+    )
+
+    expect(result.needsAttention).toMatchObject({
+      undated: ['nothing'],
+      openEnded: ['running', 'also-running'],
+      total: 3,
+    })
+  })
+
   it('counts a childless jira node still sitting where import dropped it', () => {
     const result = layout(
       chart([
@@ -390,6 +536,7 @@ describe('layout needsAttention', () => {
 
     expect(result.needsAttention).toEqual({
       undated: [],
+      openEnded: [],
       unplacedAtRoot: [],
       orphaned: [],
       total: 0,

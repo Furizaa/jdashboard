@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { axisFor, place, ticksFor, toDay } from './gantt-axis'
+import { axisFor, place, placeOpen, ticksFor, toDay } from './gantt-axis'
 
 // `gantt-layout.test.ts` exercises the axis through `layout`, which is how the
 // views meet it. What is here is the arithmetic that has edges of its own: the
@@ -74,6 +74,37 @@ describe('place', () => {
     expect(place({ start: '2026-10-31', end: '2026-10-31' }, axis)).toEqual({
       x: 30 / 31,
       width: 1 / 31,
+    })
+  })
+})
+
+// An open-ended bar runs from its start to today — and the two clamps are the
+// whole reason this is not just `place` with today substituted for the end.
+describe('placeOpen', () => {
+  const october = axisFor({ start: '2026-10-01', end: '2026-10-31' }, 'month', 0)
+
+  it('runs from the start up to and including today', () => {
+    expect(placeOpen({ start: '2026-10-01', end: null }, october, toDay('2026-10-10'))).toEqual({
+      x: 0,
+      width: 10 / 31,
+    })
+  })
+
+  it('is one day wide when today has not reached the start yet', () => {
+    // A lane dated into the future with no forecast end. A negative width would
+    // draw the bar backwards out of the chart.
+    expect(placeOpen({ start: '2026-10-20', end: null }, october, toDay('2026-10-10'))).toEqual({
+      x: 19 / 31,
+      width: 1 / 31,
+    })
+  })
+
+  it('stops at the axis end when today is past it', () => {
+    // The domain is padded from the plan's own extent, so a chart whose only
+    // lane began months ago ends before now.
+    expect(placeOpen({ start: '2026-10-25', end: null }, october, toDay('2027-03-01'))).toEqual({
+      x: 24 / 31,
+      width: 7 / 31,
     })
   })
 })

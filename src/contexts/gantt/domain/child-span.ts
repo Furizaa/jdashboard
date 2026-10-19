@@ -19,6 +19,19 @@ export type GanttSpan = {
   readonly end: string
 }
 
+/**
+ * Work that has begun and that nobody has forecast an end for.
+ *
+ * `end` is typed `null` rather than omitted so the two span shapes are
+ * discriminable, and it stays `null` all the way to the view: substituting today
+ * would assert a forecast nobody made, which is precisely what leaving it unset
+ * was refusing to do.
+ */
+export type GanttOpenSpan = {
+  readonly start: string
+  readonly end: null
+}
+
 export type GanttChildSpan = GanttSpan & {
   /**
    * The children leave the node's declared window on one side or the other.
@@ -43,6 +56,23 @@ export type GanttChildSpan = GanttSpan & {
 export function datedSpanOf(node: GanttNode): GanttSpan | null {
   if (node.start === null || node.end === null) return null
   return { start: node.start, end: node.end }
+}
+
+/**
+ * A node's span when it has a start and **no** end, or `null`.
+ *
+ * The state `datedSpanOf` deliberately refuses to name, given a name of its own
+ * — because a lane that demonstrably began on a known day is not undated, and
+ * collapsing the two draws a known start as a blank row. Dates seeded from a
+ * ticket's status history are exactly this shape: a real `start` from the first
+ * transition out of `TO DO`, and `end` left null for work still in flight.
+ *
+ * The two functions are mutually exclusive and neither is the other's fallback:
+ * a node is fully dated, open-ended, or undated, and nothing is both.
+ */
+export function openSpanOf(node: GanttNode): GanttOpenSpan | null {
+  if (node.start === null || node.end !== null) return null
+  return { start: node.start, end: null }
 }
 
 /** The extent covering both spans. */
@@ -103,6 +133,31 @@ export function datedExtentOf(nodes: readonly GanttNode[]): GanttSpan | null {
   for (const node of nodes) {
     const span = datedSpanOf(node)
     if (span !== null) extent = extent === null ? span : union(extent, span)
+  }
+  return extent
+}
+
+/**
+ * The extent the **axis domain** is built from: every dated node's span, plus
+ * every open-ended node's start.
+ *
+ * Wider than `datedExtentOf`, and separate from it rather than replacing it,
+ * because the two answer different questions. A chart of nothing but in-flight
+ * work has no dated extent at all, and an axis derived from that would have no
+ * domain for the very bars it has to draw.
+ *
+ * An open-ended node contributes **its start as a single day**, not a span
+ * reaching to today. Padding the domain out to the clock would make "today is
+ * past the axis" unreachable, and the axis is a property of the plan rather than
+ * of when it is being read.
+ */
+export function axisExtentOf(nodes: readonly GanttNode[]): GanttSpan | null {
+  let extent = datedExtentOf(nodes)
+  for (const node of nodes) {
+    const open = openSpanOf(node)
+    if (open === null) continue
+    const begun: GanttSpan = { start: open.start, end: open.start }
+    extent = extent === null ? begun : union(extent, begun)
   }
   return extent
 }

@@ -12,9 +12,12 @@ export { findCycles, type GanttCycle, type GanttCycles } from './cycles'
 export { progressFor, NO_PROGRESS, type ColumnDistribution, type GanttProgress } from './progress'
 export { isSyncStale, SYNC_STALE_AFTER_MS, type SyncStaleness } from './staleness'
 export {
+  axisExtentOf,
   childSpanFor,
   datedExtentOf,
   datedSpanOf,
+  openSpanOf,
   type GanttChildSpan,
+  type GanttOpenSpan,
   type GanttSpan,
 } from './child-span'

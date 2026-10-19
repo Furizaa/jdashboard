@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { GanttNode } from '~/kernel'
-import { childSpanFor, datedExtentOf, datedSpanOf } from './child-span'
+import { axisExtentOf, childSpanFor, datedExtentOf, datedSpanOf, openSpanOf } from './child-span'
 import { buildTree } from './tree'
 
 // The underlay that makes slip visible. Two claims: undated descendants
@@ -37,6 +37,31 @@ describe('datedSpanOf', () => {
     ['an end only', [null, '2026-10-31'], null],
   ] as const)('a node with %s', (_name, dates, expected) => {
     expect(datedSpanOf(node('n', dates))).toEqual(expected)
+  })
+})
+
+// The state `datedSpanOf` refuses to name, given a name of its own. The two are
+// exclusive: every node is fully dated, open-ended, or undated, and the pairs
+// below assert that for all four combinations at once.
+describe('openSpanOf', () => {
+  it.each([
+    ['both ends', ['2026-10-01', '2026-10-31'], null],
+    ['no ends', [null, null], null],
+    ['a start only', ['2026-10-01', null], { start: '2026-10-01', end: null }],
+    ['an end only', [null, '2026-10-31'], null],
+  ] as const)('a node with %s', (_name, dates, expected) => {
+    expect(openSpanOf(node('n', dates))).toEqual(expected)
+  })
+
+  it.each([
+    ['both ends', ['2026-10-01', '2026-10-31']],
+    ['no ends', [null, null]],
+    ['a start only', ['2026-10-01', null]],
+    ['an end only', [null, '2026-10-31']],
+  ] as const)('is never both a dated span and an open one, with %s', (_name, dates) => {
+    const subject = node('n', dates)
+
+    expect(datedSpanOf(subject) === null || openSpanOf(subject) === null).toBe(true)
   })
 })
 
@@ -120,5 +145,40 @@ describe('datedExtentOf', () => {
         node('d'),
       ]),
     ).toEqual({ start: '2026-10-01', end: '2026-12-31' })
+  })
+})
+
+// Wider than `datedExtentOf` by exactly one thing: an open-ended lane's start.
+// Without it a chart of nothing but in-flight work has no domain at all, and the
+// bars it does have would be drawn on an axis that does not contain them.
+describe('axisExtentOf', () => {
+  it('is null only when no node has even started', () => {
+    expect(axisExtentOf([node('a'), node('b', [null, '2026-10-31'])])).toBeNull()
+  })
+
+  it('is the open start alone for a chart whose only lane is in flight', () => {
+    expect(axisExtentOf([node('a', ['2026-10-05', null])])).toEqual({
+      start: '2026-10-05',
+      end: '2026-10-05',
+    })
+  })
+
+  it('stretches a dated extent to reach an open-ended start outside it', () => {
+    expect(
+      axisExtentOf([
+        node('done', ['2026-10-01', '2026-10-10']),
+        node('early', ['2026-09-15', null]),
+        node('late', ['2026-11-20', null]),
+      ]),
+    ).toEqual({ start: '2026-09-15', end: '2026-11-20' })
+  })
+
+  it('leaves a dated extent alone when the open starts fall inside it', () => {
+    const nodes = [
+      node('done', ['2026-10-01', '2026-12-31']),
+      node('running', ['2026-11-01', null]),
+    ]
+
+    expect(axisExtentOf(nodes)).toEqual(datedExtentOf(nodes))
   })
 })

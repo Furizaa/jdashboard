@@ -1,12 +1,13 @@
 import type { GanttChart, GanttNode } from '~/kernel'
 import {
+  axisExtentOf,
   blockedStateFor,
   buildTree,
   childSpanFor,
-  datedExtentOf,
   datedSpanOf,
   findCycles,
   NO_PROGRESS,
+  openSpanOf,
   progressFor,
   visibleRows,
   type GanttBlockedState,
@@ -14,7 +15,15 @@ import {
   type GanttProgress,
   type GanttTree,
 } from '../domain'
-import { axisFor, place, ticksFor, toDay, type GanttTick, type GanttZoom } from './gantt-axis'
+import {
+  axisFor,
+  place,
+  placeOpen,
+  ticksFor,
+  toDay,
+  type GanttTick,
+  type GanttZoom,
+} from './gantt-axis'
 
 // The Gantt's whole geometry, as one pure function.
 //
@@ -41,7 +50,14 @@ export type GanttRow = {
   readonly depth: number
   readonly hasChildren: boolean
   readonly collapsed: boolean
-  /** No dates, so no bar — the row renders dimmed in the tree (ADR-0012 §4). */
+  /**
+   * **No start at all**, so no bar — the row renders dimmed in the tree
+   * (ADR-0012 §4).
+   *
+   * The stricter of the two readings. A lane with a start and no end is not
+   * undated; it has a bar, an open-ended one, and `GanttBar.openEnded` is what
+   * says so.
+   */
   readonly undated: boolean
   readonly blocked: GanttBlockedState
   readonly progress: GanttProgress
@@ -52,6 +68,16 @@ export type GanttBar = {
   readonly nodeId: string
   readonly x: number
   readonly width: number
+  /**
+   * The lane has a start and no forecast end, so `width` runs to today rather
+   * than to an end anybody declared.
+   *
+   * The view draws it **unterminated** — faded out at its right edge instead of
+   * stopped by one. A hard edge at today would read as a bar that finishes
+   * today, which is a forecast nobody made and the exact assertion leaving `end`
+   * null was avoiding.
+   */
+  readonly openEnded: boolean
   readonly column: GanttNode['column']
   readonly blocked: GanttBlockedState
 }
@@ -76,11 +102,19 @@ export type GanttArrow = {
 }
 
 export type GanttNeedsAttention = {
-  /** Nodes with no dates. Each array is both the count (`.length`) and the ids. */
+  /** Nodes with **no start**. Each array is both the count (`.length`) and the ids. */
   readonly undated: readonly string[]
+  /**
+   * Nodes with a start and no end — in flight, with nobody forecasting a finish.
+   *
+   * Its own count rather than part of `undated`, because the two ask for
+   * different work: "nobody knows when this starts" and "nobody has forecast
+   * when this ends" are separate sentences in the instruction that fixes them.
+   */
+  readonly openEnded: readonly string[]
   readonly unplacedAtRoot: readonly string[]
   readonly orphaned: readonly string[]
-  /** Nodes needing attention for any of the three reasons, counted once. */
+  /** Nodes needing attention for any of the four reasons, counted once. */
   readonly total: number
 }
 
@@ -106,6 +140,16 @@ export type GanttLayout = {
   readonly arrows: readonly GanttArrow[]
   readonly cycles: readonly GanttCycle[]
   readonly needsAttention: GanttNeedsAttention
+  /**
+   * Not one lane on the whole chart can be drawn — nothing dated, nothing even
+   * started.
+   *
+   * A property of the **chart**, not of the window: a chart whose only dated
+   * lane is collapsed out of view still has dates. An axis, a today line and a
+   * screenful of empty rows reads as a broken chart rather than as one waiting
+   * to be dated, so the view says which it is (ADR-0012 §4).
+   */
+  readonly nothingDated: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -187,8 +231,13 @@ function arrowsFor(
 // ---------------------------------------------------------------------------
 
 /**
- * The three things a chart can be waiting on a human — or an agent — to fix, so
- * one header can state all three (ADR-0012 §4).
+ * The things a chart can be waiting on a human — or an agent — to fix, so one
+ * header can state all of them (ADR-0012 §4).
+ *
+ * `undated` and `openEnded` are **exclusive and separately counted**: a lane
+ * with no start at all is undated, a lane with a start and no end is in flight.
+ * Reading the second as the first is what drew eight known starts as eight blank
+ * rows, and the instruction that fixes each is a different instruction.
  *
  * `unplacedAtRoot` is the judgement call. A root lane someone *chose* to put
  * there is not unplaced, so what counts is a root lane nobody chose: a node
@@ -198,10 +247,12 @@ function arrowsFor(
  */
 function needsAttentionFor(chart: GanttChart, tree: GanttTree): GanttNeedsAttention {
   const undated: string[] = []
+  const openEnded: string[] = []
   const unplacedAtRoot: string[] = []
   const orphaned: string[] = []
   for (const node of chart.nodes) {
-    if (datedSpanOf(node) === null) undated.push(node.id)
+    if (openSpanOf(node) !== null) openEnded.push(node.id)
+    else if (datedSpanOf(node) === null) undated.push(node.id)
     if (node.orphaned) orphaned.push(node.id)
     const atRoot = (tree.parentOf.get(node.id) ?? null) === null
     const childless = (tree.byId.get(node.id)?.children.length ?? 0) === 0
@@ -211,9 +262,10 @@ function needsAttentionFor(chart: GanttChart, tree: GanttTree): GanttNeedsAttent
   }
   return {
     undated,
+    openEnded,
     unplacedAtRoot,
     orphaned,
-    total: new Set([...undated, ...unplacedAtRoot, ...orphaned]).size,
+    total: new Set([...undated, ...openEnded, ...unplacedAtRoot, ...orphaned]).size,
   }
 }
 
@@ -236,7 +288,10 @@ export function layout(chart: GanttChart, opts: GanttLayoutOptions): GanttLayout
   const visible = new Set(rows.map((row) => row.node.id))
 
   const todayDay = toDay(opts.today)
-  const axis = axisFor(datedExtentOf(chart.nodes), opts.zoom, todayDay)
+  // An open-ended lane's start counts towards the domain, or a chart of nothing
+  // but in-flight work would have no domain to draw its bars on.
+  const extent = axisExtentOf(chart.nodes)
+  const axis = axisFor(extent, opts.zoom, todayDay)
   const inAxis = todayDay >= axis.start && todayDay <= axis.end
 
   const blocked = blockedStateFor(chart)
@@ -254,11 +309,20 @@ export function layout(chart: GanttChart, opts: GanttLayoutOptions): GanttLayout
   const bars = new Map<string, GanttBar>()
   const spans = new Map<string, GanttChildSpanBar>()
   const laidOut = windowed.map(({ row, index }): GanttRow => {
+    // Fully dated, open-ended, or neither — the three states a lane's own span
+    // can be in, and the only place the chart decides which bar to draw.
     const own = datedSpanOf(row.node)
-    if (own !== null) {
+    const open = openSpanOf(row.node)
+    const placed =
+      own !== null
+        ? { ...place(own, axis), openEnded: false }
+        : open !== null
+          ? { ...placeOpen(open, axis, todayDay), openEnded: true }
+          : null
+    if (placed !== null) {
       bars.set(row.node.id, {
         nodeId: row.node.id,
-        ...place(own, axis),
+        ...placed,
         column: row.node.column,
         blocked: blocked.get(row.node.id) ?? 'none',
       })
@@ -277,7 +341,7 @@ export function layout(chart: GanttChart, opts: GanttLayoutOptions): GanttLayout
       depth: row.depth,
       hasChildren: row.hasChildren,
       collapsed: row.collapsed,
-      undated: own === null,
+      undated: placed === null,
       blocked: blocked.get(row.node.id) ?? 'none',
       progress: progress.get(row.node.id) ?? NO_PROGRESS,
       infoExpanded: opts.expandedInfo.has(row.node.id),
@@ -296,6 +360,7 @@ export function layout(chart: GanttChart, opts: GanttLayoutOptions): GanttLayout
     arrows: arrowsFor(chart, tree, visible, edgeIds),
     cycles,
     needsAttention: needsAttentionFor(chart, tree),
+    nothingDated: extent === null,
   }
 }
 

@@ -43,6 +43,22 @@ function blockedRing(state: GanttRow['blocked']): string {
     .exhaustive()
 }
 
+/**
+ * An open-ended bar is **unterminated**: it fades out towards its right edge
+ * instead of stopping at one (ADR-0012 §4).
+ *
+ * The bar runs from a known start to today, and a hard edge there would read as
+ * a bar that finishes today — a forecast nobody made, and precisely the
+ * assertion that leaving `end` null was refusing to make. A mask rather than a
+ * gradient fill, because it fades the ring, the segments and the tone together,
+ * so the fade cannot disagree with whatever the bar is otherwise drawn as.
+ *
+ * The stop is a **proportion**, not a pixel distance: bar widths vary by more
+ * than an order of magnitude across the three zooms, and a fixed feather that
+ * reads at quarter zoom is invisible at week zoom.
+ */
+const OPEN_ENDED_FADE = 'mask-r-from-60% mask-r-to-100%'
+
 export function GanttBar({
   row,
   bar,
@@ -62,18 +78,23 @@ export function GanttBar({
 
 function Bar({ row, bar }: { row: GanttRow; bar: GanttBarGeometry }) {
   const label = `${row.progress.done} of ${row.progress.total} done`
+  const named = row.hasChildren ? `${row.node.title} — ${label}` : row.node.title
   return (
     <div
       data-testid={testIds.ganttBar}
       data-node-id={row.node.id}
       data-blocked={row.blocked}
       data-segmented={row.hasChildren}
-      title={row.hasChildren ? `${row.node.title} — ${label}` : row.node.title}
+      data-open-ended={bar.openEnded}
+      title={bar.openEnded ? `${named} — in flight, no forecast end` : named}
       className={cn(
         'absolute top-1.5 bottom-1.5 flex overflow-hidden rounded-[3px]',
         blockedRing(row.blocked),
         row.blocked === 'unresolvable' && 'outline-1 outline-offset-1 outline-dashed',
         !row.hasChildren && columnTone(row.node.column),
+        // The whole bar is masked, ring and segments included, so there is no
+        // edge of any kind left on the right — see `OPEN_ENDED_FADE`.
+        bar.openEnded && OPEN_ENDED_FADE,
       )}
       style={{ left: pct(bar.x), width: pct(bar.width) }}
     >

@@ -156,6 +156,7 @@ export const testIds = Object.freeze({
   ganttInfoBand: 'gantt-info-band',
   ganttNeedsAttention: 'gantt-needs-attention',
   ganttCycleWarning: 'gantt-cycle-warning',
+  ganttNoDatesBanner: 'gantt-no-dates-banner',
   ganttZoom: 'gantt-zoom',
   ganttCopySkill: 'gantt-copy-skill',
   ganttSync: 'gantt-sync',

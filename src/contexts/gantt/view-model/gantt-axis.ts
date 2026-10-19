@@ -1,4 +1,4 @@
-import type { GanttSpan } from '../domain'
+import type { GanttOpenSpan, GanttSpan } from '../domain'
 
 // The time dimension: the axis domain the chart's dated extent is padded out to,
 // the ticks along it, and where a span sits on it.
@@ -184,5 +184,33 @@ export function place(
 ): { readonly x: number; readonly width: number } {
   const start = toDay(span.start)
   const end = toDay(span.end)
+  return { x: (start - axis.start) / axis.days, width: (end - start + 1) / axis.days }
+}
+
+/**
+ * An open-ended span as a fraction of the axis: from its start to **today**,
+ * clipped into the axis.
+ *
+ * Today is where the bar *stops being drawn*, not where the work is forecast to
+ * finish — nobody forecast anything, which is why `GanttOpenSpan.end` is `null`.
+ * The view is what keeps the two apart: it fades the right edge out rather than
+ * terminating it, so the bar states how long the work has been running without
+ * asserting that it ends now.
+ *
+ * Two clamps, both of which a real chart reaches:
+ *
+ * - **Today before the start** — a lane dated into the future with no forecast
+ *   end. One day wide at its start, rather than a negative width.
+ * - **Today past the axis end** — the domain is padded from the plan's own
+ *   extent, so a chart whose only lane began months ago ends before now. The bar
+ *   runs to the last day there is, and the today line is already absent.
+ */
+export function placeOpen(
+  span: GanttOpenSpan,
+  axis: GanttAxis,
+  today: number,
+): { readonly x: number; readonly width: number } {
+  const start = toDay(span.start)
+  const end = Math.min(Math.max(today, start), axis.end)
   return { x: (start - axis.start) / axis.days, width: (end - start + 1) / axis.days }
 }

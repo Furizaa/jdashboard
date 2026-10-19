@@ -1,6 +1,7 @@
 export {
   axisFor,
   place,
+  placeOpen,
   ticksFor,
   toDay,
   type GanttAxis,

@@ -16,6 +16,7 @@ import {
   type GanttChartView,
   type GanttKeyIndex,
 } from '../contexts/gantt/application/load-chart'
+import { seedDatesFromHistory } from '../contexts/gantt/application/seed-dates'
 import { syncChart } from '../contexts/gantt/application/sync-chart'
 import {
   ChartNotFound,
@@ -26,13 +27,15 @@ import {
 import type { WireResult } from '../wire/to-wire'
 import { runWire } from './run-wire'
 
-// The Gantt surface's **read side**, plus the two lifecycle verbs the **human**
-// owns rather than the agent — `syncGanttChart` and `archiveGanttChart`
-// (ADR-0012 §8). The UI is read-only about chart *content*: the agent is the
-// chart's one writer and it writes over the REST contract in `routes/api/`.
-// Neither verb is an exception to that. Sync writes nothing the agent authored,
-// only the mirrored half Jira owns; archive does not write a chart at all, it
-// moves the folder, and it is deliberately absent from the REST surface.
+// The Gantt surface's **read side**, plus the three verbs the **human** owns
+// rather than the agent — `syncGanttChart`, `seedGanttDates` and
+// `archiveGanttChart` (ADR-0012 §8). The UI is read-only about chart *content*:
+// the agent is the chart's one writer and it writes over the REST contract in
+// `routes/api/`. None of the three is an exception to that. Sync writes nothing
+// the agent authored, only the mirrored half Jira owns; seeding dates writes
+// `start` and `end` only where they are `null`, so it cannot overwrite a date the
+// agent set; archive does not write a chart at all, it moves the folder, and it
+// is deliberately absent from the REST surface.
 //
 // Ordinary ADR-0005 JSON-RPC: the use-cases live in
 // `server/contexts/gantt/application/load-chart.ts` because the REST routes call
@@ -71,10 +74,20 @@ export type SyncGanttChartResult = WireResult<
   | Schema.Schema.Encoded<typeof InvalidChartPayload>
 >
 
+export type SeedGanttDatesResult = WireResult<
+  { readonly chart: GanttChart },
+  | ChartNotFoundWire
+  | Schema.Schema.Encoded<typeof JiraUnreachable>
+  | Schema.Schema.Encoded<typeof InvalidChartPayload>
+>
+
 export type ArchiveGanttChartResult = WireResult<{ readonly archivedTo: string }, ChartNotFoundWire>
 
 /** The three a sync can fail with — Jira silent, chart gone, chart unwritable. */
 const SyncGanttChartError = Schema.Union(ChartNotFound, JiraUnreachable, InvalidChartPayload)
+
+/** The same three, for the same three reasons — seeding dates reads Jira and writes the chart. */
+const SeedGanttDatesError = SyncGanttChartError
 
 /** A node's body needs the chart to exist before "no body" means anything. */
 const GetGanttBodyError = Schema.Union(ChartNotFound, NodeNotFound)
@@ -211,6 +224,30 @@ export const syncGanttChart = createServerFn({ method: 'POST' })
       Effect.map((chart) => ({ chart })),
     )
     return runWire(program, SyncGanttChartError, 'syncGanttChart')
+  })
+
+/**
+ * Fill the chart's blank dates from its tickets' status histories (ADR-0012 §4,
+ * as amended) — the header's companion to Refresh, and the **third** write this
+ * surface offers without contradicting the agent being the chart's only writer.
+ *
+ * It is not an exception for the reason the verb itself is scoped: it only ever
+ * replaces a `null`. A date the agent set is a date it keeps, so nothing the
+ * agent authored can be overwritten from here — which is also why it is safe to
+ * press twice.
+ *
+ * Like sync it takes the **live write queue**: it writes, and it must serialise
+ * against whatever the agent is doing to the same chart over REST.
+ */
+export const seedGanttDates = createServerFn({ method: 'POST' })
+  .inputValidator((data: { chartId: string }) => ({
+    chartId: requireChartId('seedGanttDates', data?.chartId),
+  }))
+  .handler(({ data }): Promise<SeedGanttDatesResult> => {
+    const program = seedDatesFromHistory(data.chartId, liveGanttWrites()).pipe(
+      Effect.map((chart) => ({ chart })),
+    )
+    return runWire(program, SeedGanttDatesError, 'seedGanttDates')
   })
 
 /**

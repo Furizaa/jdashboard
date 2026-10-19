@@ -361,3 +361,171 @@ describe('JiraGatewayLive — schema decode failures route to TransportError', (
     return provideTestLayers(program, client)
   })
 })
+
+describe('JiraGatewayLive — getIssueChangelog', () => {
+  // A real-shaped response: two batches, one of which changed two fields at
+  // once, and a status change whose `fromString` is null because it is the
+  // issue's first. `created` carries Jira's `+0200` offset rather than `Z`,
+  // which is what the instance actually sends.
+  const realShaped = {
+    id: '10001',
+    key: 'HDR-20708',
+    fields: { status: { name: 'IN UAT' } },
+    changelog: {
+      startAt: 0,
+      maxResults: 100,
+      total: 3,
+      histories: [
+        {
+          id: '1',
+          created: '2026-09-01T09:15:00.000+0200',
+          items: [
+            { field: 'status', fieldId: 'status', fromString: null, toString: 'New' },
+            { field: 'assignee', fieldId: 'assignee', fromString: null, toString: 'Ada' },
+          ],
+        },
+        {
+          id: '2',
+          created: '2026-09-04T11:00:00.000+0200',
+          items: [
+            {
+              field: 'status',
+              fieldId: 'status',
+              fromString: 'New',
+              toString: 'IN IMPLEMENTATION',
+            },
+          ],
+        },
+        {
+          id: '3',
+          created: '2026-09-11T16:30:00.000+0200',
+          items: [
+            { field: 'summary', fieldId: 'summary', fromString: 'Old', toString: 'New title' },
+          ],
+        },
+      ],
+    },
+  }
+
+  it.effect('asks for the changelog expansion and the smallest field set', () => {
+    const captured: Capture[] = []
+    const client = fakeHttpClient(() => jsonResponse(realShaped), captured)
+    const program = Effect.gen(function* () {
+      const gateway = yield* JiraGateway
+      yield* gateway.getIssueChangelog('HDR-20708')
+    })
+    return provideTestLayers(program, client).pipe(
+      Effect.tap(() => {
+        expect(captured[0]?.method).toBe('GET')
+        expect(captured[0]?.url).toBe(
+          'https://x.example/rest/api/3/issue/HDR-20708?fields=status&expand=changelog',
+        )
+      }),
+    )
+  })
+
+  it.effect('decodes the status items only, oldest first', () => {
+    const client = fakeHttpClient(() => jsonResponse(realShaped))
+    const program = Effect.gen(function* () {
+      const gateway = yield* JiraGateway
+      const transitions = yield* gateway.getIssueChangelog('HDR-20708')
+      expect(transitions).toEqual([
+        { at: '2026-09-01T09:15:00.000+0200', from: null, to: 'New' },
+        { at: '2026-09-04T11:00:00.000+0200', from: 'New', to: 'IN IMPLEMENTATION' },
+      ])
+    })
+    return provideTestLayers(program, client)
+  })
+
+  // The ordering is the contract — everything downstream reads "the *first*
+  // transition into Done" — so a response that arrives newest-first must still
+  // come back oldest-first.
+  it.effect('sorts a response Jira returned out of order', () => {
+    const client = fakeHttpClient(() =>
+      jsonResponse({
+        changelog: {
+          histories: [
+            {
+              created: '2026-09-20T10:00:00.000+0000',
+              items: [{ field: 'status', fromString: 'In QA', toString: 'Done' }],
+            },
+            {
+              created: '2026-09-02T10:00:00.000+0000',
+              items: [{ field: 'status', fromString: 'New', toString: 'In QA' }],
+            },
+          ],
+        },
+      }),
+    )
+    const program = Effect.gen(function* () {
+      const gateway = yield* JiraGateway
+      const transitions = yield* gateway.getIssueChangelog('HDR-1')
+      expect(transitions.map((transition) => transition.to)).toEqual(['In QA', 'Done'])
+    })
+    return provideTestLayers(program, client)
+  })
+
+  // Not a decode failure: an issue nothing has ever happened to is answered
+  // without a `changelog` key at all, and "no transitions" is the honest reading.
+  it.effect('answers an empty history for a response carrying no changelog', () => {
+    const client = fakeHttpClient(() => jsonResponse({ id: '1', key: 'HDR-1', fields: {} }))
+    const program = Effect.gen(function* () {
+      const gateway = yield* JiraGateway
+      expect(yield* gateway.getIssueChangelog('HDR-1')).toEqual([])
+    })
+    return provideTestLayers(program, client)
+  })
+
+  it.effect('drops a status change whose destination Jira will not name', () => {
+    const client = fakeHttpClient(() =>
+      jsonResponse({
+        changelog: {
+          histories: [
+            {
+              created: '2026-09-02T10:00:00.000+0000',
+              items: [
+                { field: 'status', fromString: 'New', toString: null },
+                { field: 'status', fromString: 'New', toString: 'In QA' },
+              ],
+            },
+          ],
+        },
+      }),
+    )
+    const program = Effect.gen(function* () {
+      const gateway = yield* JiraGateway
+      const transitions = yield* gateway.getIssueChangelog('HDR-1')
+      expect(transitions).toEqual([
+        { at: '2026-09-02T10:00:00.000+0000', from: 'New', to: 'In QA' },
+      ])
+    })
+    return provideTestLayers(program, client)
+  })
+
+  it.effect('decodes a malformed histories array as TransportError', () => {
+    const client = fakeHttpClient(() => jsonResponse({ changelog: { histories: 'nope' } }))
+    const program = Effect.gen(function* () {
+      const gateway = yield* JiraGateway
+      const failure = yield* gateway.getIssueChangelog('HDR-1').pipe(Effect.flip)
+      expect(failure._tag).toBe('TransportError')
+    })
+    return provideTestLayers(program, client)
+  })
+
+  it.each([
+    ['a 401', 401, 'Unauthorized'],
+    ['a 404', 404, 'NotFound'],
+    ['a 500', 500, 'Rejected'],
+  ])('maps %s to the existing tagged error', (_label, status, tag) =>
+    Effect.runPromise(
+      provideTestLayers(
+        Effect.gen(function* () {
+          const gateway = yield* JiraGateway
+          const failure = yield* gateway.getIssueChangelog('HDR-1').pipe(Effect.flip)
+          expect(failure._tag).toBe(tag)
+        }),
+        fakeHttpClient(() => new Response('no', { status })),
+      ),
+    ),
+  )
+})

@@ -8,6 +8,7 @@ import type {
   MediaStream,
   RawDetailedIssue,
   RawSearchResponse,
+  StatusTransition,
 } from './types'
 
 export type JiraGatewayShape = {
@@ -21,6 +22,13 @@ export type JiraGatewayShape = {
     fields: readonly string[],
   ) => Effect.Effect<RawDetailedIssue, JiraGatewayError>
   readonly getTransitions: (key: string) => Effect.Effect<AllowedTransition[], JiraGatewayError>
+  /**
+   * One issue's **status** transitions, oldest first. Distinct from
+   * `getTransitions`, which is about what an issue could do next: this is what it
+   * has already done, and it is the only truthful source of a date for work that
+   * has happened (ADR-0012 §4, as amended).
+   */
+  readonly getIssueChangelog: (key: string) => Effect.Effect<StatusTransition[], JiraGatewayError>
   readonly transitionIssue: (
     key: string,
     transitionId: string,

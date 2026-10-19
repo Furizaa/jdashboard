@@ -50,8 +50,23 @@ The sharper statement, which §4 forces: **source names who owns which _field_, 
 
 - **(a) Read Jira dates, fall back to local.** _Rejected:_ needs a custom-field id discovered per tenant, handles mostly-empty values, and creates a two-writer problem on the one field the chart exists to show.
 - **(b) Derive the axis from dependency order and size estimates — a logical Gantt with no calendar.** _Rejected for now:_ "where is this project" wants a date, and a cycle (§6) would become a layout failure rather than a warning. Noted as the upgrade path if hand-set dates rot.
-- **(c) Spans from observed status history.** _Rejected:_ answers where the time went, not where the project is going, and costs a changelog expand per issue.
+- **(c) Spans from observed status history.** _Rejected:_ answers where the time went, not where the project is going, and costs a changelog expand per issue. **Amended — see below: the rejection held for the forecast and failed for the record.**
 - **(d) `start` / `end` are chart-owned on every node, nullable, never read from Jira and never written back.** _Selected._
+
+**Amendment (2026-10-19): history seeds blanks.** The first real chart settled (c) against itself. Built from `HDR-20708`, it arrived with 29 lanes, 24 of them correctly parented, 53 edges reconciled from `issuelinks` — and `start: null, end: null` on **every single one**. The agent did nothing wrong: the SKILL teaches the date _format_ and never says where a date comes from, and this section had explicitly rejected the only source there was.
+
+The rejection was right about what it was looking at and wrong about what the chart would mostly contain. "Answers where the time went, not where the project is going" is a statement about a **forecast**, and it holds: history cannot say when unstarted work will start, and the §4(b) upgrade path remains the answer for that. But a chart of mostly-finished work is a **record** before it is a forecast, and for work that has already happened the transition history is not retrospective trivia — it is the only truthful source in existence. Of those 29 lanes, 16 were Done, 5 In Code Review and 3 In Implementation: 24 had already started, and only 5 were genuinely future. The cost objection stands and is paid deliberately — one changelog expand per _undated_ mirrored lane, five at a time.
+
+It also cannot be pushed onto the agent, which is what makes this the server's job rather than a SKILL instruction: clashboard holds the Jira credentials and the agent does not, and `acli jira workitem view --json` returns no transitions at all.
+
+So `POST /charts/:chartId/dates` — `seedDatesFromHistory`, beside `sync` rather than inside it, because sync is promised never to touch a date (§5) and this verb writes nothing else. The amendment is **scoped**, and each clause of the scope is what keeps (d) true:
+
+- **It fills only nulls.** Dates stay chart-owned (§3). A node whose `start` an agent set keeps it even where history disagrees, so history is a source of a first value and never a second writer. That is what makes the verb safe to re-run and what stops it fighting the agent planning the same chart.
+- **`end` is the _first_ transition into a Done-column status, not the last.** A ticket that bounced out of QA and back in was finished the first time by any reading a reader cares about; "last" would make a reopened ticket look like it took months.
+- **It never invents an end.** In-flight work gets a start and `end: null`, which the view draws as an open-ended bar. Substituting today would be asserting a forecast nobody made — exactly the thing (c) was rejected for being unable to do honestly.
+- **A ticket Jira will not answer for is skipped and counted, not fatal.** One unreachable issue must not cost the other 23 their dates; a chart Jira answers for _not at all_ is a `503` and leaves `chart.json` byte-identical.
+
+Every status comparison goes through `columnForStatus`, which §4 already requires for `column` and which is already case-insensitive — the chart that forced this amendment carries `IN CODE REVIEW`, `IN IMPLEMENTATION`, `In QA`, `IN UAT` and `New` in one dataset.
 
 Two consequences that are not obvious:
 

@@ -48,5 +48,6 @@ export type {
   GetGanttKeyIndexResult,
   GetGanttSkillResult,
   ListGanttChartsResult,
+  SeedGanttDatesResult,
   SyncGanttChartResult,
 } from '~/server/server-functions/gantt'

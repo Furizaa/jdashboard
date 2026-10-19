@@ -132,5 +132,6 @@ export type {
   GetGanttKeyIndexResult,
   GetGanttSkillResult,
   ListGanttChartsResult,
+  SeedGanttDatesResult,
   SyncGanttChartResult,
 } from './gantt'

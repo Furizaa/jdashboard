@@ -208,3 +208,55 @@ export type CreateIssueBody = {
     assignee: { accountId: string }
   }
 }
+
+/**
+ * One status transition on one issue — the only part of a Jira changelog this
+ * app reads. `from` is `null` for the very first one, which Jira reports with a
+ * null `fromString`.
+ */
+export type StatusTransition = {
+  readonly at: string
+  readonly from: string | null
+  readonly to: string
+}
+
+// A changelog entry is one *batch* of field changes made at one instant, so the
+// status items are nested two deep. `field` is the display name (`'status'`) and
+// `fieldId` the schema name; both are optional because Jira omits `fieldId` for
+// custom fields, and the reader accepts either.
+//
+// The names carry the **status name**, not its id: `fromString` / `toString`
+// rather than `from` / `to`, which are numeric status ids this app has no map
+// for. `toString` is an unfortunate key to read off an object and it is Jira's,
+// not ours.
+const RawChangelogItemSchema = Schema.Struct({
+  field: Schema.optional(Schema.String),
+  fieldId: Schema.optional(Schema.String),
+  fromString: Schema.optional(Schema.NullOr(Schema.String)),
+  toString: Schema.optional(Schema.NullOr(Schema.String)),
+})
+
+const RawChangelogHistorySchema = Schema.Struct({
+  created: Schema.String,
+  items: Schema.Array(RawChangelogItemSchema),
+})
+
+/**
+ * `GET /issue/<key>?expand=changelog`. `changelog` is optional because an issue
+ * with no history at all is answered without the key.
+ *
+ * **Jira caps the inline changelog at 100 entries** and exposes the remainder
+ * through a separate `/changelog` endpoint. A status history longer than a
+ * hundred field-change batches is not worth paging for — what this reads is the
+ * first transition out of TO DO and the first into Done, and both are at the
+ * *oldest* end of a history that arrives oldest-first. So this takes what is
+ * inline and does not page.
+ */
+export const RawIssueChangelogSchema = Schema.Struct({
+  changelog: Schema.optional(
+    Schema.Struct({
+      histories: Schema.Array(RawChangelogHistorySchema),
+    }),
+  ),
+})
+export type RawIssueChangelog = Schema.Schema.Type<typeof RawIssueChangelogSchema>

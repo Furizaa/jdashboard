@@ -11,6 +11,7 @@ export function fakeJiraGateway(overrides: Partial<JiraGatewayShape>): JiraGatew
     searchIssues: () => notImpl('searchIssues'),
     getIssue: () => notImpl('getIssue'),
     getTransitions: () => notImpl('getTransitions'),
+    getIssueChangelog: () => notImpl('getIssueChangelog'),
     transitionIssue: () => notImpl('transitionIssue'),
     createIssue: () => notImpl('createIssue'),
     streamMedia: () => notImpl('streamMedia'),

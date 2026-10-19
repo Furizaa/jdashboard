@@ -7,6 +7,7 @@ import type {
   GetGanttKeyIndexResult,
   GetGanttSkillResult,
   ListGanttChartsResult,
+  SeedGanttDatesResult,
   SyncGanttChartResult,
 } from '~/kernel'
 import {
@@ -17,6 +18,7 @@ import {
   getGanttKeyIndex,
   getGanttSkill,
   listGanttCharts,
+  seedGanttDates,
   syncGanttChart,
 } from '~/server/server-functions/gantt'
 import { DASHBOARD_QUERY_KEYS, DASHBOARD_STALE_TIMES } from './adapters/tanstack-cache'
@@ -25,11 +27,13 @@ import { DASHBOARD_QUERY_KEYS, DASHBOARD_STALE_TIMES } from './adapters/tanstack
 // reason `explain-hooks.ts` does — that file is already the app's longest and a
 // surface's whole read side belongs together.
 //
-// Six reads and **two** writes, and neither write is an exception to the agent
-// being the chart's only writer (ADR-0012 §8): sync touches only the mirrored
-// half Jira owns, never a lane, a date or a body an agent authored, and archive
-// is a chart *lifecycle* verb the human owns — it moves the folder rather than
-// editing a plan, which is why there is no `DELETE /charts/:chartId` beside it.
+// Six reads and **three** writes, and none of the three is an exception to the
+// agent being the chart's only writer (ADR-0012 §8): sync touches only the
+// mirrored half Jira owns, never a lane or a body an agent authored; seeding
+// dates writes `start` and `end` but only where they are `null`, so a date the
+// agent set is a date it keeps; and archive is a chart *lifecycle* verb the human
+// owns — it moves the folder rather than editing a plan, which is why there is no
+// `DELETE /charts/:chartId` beside it.
 //
 // The wire types come through `~/kernel`, as the kernel rule asks: the values
 // below are server functions and must be imported from their module, but their
@@ -119,6 +123,34 @@ export function useSyncGanttChart(): {
   })
   return {
     sync: (chartId) => mutation.mutateAsync({ chartId }),
+    isPending: mutation.isPending,
+  }
+}
+
+/**
+ * Fill this chart's blank dates from its tickets' status histories (ADR-0012
+ * §4, as amended) — the header's companion to Refresh.
+ *
+ * Invalidates the same three keys sync does, and for the same three reasons: the
+ * rows now have bars, the list's counts are read off the chart, and one
+ * `actor: 'sync'` entry naming the counts was appended. `isPending` is the whole
+ * concurrency story, exactly as it is for sync.
+ */
+export function useSeedGanttDates(): {
+  seedDates: (chartId: string) => Promise<SeedGanttDatesResult>
+  isPending: boolean
+} {
+  const queryClient = useQueryClient()
+  const mutation = useMutation<SeedGanttDatesResult, Error, { chartId: string }>({
+    mutationFn: (data) => seedGanttDates({ data }),
+    onSuccess: (_result, { chartId }) => {
+      queryClient.invalidateQueries({ queryKey: DASHBOARD_QUERY_KEYS.ganttChart(chartId) })
+      queryClient.invalidateQueries({ queryKey: DASHBOARD_QUERY_KEYS.ganttCharts })
+      queryClient.invalidateQueries({ queryKey: DASHBOARD_QUERY_KEYS.ganttChangelog(chartId) })
+    },
+  })
+  return {
+    seedDates: (chartId) => mutation.mutateAsync({ chartId }),
     isPending: mutation.isPending,
   }
 }

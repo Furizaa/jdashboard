@@ -14,12 +14,15 @@ import { JiraGateway } from './port'
 import {
   JiraUserResponseSchema,
   RawDetailedIssueSchema,
+  RawIssueChangelogSchema,
   RawSearchResponseSchema,
   type AllowedTransition,
   type CreateIssueBody,
   type GatewayCreatedIssue,
   type JiraUser,
   type MediaStream,
+  type RawIssueChangelog,
+  type StatusTransition,
 } from './types'
 
 const GetTransitionsResponseSchema = Schema.Struct({
@@ -37,6 +40,31 @@ const CreatedIssueResponseSchema = Schema.Struct({
   key: Schema.String,
   self: Schema.String,
 })
+
+/**
+ * The status transitions out of one issue's inline changelog, oldest first.
+ *
+ * Two things are dropped rather than carried: a change to any field other than
+ * `status`, and a status change with no `toString` — a transition whose
+ * destination Jira will not name says nothing about when the work moved.
+ *
+ * The sort is explicit even though Jira returns the inline histories in order.
+ * Everything downstream reads "the **first** transition into Done", so the
+ * ordering is the contract rather than an observation about today's Jira, and
+ * one line here is cheaper than a wrong date nobody can see is wrong.
+ */
+function toStatusTransitions(response: RawIssueChangelog): StatusTransition[] {
+  const transitions: StatusTransition[] = []
+  for (const history of response.changelog?.histories ?? []) {
+    for (const item of history.items) {
+      if ((item.field ?? item.fieldId)?.toLowerCase() !== 'status') continue
+      const to = item.toString
+      if (to === null || to === undefined || to === '') continue
+      transitions.push({ at: history.created, from: item.fromString ?? null, to })
+    }
+  }
+  return transitions.toSorted((a, b) => Date.parse(a.at) - Date.parse(b.at))
+}
 
 function basicAuth(email: string, token: string): string {
   const encoded = Buffer.from(`${email}:${token}`, 'utf8').toString('base64')
@@ -236,6 +264,14 @@ export const JiraGatewayLive: Layer.Layer<JiraGateway, never, HttpClient.HttpCli
               resp.transitions.map((t) => ({ id: t.id, name: t.name, toStatusName: t.to.name })),
             ),
           ),
+
+        // `fields=status` rather than the default: the whole payload this call
+        // wants is `changelog`, and asking for every field of an issue to read
+        // its history would ship a description and a comment thread per lane.
+        getIssueChangelog: (key) =>
+          executeJson(RawIssueChangelogSchema)(
+            get(`/rest/api/3/issue/${encodeURIComponent(key)}?fields=status&expand=changelog`),
+          ).pipe(Effect.map(toStatusTransitions)),
 
         transitionIssue: (key, transitionId) =>
           postJson(`/rest/api/3/issue/${encodeURIComponent(key)}/transitions`, {

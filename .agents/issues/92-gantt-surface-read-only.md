@@ -25,6 +25,8 @@ The fourth surface, rendering a chart that already exists on disk. Read-only thr
 - **`src/lib/testids.ts`** — the ids named in the PRD.
 - **A fixture chart** committed under `src/contexts/gantt/view-model/__fixtures__/` (following `contexts/explain/view-model/__fixtures__/`) covering: three depths, a dated parent with overflowing children, an undated node, a cross-depth arrow, a merged arrow under collapse, a cycle, and an orphaned node. This fixture is what slice 97's snapshots and this slice's manual verification both use.
 
+**Known friction handed over from slice 91:** the Zod-inferred `GanttChart` has **mutable** `nodes` / `edges` arrays, while the PRD writes them `readonly`. Test builders and the presenter both meet this. Do not "fix" it by widening your own types to mutable — if it bites, report it and it will be fixed in `gantt-schema.ts` as a follow-up, where the one source of truth is.
+
 Styling follows the design system — read `src/design-system/` and an existing surface before writing a class. No new colour literals; use the existing tokens.
 
 ## Acceptance criteria

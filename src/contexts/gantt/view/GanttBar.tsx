@@ -2,6 +2,7 @@ import { match } from 'ts-pattern'
 import { COLUMNS, type Column } from '~/kernel'
 import { cn } from '~/lib/cn'
 import { testIds } from '~/lib/testids'
+import { styleForStatus } from '~/widgets/status-pill'
 import type { GanttBar as GanttBarGeometry, GanttChildSpanBar, GanttRow } from '../view-model'
 import { pct } from './GanttAxis'
 
@@ -11,22 +12,56 @@ import { pct } from './GanttAxis'
 // and states "7 of 11 done" (ADR-0012 §4). A single rolled-up state was rejected
 // outright: "In Implementation" over eleven features could be one started and
 // ten untouched, or ten shipped and one in review, and those are different
-// projects. A **leaf** is one solid bar in its own column's tone.
+// projects. A **leaf** is one solid bar in its own status's tone.
 //
 // The underlay is where the lane's dated descendants actually sit. It is drawn
 // whether or not it exceeds the declared window, because "this PRD is Q4 and its
 // features are Q4" is worth seeing — but an **overrun** is toned differently,
 // since slip being visible rather than silently absorbed is the reason the
 // derived span is drawn at all.
+//
+// **The colours are the status chips'.** `styleForStatus` is the ticket card's
+// own palette, read rather than re-picked: a bar and the chip on the same
+// ticket's card disagreeing about what colour `IN UAT` is would be two answers to
+// one question. It is also the finer vocabulary — `Column` folds `In STG`,
+// `In QA`, `In UAT` and `Done` into one green and `Blocked` into `TO DO`'s grey,
+// which is exactly the distinction a reader scanning a release wants back.
 
-/** The bar's tone per column. Progress is the kernel vocabulary, so this is too. */
-function columnTone(column: Column): string {
-  return match(column)
-    .with('TO DO', () => 'bg-slate-500/55')
-    .with('In Implementation', () => 'bg-sky-500/60')
-    .with('In Code Review', () => 'bg-amber-500/60')
-    .with('Done', () => 'bg-emerald-500/60')
-    .exhaustive()
+/**
+ * The bar's fill, as a translucent wash of the status chip's colour.
+ *
+ * Translucent rather than solid for the same reason the tones always were: the
+ * gridlines and the today line have to read through a bar, and a parent's
+ * segments have to stay distinguishable where they join. `99` is 60% as the two
+ * hex digits CSS appends to a `#rrggbb`.
+ */
+const BAR_FILL_ALPHA = '99'
+
+/**
+ * A lane with no status of its own — every **local** lane, since `status` is
+ * mirrored from Jira and an agent-authored lane has no ticket to mirror.
+ *
+ * Its declared `Column` is the only progress it has, so each column borrows the
+ * chip colour of the status that best stands for it. Borrowing rather than
+ * inventing a parallel set is the point: a local lane marked `Done` and a ticket
+ * in `Done` must not be two different greens.
+ */
+const COLUMN_PROXY_STATUS: Readonly<Record<Column, string>> = {
+  // `New` deliberately — HDR's own first status, and one the pill has no entry
+  // for, so it lands on the palette's grey fallback. That is the right grey: a
+  // `TO DO` lane nobody has picked up looks like a `New` ticket on the board,
+  // which is what a reader is already used to it looking like. The column's two
+  // real statuses would both be wrong here — `Reviewed` is yellow and `Blocked`
+  // is red, and neither is what "no status at all" means.
+  'TO DO': 'new',
+  'In Implementation': 'in implementation',
+  'In Code Review': 'in code review',
+  Done: 'done',
+}
+
+/** The chip colour for a lane: its real status, or its column's stand-in. */
+function toneOf(status: string | null, column: Column): string {
+  return styleForStatus(status ?? COLUMN_PROXY_STATUS[column]).color
 }
 
 /**
@@ -34,6 +69,12 @@ function columnTone(column: Column): string {
  * colour in it: the fill already means progress, and overloading it would make
  * "blocked" and "in review" compete for the same pixels. `unresolvable` — a lane
  * in a cycle — gets the dashed destructive outline the cycle's arrows get.
+ *
+ * The derived state keeps amber even though the Jira status named `Blocked` is
+ * now red, and the two staying apart is deliberate: "somebody set this ticket to
+ * Blocked" and "something in this chart is in front of it" are different facts,
+ * and on a chart with fifty edges the second is common enough that painting it
+ * red would make red mean nothing.
  */
 function blockedRing(state: GanttRow['blocked']): string {
   return match(state)
@@ -63,45 +104,111 @@ export function GanttBar({
   row,
   bar,
   childSpan,
+  dimmed,
+  onSelect,
 }: {
   row: GanttRow
   bar: GanttBarGeometry | undefined
   childSpan: GanttChildSpanBar | undefined
+  /** Something else is selected, and this lane is not in its waterfall. */
+  dimmed: boolean
+  onSelect: () => void
 }) {
   return (
     <>
-      {childSpan !== undefined && <ChildSpanUnderlay span={childSpan} />}
-      {bar === undefined ? <NoBar undated={row.undated} /> : <Bar row={row} bar={bar} />}
+      {childSpan !== undefined && <ChildSpanUnderlay span={childSpan} dimmed={dimmed} />}
+      {bar === undefined ? (
+        <NoBar undated={row.undated} />
+      ) : (
+        <Bar row={row} bar={bar} dimmed={dimmed} onSelect={onSelect} />
+      )}
     </>
   )
 }
 
-function Bar({ row, bar }: { row: GanttRow; bar: GanttBarGeometry }) {
+function Bar({
+  row,
+  bar,
+  dimmed,
+  onSelect,
+}: {
+  row: GanttRow
+  bar: GanttBarGeometry
+  dimmed: boolean
+  onSelect: () => void
+}) {
   const label = `${row.progress.done} of ${row.progress.total} done`
   const named = row.hasChildren ? `${row.node.title} — ${label}` : row.node.title
+  const tone = toneOf(row.node.status, row.node.column)
   return (
-    <div
+    // A **button**, because selecting a lane is what clicking its bar now does —
+    // the chart's answer to a thicket of 54 arrows is to draw none of them until
+    // a reader asks about one lane (ADR-0012 §10's amendment). The lane's *title*
+    // still opens the ticket, so the two gestures stay on two targets.
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-pressed={row.selected}
+      aria-label={`Show what ${row.node.title} depends on`}
       data-testid={testIds.ganttBar}
       data-node-id={row.node.id}
       data-blocked={row.blocked}
       data-segmented={row.hasChildren}
       data-open-ended={bar.openEnded}
-      title={bar.openEnded ? `${named} — in flight, no forecast end` : named}
+      data-ghost={bar.ghost}
+      data-selected={row.selected}
+      title={titleFor(named, bar)}
       className={cn(
-        'absolute top-1.5 bottom-1.5 flex overflow-hidden rounded-[3px]',
+        'focus-visible:ring-ring absolute top-1.5 bottom-1.5 flex overflow-hidden rounded-[3px] transition-opacity focus-visible:ring-2 focus-visible:outline-none',
         blockedRing(row.blocked),
         row.blocked === 'unresolvable' && 'outline-1 outline-offset-1 outline-dashed',
-        !row.hasChildren && columnTone(row.node.column),
+        // A ghost is an outline with no fill — see `GHOST_BAR`.
+        bar.ghost && GHOST_BAR,
         // The whole bar is masked, ring and segments included, so there is no
         // edge of any kind left on the right — see `OPEN_ENDED_FADE`.
         bar.openEnded && OPEN_ENDED_FADE,
+        // Selection reads as *everything else receding*, not as the bar growing:
+        // a chart where the lit lane changed size would reflow on every click.
+        dimmed && 'opacity-25',
+        row.selected && 'ring-primary ring-offset-background ring-2 ring-offset-1',
       )}
-      style={{ left: pct(bar.x), width: pct(bar.width) }}
+      style={{
+        left: pct(bar.x),
+        width: pct(bar.width),
+        ...(bar.ghost
+          ? { borderColor: tone }
+          : row.hasChildren
+            ? {}
+            : { backgroundColor: `${tone}${BAR_FILL_ALPHA}` }),
+      }}
     >
       {row.hasChildren && <Segments row={row} />}
       {row.hasChildren && <ProgressLabel label={label} />}
-    </div>
+    </button>
   )
+}
+
+/**
+ * **The invented bar.** A dashed outline with no fill, for a lane nobody dated
+ * (ADR-0012 §4's amendment (ii)).
+ *
+ * ADR-0012 §4 refused to draw an undated lane at all, on the grounds that a bar
+ * is a plan and the chart must not fabricate one. The first real chart showed
+ * what that costs: the `TO DO` and blocked lanes — the ones a reader opens a
+ * Gantt to find — were exactly the blank ones, so the chart could not answer
+ * "what do I work on next" at all. The resolution is not to relax the rule but
+ * to draw something that is visibly **not a plan**: no fill, a dashed border in
+ * the status's own colour, and a tooltip that says "no dates". Nobody reads this
+ * as a date somebody set, which is the whole licence for drawing it.
+ */
+const GHOST_BAR = 'border border-dashed bg-transparent'
+
+function titleFor(named: string, bar: GanttBarGeometry): string {
+  if (bar.openEnded) return `${named} — in flight, no forecast end`
+  if (!bar.ghost) return named
+  return bar.afterBlocker === null
+    ? `${named} — no dates; shown as a week from today`
+    : `${named} — no dates; shown as a week after ${bar.afterBlocker}`
 }
 
 /**
@@ -128,6 +235,13 @@ function ProgressLabel({ label }: { label: string }) {
 /**
  * The distribution as widths. Empty columns contribute no segment at all rather
  * than a zero-width one, so a bar of two tones is two elements.
+ *
+ * Segments stay keyed by **`Column`** while a leaf bar is keyed by status, and
+ * that asymmetry is deliberate. The rollup is a Column fact — it is what "7 of 11
+ * done" counts — and splitting a PRD over eleven features into eight status
+ * segments would make a thin rainbow of the one bar whose job is to be read at a
+ * glance. The column borrows its chip colour from `COLUMN_PROXY_STATUS`, so the
+ * two vocabularies at least agree about what green means.
  */
 function Segments({ row }: { row: GanttRow }) {
   const { distribution, total } = row.progress
@@ -139,15 +253,18 @@ function Segments({ row }: { row: GanttRow }) {
           key={column}
           data-column={column}
           title={`${distribution[column]} ${column}`}
-          className={cn('h-full', columnTone(column))}
-          style={{ width: pct(distribution[column] / total) }}
+          className="h-full"
+          style={{
+            width: pct(distribution[column] / total),
+            backgroundColor: `${toneOf(null, column)}${BAR_FILL_ALPHA}`,
+          }}
         />
       ))}
     </>
   )
 }
 
-function ChildSpanUnderlay({ span }: { span: GanttChildSpanBar }) {
+function ChildSpanUnderlay({ span, dimmed }: { span: GanttChildSpanBar; dimmed: boolean }) {
   return (
     <div
       data-testid={testIds.ganttChildSpan}
@@ -155,8 +272,9 @@ function ChildSpanUnderlay({ span }: { span: GanttChildSpanBar }) {
       data-overflow={span.overflow}
       title={span.overflow ? 'Children run outside this lane’s declared window' : 'Children'}
       className={cn(
-        'absolute bottom-0.5 h-1 rounded-full',
+        'absolute bottom-0.5 h-1 rounded-full transition-opacity',
         span.overflow ? 'bg-amber-400/80' : 'bg-ink-tertiary/60',
+        dimmed && 'opacity-25',
       )}
       style={{ left: pct(span.x), width: pct(span.width) }}
     />
@@ -164,9 +282,14 @@ function ChildSpanUnderlay({ span }: { span: GanttChildSpanBar }) {
 }
 
 /**
- * A lane with no bar. Dates are nullable because import makes them so (ADR-0012
- * §4), so this is an ordinary state and not a defect — it says "no dates yet"
- * rather than leaving the reader to wonder where the bar went.
+ * A lane with no bar at all, which after the ghost amendment means exactly one
+ * thing: an undated **parent**.
+ *
+ * A parent is left out of the ghosting on purpose — its child-span underlay
+ * already answers "when", and a ghost over the top of that would be the chart
+ * arguing with itself (`domain/ghost-span.ts`). So the label stays for the case
+ * it was written for: saying "no dates yet" rather than leaving the reader to
+ * wonder where the bar went.
  */
 function NoBar({ undated }: { undated: boolean }) {
   if (!undated) return null

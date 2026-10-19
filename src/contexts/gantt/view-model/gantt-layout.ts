@@ -6,21 +6,28 @@ import {
   childSpanFor,
   datedSpanOf,
   findCycles,
+  ghostSpansFor,
   NO_PROGRESS,
   openSpanOf,
   progressFor,
   visibleRows,
   type GanttBlockedState,
   type GanttCycle,
+  type GanttOpenSpan,
   type GanttProgress,
-  type GanttTree,
+  type GanttGhostSpan,
+  type GanttSpan,
 } from '../domain'
+import { arrowsFor, nearestVisible, type GanttArrow } from './gantt-arrows'
+import { needsAttentionFor, type GanttNeedsAttention } from './gantt-needs-attention'
 import {
   axisFor,
+  axisWidthOf,
   place,
   placeOpen,
   ticksFor,
   toDay,
+  type GanttAxis,
   type GanttTick,
   type GanttZoom,
 } from './gantt-axis'
@@ -51,17 +58,33 @@ export type GanttRow = {
   readonly hasChildren: boolean
   readonly collapsed: boolean
   /**
-   * **No start at all**, so no bar — the row renders dimmed in the tree
-   * (ADR-0012 §4).
+   * **No start at all** — the row renders dimmed in the tree (ADR-0012 §4).
    *
-   * The stricter of the two readings. A lane with a start and no end is not
-   * undated; it has a bar, an open-ended one, and `GanttBar.openEnded` is what
-   * says so.
+   * No longer "and therefore no bar": a childless undated lane now gets a
+   * **ghost** bar (`GanttBar.ghost`), because a chart that draws nothing for its
+   * `TO DO` work cannot answer what to work on next. What this still means is
+   * that nobody dated the lane, which is what the dimming and the Needs
+   * attention count are both about.
+   *
+   * The stricter of the two readings of "undated". A lane with a start and no
+   * end is not undated; it has a bar, an open-ended one, and
+   * `GanttBar.openEnded` is what says so.
    */
   readonly undated: boolean
   readonly blocked: GanttBlockedState
   readonly progress: GanttProgress
   readonly infoExpanded: boolean
+  /** The lane the reader clicked, whose dependency waterfall the arrows are showing. */
+  readonly selected: boolean
+  /**
+   * This lane is somewhere in the selected lane's waterfall — upstream of it,
+   * downstream of it, or the lane itself.
+   *
+   * `false` on every row while nothing is selected, which is why the view also
+   * reads `GanttLayout.selection`: "not in the waterfall" and "there is no
+   * waterfall" must not dim the same lanes.
+   */
+  readonly inWaterfall: boolean
 }
 
 export type GanttBar = {
@@ -78,6 +101,18 @@ export type GanttBar = {
    * null was avoiding.
    */
   readonly openEnded: boolean
+  /**
+   * Nobody dated this lane; the span is **invented** — one week, placed behind
+   * whatever blocks it (`domain/ghost-span.ts`).
+   *
+   * The view draws it as a dashed outline with no fill, so it reads as a
+   * placeholder rather than as a plan. That distinction is the whole licence for
+   * drawing it at all: ADR-0012 §4 refuses to fabricate dates, and a ghost does
+   * not claim to be one (§4's amendment (ii)).
+   */
+  readonly ghost: boolean
+  /** The blocker a ghost was queued behind, for the view to name. `null` otherwise. */
+  readonly afterBlocker: string | null
   readonly column: GanttNode['column']
   readonly blocked: GanttBlockedState
 }
@@ -90,34 +125,6 @@ export type GanttChildSpanBar = {
   readonly overflow: boolean
 }
 
-export type GanttArrow = {
-  /** The re-anchored pair, which is what makes a merged arrow one arrow. */
-  readonly id: string
-  readonly from: string
-  readonly to: string
-  /** How many edges this arrow stands for. `1` unless collapse merged them. */
-  readonly count: number
-  readonly edgeIds: readonly string[]
-  readonly inCycle: boolean
-}
-
-export type GanttNeedsAttention = {
-  /** Nodes with **no start**. Each array is both the count (`.length`) and the ids. */
-  readonly undated: readonly string[]
-  /**
-   * Nodes with a start and no end — in flight, with nobody forecasting a finish.
-   *
-   * Its own count rather than part of `undated`, because the two ask for
-   * different work: "nobody knows when this starts" and "nobody has forecast
-   * when this ends" are separate sentences in the instruction that fixes them.
-   */
-  readonly openEnded: readonly string[]
-  readonly unplacedAtRoot: readonly string[]
-  readonly orphaned: readonly string[]
-  /** Nodes needing attention for any of the four reasons, counted once. */
-  readonly total: number
-}
-
 export type GanttLayoutOptions = {
   readonly zoom: GanttZoom
   readonly collapsed: ReadonlySet<string>
@@ -126,10 +133,24 @@ export type GanttLayoutOptions = {
   readonly visibleRange: { readonly first: number; readonly count: number }
   /** `YYYY-MM-DD`. Injected, never read from the clock: this function is pure. */
   readonly today: string
+  /**
+   * The lane whose dependency waterfall to draw, or `null` to draw no arrows at
+   * all bar the cycles. A node id the chart does not have is the same as `null`.
+   */
+  readonly selected: string | null
 }
 
 export type GanttLayout = {
   readonly ticks: readonly GanttTick[]
+  /**
+   * The bar region's width in pixels — the one pixel number on the whole layout,
+   * and the thing the horizontal scroll is sized by.
+   *
+   * Every position stays a fraction; this is what those fractions resolve
+   * against, so a chart wider than the viewport scrolls instead of compressing
+   * thirty lanes behind one long one.
+   */
+  readonly axisWidth: number
   /** The today line, or `null` when today falls outside the chart's axis. */
   readonly todayX: number | null
   readonly rows: readonly GanttRow[]
@@ -138,6 +159,16 @@ export type GanttLayout = {
   readonly bars: ReadonlyMap<string, GanttBar>
   readonly childSpans: ReadonlyMap<string, GanttChildSpanBar>
   readonly arrows: readonly GanttArrow[]
+  /**
+   * The selected lane **re-anchored onto the visible rows**, or `null` when
+   * nothing is selected — so selecting a lane and then collapsing its parent
+   * keeps the waterfall, drawn from the parent.
+   *
+   * The view needs the distinction this makes rather than just the row flags: a
+   * chart with no selection dims nothing, and a chart with one dims everything
+   * outside the waterfall.
+   */
+  readonly selection: string | null
   readonly cycles: readonly GanttCycle[]
   readonly needsAttention: GanttNeedsAttention
   /**
@@ -153,125 +184,68 @@ export type GanttLayout = {
 }
 
 // ---------------------------------------------------------------------------
-// Arrows
+// The layout
 // ---------------------------------------------------------------------------
 
 /**
- * The nearest ancestor a reader can actually see, or `null` when the node has
- * been windowed out of a tree it is not even in.
+ * The axis domain widened to hold the ghost bars as well as the real ones.
  *
- * This walks `tree.parentOf` — the *effective* parent, after `buildTree` has
- * re-rooted a dangling `parentId` — and it walks the **whole** tree. Windowing
- * must not change what an arrow points at.
+ * Separate from `axisExtentOf` rather than folded into it, and the separation is
+ * the same one `axisExtentOf` already makes against `datedExtentOf`: the domain
+ * has to cover everything that gets **drawn**, while `nothingDated` has to stay a
+ * statement about what somebody actually **dated**. Collapsing the two would make
+ * a chart of thirty undated lanes report that it has dates, because ghosts gave
+ * it an extent.
  */
-function nearestVisible(
-  nodeId: string,
-  tree: GanttTree,
-  visible: ReadonlySet<string>,
-): string | null {
-  let current: string | null = nodeId
-  const seen = new Set<string>()
-  while (current !== null && !seen.has(current)) {
-    if (visible.has(current)) return current
-    seen.add(current)
-    current = tree.parentOf.get(current) ?? null
+function withGhosts(
+  extent: GanttSpan | null,
+  ghosts: ReadonlyMap<string, GanttSpan>,
+): GanttSpan | null {
+  let widened = extent
+  for (const ghost of ghosts.values()) {
+    widened =
+      widened === null
+        ? { start: ghost.start, end: ghost.end }
+        : {
+            start: widened.start < ghost.start ? widened.start : ghost.start,
+            end: widened.end > ghost.end ? widened.end : ghost.end,
+          }
+  }
+  return widened
+}
+
+/**
+ * Where one lane's bar goes, or `null` when it has none.
+ *
+ * Fully dated, open-ended, ghosted, or nothing — the four states a lane's own
+ * span can be in, and the order below is the precedence: **a real date always
+ * beats an invented one.** That ordering is the whole guarantee the ghost rests
+ * on, since it is what stops an invented week from ever covering a date somebody
+ * set.
+ */
+function placeBar(
+  own: GanttSpan | null,
+  open: GanttOpenSpan | null,
+  ghost: GanttGhostSpan | null,
+  axis: GanttAxis,
+  today: number,
+): Pick<GanttBar, 'x' | 'width' | 'openEnded' | 'ghost' | 'afterBlocker'> | null {
+  if (own !== null) {
+    return { ...place(own, axis), openEnded: false, ghost: false, afterBlocker: null }
+  }
+  if (open !== null) {
+    return { ...placeOpen(open, axis, today), openEnded: true, ghost: false, afterBlocker: null }
+  }
+  if (ghost !== null) {
+    return {
+      ...place(ghost, axis),
+      openEnded: false,
+      ghost: true,
+      afterBlocker: ghost.afterBlocker,
+    }
   }
   return null
 }
-
-/**
- * Edges re-anchored onto the visible row set (ADR-0012 §10).
- *
- * Collapse then **summarises** dependencies rather than concealing them, and a
- * fully collapsed chart becomes a PRD-level dependency graph — arguably the most
- * useful view of all. Two rules do the summarising:
- *
- * - An arrow whose endpoints re-anchor to the **same** node is dropped. Two
- *   children of one collapsed parent waiting on each other is a self-loop, and a
- *   self-arrow communicates nothing.
- * - Arrows landing on the same ordered pair **merge**, carrying a `count`. Three
- *   features of PRD A waiting on PRD B is one arrow labelled 3, not three
- *   arrows drawn on top of each other.
- */
-function arrowsFor(
-  chart: GanttChart,
-  tree: GanttTree,
-  visible: ReadonlySet<string>,
-  inCycle: ReadonlySet<string>,
-): readonly GanttArrow[] {
-  const merged = new Map<
-    string,
-    { from: string; to: string; edgeIds: string[]; inCycle: boolean }
-  >()
-  for (const edge of chart.edges) {
-    const from = nearestVisible(edge.from, tree, visible)
-    const to = nearestVisible(edge.to, tree, visible)
-    if (from === null || to === null || from === to) continue
-    const id = `${from}→${to}`
-    const existing = merged.get(id)
-    if (existing === undefined) {
-      merged.set(id, { from, to, edgeIds: [edge.id], inCycle: inCycle.has(edge.id) })
-      continue
-    }
-    existing.edgeIds.push(edge.id)
-    existing.inCycle ||= inCycle.has(edge.id)
-  }
-  return [...merged].map(([id, arrow]) => ({
-    id,
-    from: arrow.from,
-    to: arrow.to,
-    count: arrow.edgeIds.length,
-    edgeIds: arrow.edgeIds,
-    inCycle: arrow.inCycle,
-  }))
-}
-
-// ---------------------------------------------------------------------------
-// Needs attention
-// ---------------------------------------------------------------------------
-
-/**
- * The things a chart can be waiting on a human — or an agent — to fix, so one
- * header can state all of them (ADR-0012 §4).
- *
- * `undated` and `openEnded` are **exclusive and separately counted**: a lane
- * with no start at all is undated, a lane with a start and no end is in flight.
- * Reading the second as the first is what drew eight known starts as eight blank
- * rows, and the instruction that fixes each is a different instruction.
- *
- * `unplacedAtRoot` is the judgement call. A root lane someone *chose* to put
- * there is not unplaced, so what counts is a root lane nobody chose: a node
- * whose `parentId` named a node that is not in the chart, and a childless
- * **jira** node still sitting where import dropped it. A jira lane at the root
- * with children under it is doing a PRD lane's job and is left alone.
- */
-function needsAttentionFor(chart: GanttChart, tree: GanttTree): GanttNeedsAttention {
-  const undated: string[] = []
-  const openEnded: string[] = []
-  const unplacedAtRoot: string[] = []
-  const orphaned: string[] = []
-  for (const node of chart.nodes) {
-    if (openSpanOf(node) !== null) openEnded.push(node.id)
-    else if (datedSpanOf(node) === null) undated.push(node.id)
-    if (node.orphaned) orphaned.push(node.id)
-    const atRoot = (tree.parentOf.get(node.id) ?? null) === null
-    const childless = (tree.byId.get(node.id)?.children.length ?? 0) === 0
-    if (atRoot && (tree.reRooted.has(node.id) || (node.source.kind === 'jira' && childless))) {
-      unplacedAtRoot.push(node.id)
-    }
-  }
-  return {
-    undated,
-    openEnded,
-    unplacedAtRoot,
-    orphaned,
-    total: new Set([...undated, ...openEnded, ...unplacedAtRoot, ...orphaned]).size,
-  }
-}
-
-// ---------------------------------------------------------------------------
-// The layout
-// ---------------------------------------------------------------------------
 
 /**
  * A chart and a viewport in; everything the views need out.
@@ -291,13 +265,20 @@ export function layout(chart: GanttChart, opts: GanttLayoutOptions): GanttLayout
   // An open-ended lane's start counts towards the domain, or a chart of nothing
   // but in-flight work would have no domain to draw its bars on.
   const extent = axisExtentOf(chart.nodes)
-  const axis = axisFor(extent, opts.zoom, todayDay)
+  // Ghosts widen the domain too, and they have to: a ghost queued behind the
+  // last real bar sits past the plan's own extent by a week, and an axis built
+  // without it would clip the very lane the invention exists to make visible.
+  const ghosts = ghostSpansFor(chart, tree, opts.today)
+  const axis = axisFor(withGhosts(extent, ghosts), opts.zoom, todayDay)
   const inAxis = todayDay >= axis.start && todayDay <= axis.end
 
   const blocked = blockedStateFor(chart)
   const progress = progressFor(tree)
   const childSpans = childSpanFor(tree)
   const { cycles, edgeIds } = findCycles(chart)
+  // A selection the chart no longer has — a lane the agent deleted under a
+  // reader who had it selected — is the same as no selection.
+  const selection = opts.selected === null ? null : nearestVisible(opts.selected, tree, visible)
 
   // Sliced *before* the per-row work, not after: windowing exists so that a
   // three-hundred-node chart costs what a screenful costs.
@@ -306,19 +287,18 @@ export function layout(chart: GanttChart, opts: GanttLayoutOptions): GanttLayout
     .slice(first, first + Math.max(0, opts.visibleRange.count))
     .map((row, offset) => ({ row, index: first + offset }))
 
+  const arrows = arrowsFor(chart, tree, visible, edgeIds, selection)
+  const inWaterfall = new Set(
+    arrows.flatMap((arrow) => (arrow.focus === 'waterfall' ? [arrow.from, arrow.to] : [])),
+  )
+  if (selection !== null) inWaterfall.add(selection)
+
   const bars = new Map<string, GanttBar>()
   const spans = new Map<string, GanttChildSpanBar>()
   const laidOut = windowed.map(({ row, index }): GanttRow => {
-    // Fully dated, open-ended, or neither — the three states a lane's own span
-    // can be in, and the only place the chart decides which bar to draw.
     const own = datedSpanOf(row.node)
     const open = openSpanOf(row.node)
-    const placed =
-      own !== null
-        ? { ...place(own, axis), openEnded: false }
-        : open !== null
-          ? { ...placeOpen(open, axis, todayDay), openEnded: true }
-          : null
+    const placed = placeBar(own, open, ghosts.get(row.node.id) ?? null, axis, todayDay)
     if (placed !== null) {
       bars.set(row.node.id, {
         nodeId: row.node.id,
@@ -341,15 +321,21 @@ export function layout(chart: GanttChart, opts: GanttLayoutOptions): GanttLayout
       depth: row.depth,
       hasChildren: row.hasChildren,
       collapsed: row.collapsed,
-      undated: placed === null,
+      // Still "nobody dated this" even when a ghost gives it a bar — the tree
+      // cell dims on this and Needs attention counts it, and both are about the
+      // missing dates rather than about whether something got drawn.
+      undated: own === null && open === null,
       blocked: blocked.get(row.node.id) ?? 'none',
       progress: progress.get(row.node.id) ?? NO_PROGRESS,
       infoExpanded: opts.expandedInfo.has(row.node.id),
+      selected: selection === row.node.id,
+      inWaterfall: inWaterfall.has(row.node.id),
     }
   })
 
   return {
     ticks: ticksFor(axis, opts.zoom),
+    axisWidth: axisWidthOf(axis, opts.zoom),
     // The middle of today rather than its leading edge, so the line reads as
     // "now" rather than as the boundary between yesterday and today.
     todayX: inAxis ? (todayDay - axis.start + 0.5) / axis.days : null,
@@ -357,7 +343,8 @@ export function layout(chart: GanttChart, opts: GanttLayoutOptions): GanttLayout
     totalRows: rows.length,
     bars,
     childSpans: spans,
-    arrows: arrowsFor(chart, tree, visible, edgeIds),
+    arrows,
+    selection,
     cycles,
     needsAttention: needsAttentionFor(chart, tree),
     nothingDated: extent === null,

@@ -110,22 +110,25 @@ test("the tree renders every lane, at its own depth, in the chart's order", asyn
   await expect(row(page, 'geo-150').getByLabel('Orphaned')).toBeVisible()
 })
 
-test('bars are drawn for dated lanes, segmented for parents, and absent for undated ones', async ({
+test('bars are drawn for dated lanes, segmented for parents, and ghosted for undated ones', async ({
   page,
 }) => {
   await openDemoChart(page)
 
-  // Fourteen bars of sixteen lanes. The two without dates have no bar at all,
-  // which is an ordinary state and not a defect: import makes dates nullable.
-  await expect(bars(page)).toHaveCount(14)
-  await expect(bar(page, 'rate-cards')).toHaveCount(0)
-  await expect(bar(page, 'geo-200')).toHaveCount(0)
+  // Sixteen bars of sixteen lanes. The two without dates get a **ghost** — an
+  // invented week, drawn as a dashed outline with no fill, because a chart that
+  // draws nothing for its `TO DO` work cannot answer what to work on next
+  // (ADR-0012 §4's amendment). It stays undated: the invention is visible as one.
+  await expect(bars(page)).toHaveCount(16)
+  await expect(bar(page, 'rate-cards')).toHaveAttribute('data-ghost', 'true')
+  await expect(bar(page, 'geo-200')).toHaveAttribute('data-ghost', 'true')
+  await expect(bar(page, 'geo-141')).toHaveAttribute('data-ghost', 'false')
   await expect(row(page, 'rate-cards')).toHaveAttribute('data-undated', 'true')
-  await expect(row(page, 'rate-cards')).toContainText('no dates')
+  await expect(bar(page, 'rate-cards')).toHaveAttribute('title', /no dates/u)
 
-  // A lane with a start and no end is the fourteenth: it has a bar, an
-  // open-ended one, and it is not undated — a known start drawn as a blank row
-  // is the defect that state exists to prevent (ADR-0012 §4).
+  // A lane with a start and no end has a bar of its own kind: open-ended, not
+  // ghosted, and not undated — a known start drawn as a blank row is the defect
+  // that state exists to prevent (ADR-0012 §4).
   await expect(bar(page, 'geo-151')).toHaveAttribute('data-open-ended', 'true')
   await expect(row(page, 'geo-151')).toHaveAttribute('data-undated', 'false')
   await expect(bar(page, 'geo-141')).toHaveAttribute('data-open-ended', 'false')
@@ -136,7 +139,9 @@ test('bars are drawn for dated lanes, segmented for parents, and absent for unda
   // Five leaf descendants, counted once each: the PRD lane and the features
   // under it are one piece of work at two altitudes, so only the leaves count.
   await expect(prd).toContainText('1 of 5 done')
-  // A leaf is one solid bar in its own column's tone, with no label to state.
+  // A leaf is one solid bar in its own **status**'s tone, with no label to
+  // state — the ticket card's own palette, so a bar and the chip on the same
+  // ticket cannot disagree about what `Done` looks like.
   await expect(bar(page, 'geo-141')).toHaveAttribute('data-segmented', 'false')
 
   // Every bar is positioned as a fraction of the axis, which is what keeps the
@@ -162,8 +167,12 @@ test("the axis speaks the zoom's own vocabulary, and the zoom is switchable", as
   // Three fixed zooms, each with its own honest labels rather than one density
   // heuristic (ADR-0012 §10).
   await zoom.locator('[data-zoom="quarter"]').click()
-  await expect(page.getByText('Oct', { exact: true })).toBeVisible()
-  await expect(page.getByText('Jan', { exact: true })).toBeVisible()
+  // `.first()`, because the axis now spans more than a year: the fixture's
+  // undated lanes ghost at the pinned clock's today (May 2026), five months
+  // before the plan starts, and the quarter axis is padded a quarter either side
+  // of *that*. So `Jan` appears for 2026 and again for 2027.
+  await expect(page.getByText('Oct', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('Jan', { exact: true }).first()).toBeVisible()
   await expect(page.getByText(/^W\d{1,2}$/u)).toHaveCount(0)
 
   await zoom.locator('[data-zoom="week"]').click()
@@ -173,10 +182,15 @@ test("the axis speaks the zoom's own vocabulary, and the zoom is switchable", as
 test('arrows are drawn between lanes at any depth, and a cycle is named', async ({ page }) => {
   await openDemoChart(page)
 
-  // Six declared dependencies, six arrows, drawn over the bar region.
-  await expect(arrows(page)).toHaveCount(6)
+  // Six declared dependencies and **two** arrows: the chart draws none of them
+  // until a lane is selected, bar the cycle, because 54 edges over 30 lanes drew
+  // a thicket nobody could read one dependency out of (ADR-0012 §10's
+  // amendment). The cycle is the exception — an impossible plan has to look it.
+  await expect(arrows(page)).toHaveCount(2)
 
   // Across depths: a depth-2 ticket blocks a depth-1 feature of another PRD.
+  // Selecting either end is what asks for it.
+  await bar(page, 'invoice-rewrite').click()
   const crossDepth = arrow(page, 'geo-142', 'invoice-rewrite')
   await expect(crossDepth).toHaveCount(1)
   await expect(crossDepth).toHaveAttribute('data-count', '1')
@@ -209,4 +223,54 @@ test('a chart the URL names but disk does not is a stale bookmark, not an error'
   await page.goto('/gantt?e2e=1&chart=no-such-chart')
   await expect(page.getByText('There is no chart called')).toBeVisible({ timeout: 15_000 })
   await expect(page.getByTestId(testIds.ganttRow)).toHaveCount(0)
+})
+
+// Zoom used to change only the tick labels: the axis was always exactly as wide
+// as the window, so a chart holding one long lane squeezed its other thirty into
+// a few pixels each and all three zooms drew the same unreadable picture. Now the
+// axis has an intrinsic pixel width and the chart scrolls sideways under a sticky
+// axis strip, which is what makes the three zooms worth having.
+test('the time axis has its own width and scrolls, with the tree column pinned', async ({
+  page,
+}) => {
+  await openDemoChart(page)
+
+  const widthAt = async (zoom: 'week' | 'month' | 'quarter'): Promise<number> => {
+    await page.getByTestId(testIds.ganttZoom).locator(`[data-zoom="${zoom}"]`).click()
+    await expect(bar(page, 'geo-141')).toBeVisible()
+    return bar(page, 'geo-141').evaluate((element) => element.getBoundingClientRect().width)
+  }
+
+  // The same ten days of work, three zooms, three widths — which is the whole
+  // point: at week zoom a ticket is readable, at quarter zoom a programme is.
+  const week = await widthAt('week')
+  const month = await widthAt('month')
+  const quarter = await widthAt('quarter')
+
+  expect(week).toBeGreaterThan(month)
+  expect(month).toBeGreaterThan(quarter)
+
+  // At week zoom the chart is wider than its frame, so there is somewhere to
+  // scroll — the fix for "the timeline should extend left and right".
+  await page.getByTestId(testIds.ganttZoom).locator('[data-zoom="week"]').click()
+  const scrollable = await page
+    .locator('[data-testid="gantt-surface"] .overflow-auto')
+    .first()
+    .evaluate((element) => element.scrollWidth > element.clientWidth + 1)
+  expect(scrollable).toBe(true)
+
+  // And the lane titles stay put while it does: the tree column is `sticky`, so a
+  // bar scrolled into view is still attached to a name. The row itself scrolls
+  // with the content — it is the cell inside it that is pinned, which is why this
+  // measures the title rather than the row.
+  const title = row(page, 'geo-141').getByTestId(testIds.ganttJiraLane)
+  const before = await title.boundingBox()
+  await page
+    .locator('[data-testid="gantt-surface"] .overflow-auto')
+    .first()
+    .evaluate((element) => {
+      element.scrollLeft += 400
+    })
+  const after = await title.boundingBox()
+  expect(Math.abs((after?.x ?? 0) - (before?.x ?? 0))).toBeLessThan(2)
 })

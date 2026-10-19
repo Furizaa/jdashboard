@@ -14,7 +14,9 @@ import type { Column, GanttChart, GanttEdge, GanttNode, GanttNodeSource } from '
 //   - **a dated parent whose children overrun it** — `tier-migration` declares
 //     a window ending 15 Nov and `pricing-ui` runs to 28 Nov, so the derived
 //     child span underlay shows the overrun (ADR-0012 §4);
-//   - **an undated node** — `rate-cards`, a lane with no dates and so no bar;
+//   - **an undated node** — `rate-cards`, a lane with no dates, drawn as a
+//     **ghost**: an invented week in a dashed outline with no fill, placed behind
+//     whatever blocks it (ADR-0012 §4's amendment);
 //   - **an open-ended node** — `geo-151`, a lane with a `start` and no `end`,
 //     which is the shape a date seeded from status history has while the work
 //     is still in flight, and which draws as a bar that fades out rather than

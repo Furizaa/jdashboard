@@ -27,6 +27,15 @@ export const ROW_HEIGHT = 36
 export const TREE_COLUMN_CLASS = 'w-80'
 export const BAR_REGION_CLASS = 'left-80 right-0'
 
+/**
+ * The same 320px as `TREE_COLUMN_CLASS`, as a number.
+ *
+ * Needed because the tree column is now `position: sticky` inside a horizontally
+ * scrolling chart, and the scroll container has to know how much of its width
+ * the tree takes before the axis gets the rest.
+ */
+export const TREE_COLUMN_WIDTH = 320
+
 /** One depth step. Deep enough to read as nesting, shallow enough for five levels. */
 const INDENT_PER_DEPTH = 14
 
@@ -37,8 +46,10 @@ export function GanttChartRow({
   bar,
   childSpan,
   revealed,
+  dimmed,
   onToggleCollapse,
   onToggleInfo,
+  onToggleSelection,
   onOpenIssue,
 }: {
   row: GanttRow
@@ -48,8 +59,11 @@ export function GanttChartRow({
   childSpan: GanttChildSpanBar | undefined
   /** This is the lane a `?node=` hand-off pointed at — scroll to it and flash it. */
   revealed: boolean
+  /** Some other lane's waterfall is on screen and this lane is not part of it. */
+  dimmed: boolean
   onToggleCollapse: () => void
   onToggleInfo: () => void
+  onToggleSelection: () => void
   onOpenIssue: (issueKey: string) => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
@@ -71,6 +85,7 @@ export function GanttChartRow({
       data-undated={row.undated}
       data-collapsed={row.collapsed}
       data-blocked={row.blocked}
+      data-selected={row.selected}
       // The flash itself is one keyframe in `globals.css`, keyed off this
       // attribute exactly as the board's changed-card pulse is — so it is one
       // animation with one reduced-motion guard rather than inline style.
@@ -80,11 +95,16 @@ export function GanttChartRow({
           height is exactly `ROW_HEIGHT` and the arrow overlay's offsets stay
           arithmetic rather than measured. */}
       <div className="border-border/40 flex border-b" style={{ height: ROW_HEIGHT }}>
+        {/* `sticky left-0` keeps the tree column in place while the time axis
+            scrolls sideways under it, and the background is explicit because a
+            transparent sticky cell would let the bars slide through it. */}
         <div
           className={cn(
-            'border-border/60 flex shrink-0 items-center gap-1 border-r pr-2 pl-2',
+            'border-border/60 bg-background sticky left-0 z-20 flex shrink-0 items-center gap-1 border-r pr-2 pl-2 transition-opacity',
             TREE_COLUMN_CLASS,
             row.undated && 'opacity-55',
+            dimmed && 'opacity-40',
+            row.selected && 'bg-surface-2',
           )}
           style={{ paddingLeft: 8 + row.depth * INDENT_PER_DEPTH }}
         >
@@ -94,7 +114,13 @@ export function GanttChartRow({
           <InfoToggle node={node} open={row.infoExpanded} onToggle={onToggleInfo} />
         </div>
         <div className="relative min-w-0 flex-1">
-          <GanttBar row={row} bar={bar} childSpan={childSpan} />
+          <GanttBar
+            row={row}
+            bar={bar}
+            childSpan={childSpan}
+            dimmed={dimmed}
+            onSelect={onToggleSelection}
+          />
         </div>
       </div>
       {row.infoExpanded && <InfoBand chartId={chartId} node={node} depth={row.depth} />}

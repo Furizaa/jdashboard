@@ -53,6 +53,10 @@ export function readGanttPreference(chartId: string): GanttState | null {
       // a refresh re-announce a lane the reader has already been shown, which is
       // exactly what consuming `?node=` with `replace` exists to prevent.
       revealed: null,
+      // Nor is a selection, for the neighbouring reason: it is the answer to
+      // "what does this lane wait on", asked a moment ago. A chart that reopens
+      // with last week's waterfall lit up asserts a focus nobody has.
+      selected: null,
     }
   } catch {
     return null

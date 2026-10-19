@@ -69,6 +69,13 @@ export type GanttChartApi =
       readonly reveal: (nodeId: string) => void
       /** Which lane the hand-off pointed at, or `null` when none did. */
       readonly revealed: string | null
+      /**
+       * Light up one lane's dependency waterfall, or clear it by naming the lane
+       * that is already lit. With nothing selected the chart draws no arrows at
+       * all bar the cycles, which is the default (ADR-0012 §10's amendment).
+       */
+      readonly toggleSelection: (nodeId: string) => void
+      readonly clearSelection: () => void
       /** A lane's title by id, for the cycle warning and the arrow labels. */
       readonly titleOf: (nodeId: string) => string
     }
@@ -145,6 +152,7 @@ export function useGanttChart(chartId: string): GanttChartApi {
             expandedInfo: state.expandedInfo,
             visibleRange: ALL_ROWS,
             today,
+            selected: state.selected,
           }),
     [chart, state, today],
   )
@@ -206,11 +214,17 @@ function useReveal(
 
 type GanttActions = Pick<
   Extract<GanttChartApi, { phase: 'ready' }>,
-  'setZoom' | 'toggleCollapse' | 'collapseAll' | 'expandAll' | 'toggleInfo'
+  | 'setZoom'
+  | 'toggleCollapse'
+  | 'collapseAll'
+  | 'expandAll'
+  | 'toggleInfo'
+  | 'toggleSelection'
+  | 'clearSelection'
 >
 
 /**
- * The five things the reader can do. `collapseAll` carries the parent ids on the
+ * The seven things the reader can do. `collapseAll` carries the parent ids on the
  * event because the reducer holds no chart — the rows are here and already know
  * which lanes have children.
  */
@@ -236,6 +250,8 @@ function useGanttActions(
       collapseAll: () => dispatch({ type: 'allCollapsed', parentIds }),
       expandAll: () => dispatch({ type: 'allExpanded' }),
       toggleInfo: (nodeId: string) => dispatch({ type: 'infoToggled', nodeId }),
+      toggleSelection: (nodeId: string) => dispatch({ type: 'selectionToggled', nodeId }),
+      clearSelection: () => dispatch({ type: 'selectionCleared' }),
     }),
     [dispatch, parentIds],
   )

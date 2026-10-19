@@ -124,7 +124,9 @@ You pick them, and you should pick them to be readable: `tier-migration`, not `n
 
 `start` and `end` are `YYYY-MM-DD` strings, or `null`. The month and the day are range-checked, so `2026-13-01` comes back as an error you can correct rather than as a bar in the wrong year.
 
-They are nullable because a chart bootstrapped from Jira has one node per discovered ticket and no dates at all. An undated lane renders in the tree, dimmed, with no bar. **Do not invent dates to fill them in.** A parent carries its own declared window _and_ an underlay derived from its dated descendants, which is what makes slip visible — a PRD whose features have overrun its declared quarter shows the overrun instead of absorbing it.
+They are nullable because a chart bootstrapped from Jira has one node per discovered ticket and no dates at all. **Do not invent dates to fill them in.** A parent carries its own declared window _and_ an underlay derived from its dated descendants, which is what makes slip visible — a PRD whose features have overrun its declared quarter shows the overrun instead of absorbing it.
+
+An undated leaf lane is drawn as a **ghost**: one week, placed behind whatever blocks it, in a dashed outline with no fill. That is the _reader's_ view inventing a position so the lane has somewhere to sit on the time axis, and it is drawn as visibly invented for exactly that reason. **It is not a date and it is not on the chart** — `start` and `end` stay `null` in the file, the lane is still counted as undated in "needs attention", and a `GET` will hand you back the nulls. Do not read a chart, see bars everywhere, and conclude the dating is done.
 
 That is not permission to leave a chart blank, though. Most of a real chart's dates are already knowable, and the next section is where each one comes from.
 
@@ -201,7 +203,7 @@ A parent carries its **own declared span** on purpose. That is what lets "this P
 
 If you finish and lanes are still undated, **say which, and why**, in your reply. One clause each is enough: "GEO-210 and GEO-211 have no start because nothing has begun on them and nothing dates their blockers yet."
 
-An undated chart renders as an empty grid, and the person who asked for it cannot tell your judgement from your omission. The chart is on your side here — it carries a "needs attention" line counting the undated lanes and the ones in flight with no forecast end, and a chart with nothing dated at all shows a banner naming this very verb. Both exist so the gap is visible; do not make them the way the user finds out.
+An undated chart renders as a grid of ghost bars all stacked on today, and the person who asked for it cannot tell your judgement from your omission. The chart is on your side here — it carries a "needs attention" line counting the undated lanes and the ones in flight with no forecast end, and a chart with nothing dated at all shows a banner naming this very verb. Both exist so the gap is visible; do not make them the way the user finds out.
 
 ## Mirrored fields must not be patched on a jira node
 

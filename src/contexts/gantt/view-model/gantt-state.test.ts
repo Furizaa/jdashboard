@@ -42,6 +42,7 @@ const STATE: GanttState = {
   collapsed: new Set(['p1']),
   expandedInfo: new Set(['a1']),
   revealed: null,
+  selected: null,
 }
 
 describe('initialGanttState', () => {
@@ -141,9 +142,36 @@ describe('reduce', () => {
       collapsed: new Set(['x']),
       expandedInfo: new Set(),
       revealed: 'x1',
+      selected: 'x2',
     }
 
     expect(reduce(STATE, { type: 'restored', state: restored })).toEqual(restored)
+  })
+
+  // Selecting a lane is what makes any arrow appear at all: the chart draws none
+  // by default, because 54 edges over 30 lanes is a thicket (ADR-0012 §10's
+  // amendment). Toggling is the way back out, since the control is the bar.
+  it('selects a lane, and clears it when the same lane is selected again', () => {
+    const lit = reduce(STATE, { type: 'selectionToggled', nodeId: 'a1' })
+    expect(lit.selected).toBe('a1')
+
+    expect(reduce(lit, { type: 'selectionToggled', nodeId: 'a1' }).selected).toBeNull()
+  })
+
+  it('moves the selection to a different lane rather than adding to it', () => {
+    const lit = reduce(STATE, { type: 'selectionToggled', nodeId: 'a1' })
+
+    expect(reduce(lit, { type: 'selectionToggled', nodeId: 'a2' }).selected).toBe('a2')
+  })
+
+  it('clears the selection without naming a lane', () => {
+    const lit = reduce(STATE, { type: 'selectionToggled', nodeId: 'a1' })
+
+    expect(reduce(lit, { type: 'selectionCleared' }).selected).toBeNull()
+  })
+
+  it('opens with nothing selected, so a fresh chart draws no arrows', () => {
+    expect(initialGanttState(chart([node('p1')])).selected).toBeNull()
   })
 
   it('never mutates the state it was given', () => {

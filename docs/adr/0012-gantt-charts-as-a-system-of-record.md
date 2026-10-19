@@ -53,7 +53,7 @@ The sharper statement, which §4 forces: **source names who owns which _field_, 
 - **(c) Spans from observed status history.** _Rejected:_ answers where the time went, not where the project is going, and costs a changelog expand per issue. **Amended — see below: the rejection held for the forecast and failed for the record.**
 - **(d) `start` / `end` are chart-owned on every node, nullable, never read from Jira and never written back.** _Selected._
 
-**Amendment (2026-10-19): history seeds blanks.** The first real chart settled (c) against itself. Built from `HDR-20708`, it arrived with 29 lanes, 24 of them correctly parented, 53 edges reconciled from `issuelinks` — and `start: null, end: null` on **every single one**. The agent did nothing wrong: the SKILL teaches the date _format_ and never says where a date comes from, and this section had explicitly rejected the only source there was.
+**Amendment (2026-10-19) i: history seeds blanks.** The first real chart settled (c) against itself. Built from `HDR-20708`, it arrived with 29 lanes, 24 of them correctly parented, 53 edges reconciled from `issuelinks` — and `start: null, end: null` on **every single one**. The agent did nothing wrong: the SKILL teaches the date _format_ and never says where a date comes from, and this section had explicitly rejected the only source there was.
 
 The rejection was right about what it was looking at and wrong about what the chart would mostly contain. "Answers where the time went, not where the project is going" is a statement about a **forecast**, and it holds: history cannot say when unstarted work will start, and the §4(b) upgrade path remains the answer for that. But a chart of mostly-finished work is a **record** before it is a forecast, and for work that has already happened the transition history is not retrospective trivia — it is the only truthful source in existence. Of those 29 lanes, 16 were Done, 5 In Code Review and 3 In Implementation: 24 had already started, and only 5 were genuinely future. The cost objection stands and is paid deliberately — one changelog expand per _undated_ mirrored lane, five at a time.
 
@@ -72,6 +72,23 @@ Two consequences that are not obvious:
 
 - **Every node carries its own span, parents included, and the children's span is drawn as a derived underlay.** A purely rolled-up parent cannot express "this PRD is Q4" before it has been decomposed, which is the order planning actually happens in — and a freshly-created PRD would have no bar at all. Drawing both makes **slip visible**: a PRD whose features have overrun its declared window shows the overrun instead of silently absorbing it. The underlay is computed from **dated** descendants only.
 - **Dates are nullable because import makes them so.** §5 bootstraps a chart with one node per discovered ticket and no dates; an undated node renders in the tree, dimmed, with no bar. Required dates would mean either fabricating a plan nobody made or making the agent supply forty of them before the chart exists.
+
+**Amendment (2026-10-19) ii: an undated lane gets a ghost bar.**
+
+The clause above — "an undated node renders in the tree, dimmed, with no bar" — was the honest rendering and the wrong one, and the same chart that forced amendment (i) is what showed it. Even after history seeded every date it could, five lanes stayed undated and several more were `TO DO` or blocked behind something unfinished. Those are **precisely the lanes a reader opens a Gantt to find**, and they were the blank ones: the chart answered "where has this project been" in full and "what do I work on next" not at all. A planning view that cannot be read for the next thing to do has failed at the only job it has.
+
+- **(e) Leave them blank, and let "needs attention" carry it.** _Rejected — this is what shipped._ The header counts them and the tree dims them, which tells a reader that lanes are missing dates. It does not tell them **which work is next**, because ordering is a property of the time axis and a lane with no position on it has no place in the ordering.
+- **(f) Fabricate a date on the chart.** _Rejected, and never close:_ it is a second writer on the one field the chart exists to show (§3), it would survive into `chart.json`, and the next sync or agent turn would read it as something a human decided.
+- **(g) Draw a span the chart does not store, and draw it as visibly invented.** _Selected._
+
+A **ghost bar** is one week, placed the day after the latest `end` of anything with a `blocks` edge into the lane and never earlier than today, drawn as a dashed outline with **no fill**. It exists only in `layout()`; nothing is written, and `start` and `end` stay `null` in the file. Four clauses are what keep (d) true and (f) rejected:
+
+- **It is not a date, and it does not look like one.** No fill, a dashed border, and a tooltip that reads "no dates — shown as a week after `<blocker>`". A reader does not have to be taught the convention to see that the bar is not the same kind of thing as its neighbours.
+- **The lane stays undated.** `GanttRow.undated` is still true, the tree cell is still dimmed, and "needs attention" still counts it. The ghost draws the lane; it does not claim the lane has been planned, and the instruction that fixes it — "date these" — is unchanged.
+- **A real date always wins.** The placement order is dated, then open-ended, then ghost. An invented week can never cover a date somebody set, which is the mechanism rather than the intention.
+- **Leaves only.** A parent with children already answers "when" with its derived child-span underlay, and a ghost on top of that would be the chart arguing with itself.
+
+The **week** is uniform on purpose: a varying default would be an estimate, and the ghost's whole claim is that it is not one. The **placement behind blockers** is what makes it worth drawing at all — it turns a column of identical week-long bars into a readable queue, where the lane with nothing in front of it sits at today and the lane three hops back sits three weeks out. That is the "what next" answer, read off the axis rather than counted in a header.
 
 **Progress is the kernel `Column`** — `TO DO | In Implementation | In Code Review | Done` — derived for a jira node via `columnForStatus(status)` and declared for a local one. Reusing the board's vocabulary is deliberate: it is already case-insensitive over HDR's mixed-casing statuses, and a second progress vocabulary would be a second answer to one question. A **percent** was rejected: a number an agent invents and never revises, with no honest Jira equivalent, rendered as a confident partial bar.
 
@@ -157,6 +174,26 @@ All geometry comes from `layout(chart, zoom, collapsed, viewport) → { rows, ba
 Three fixed zoom levels — week, month, quarter — each with its own honest tick labels, defaulting to the coarsest that fits the chart's extent, with a today line. _Rejected — continuous zoom:_ the tick-density algorithm is the fiddliest code in any timeline and the hardest to make look deliberate at every scale.
 
 **A lane's attached info is an inline band**, height-capped with an escape to a full-width panel, which is what "extends with the lane extension" describes and what keeps two PRDs comparable in one scroll context. A **side panel** was rejected for the body: it covers the right third of the time axis, which is the future, which is the part being looked at. The **ticket** detail panel is a different thing and does get the overlay — see §12.
+
+**Amendment (2026-10-19) iii: the axis has a width, and the arrows wait to be asked for.**
+
+Two clauses above were written for a chart nobody had built yet, and the first real one falsified both.
+
+**Zoom changed only the labels.** "Three fixed zoom levels, each with its own honest tick labels" was implemented with the axis sized to the container — so every zoom drew the same picture at the same density, and one fourteen-week backend lane compressed thirty others into a few pixels each at all three. The fix keeps the three zooms and gives each a **pixels-per-day**, so the bar region has an intrinsic width and the chart **scrolls horizontally** under a sticky axis strip and a sticky tree column. The axis domain is also padded by one whole unit of the zoom on each side, so there is calendar before the plan starts and after it ends rather than the programme being clipped to its own extent. _This is not continuous zoom and the rejection of that stands:_ there are still three levels with three stated tick vocabularies and three stated day widths, each a number that can be read and argued with, rather than a density heuristic. Fractional geometry is untouched — the fractions now resolve against a wide inner element instead of against the window, which is why there is still no `ResizeObserver` anywhere in the context.
+
+**Every arrow was drawn, always.** The re-anchoring rule above is about what collapse does to an arrow and it was right; what it did not settle is how many arrows a chart draws at rest. The answer shipped was "all of them", and on 54 edges over 30 lanes that is a thicket out of which a reader cannot trace one dependency. So:
+
+- **(d) Draw no arrows until a lane is selected.** _Selected._ Clicking a bar lights that lane's **whole waterfall** — everything upstream and everything downstream, transitively — and dims the lanes outside it. The header then names the selection and carries the dismiss, because a mostly-faded chart with no visible undo is worse than the thicket.
+- **(e) Draw them all and let the reader squint.** _Rejected:_ what shipped.
+- **(f) Draw only direct neighbours of the selected lane.** _Rejected:_ "what is this actually waiting on" is a transitive question, and one hop answers a question nobody asked.
+
+Two details carry weight. The closure is **directed** — upstream and downstream of the selection, not its connected component — because on a graph of this density an undirected walk lights the whole chart and puts the thicket straight back. And a **cycle edge is never hidden**: §6 requires a plan that cannot execute to _look_ impossible, and an edge the reader has to discover by clicking is not that, so cycle arrows are drawn at rest alongside the warning that names the loop.
+
+This does not reopen the collapse rule. Collapse still never removes a dependency from the graph, it restates it at a coarser altitude; a selection changes only which part of that graph is on screen at this moment, and a fully collapsed chart with its root PRD selected is still the programme-level dependency graph the clause above calls the most useful view of all.
+
+**Amendment (2026-10-19) iv: a bar is toned by its status, from the ticket card's palette.**
+
+§4 makes progress the kernel `Column` and that stands — it is what "7 of 11 done" counts and what a parent's segments are keyed by. But a **leaf** bar was also toned by column, which folds `In STG`, `In QA`, `In UAT` and `Done` into one green and `Blocked` into `TO DO`'s grey: exactly the distinctions a reader scanning a release wants back. A leaf bar now takes the colour of its real `status` from `widgets/status-pill`'s `styleForStatus` — **read, not re-picked**, because a bar and the chip on the same ticket's card disagreeing about what `IN UAT` is would be two answers to one question. This is not a second progress vocabulary: the grouping is still `Column`, and a lane with no status of its own borrows its column's chip colour so the two cannot drift.
 
 ### 11. Durability: an append-only changelog and one level of body snapshot
 

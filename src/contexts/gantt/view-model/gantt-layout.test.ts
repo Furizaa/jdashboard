@@ -61,6 +61,7 @@ const BASE: GanttLayoutOptions = {
   expandedInfo: new Set(),
   visibleRange: { first: 0, count: 100 },
   today: '2026-10-07',
+  selected: null,
 }
 
 function opts(overrides: Partial<GanttLayoutOptions> = {}): GanttLayoutOptions {
@@ -98,22 +99,57 @@ describe('layout rows and bars', () => {
     expect(result.totalRows).toBe(7)
   })
 
-  it('gives every dated row a bar and an undated row none', () => {
+  it('gives a dated row a real bar and an undated leaf a ghost one', () => {
     const result = layout(chart(TWO_PRDS), opts())
 
-    expect([...result.bars.keys()].toSorted()).toEqual(['a1', 'a2', 'p1', 'p2'])
+    expect([...result.bars.keys()].toSorted()).toEqual(['a1', 'a2', 'b1', 'b2', 'b3', 'p1', 'p2'])
+    // Still undated — nobody dated it, which is what the dimmed tree cell and
+    // the Needs attention count are both about. What changed is that it is now
+    // *drawn*, as an invention the view marks as one (ADR-0012 §4's amendment).
     expect(result.rows.find((row) => row.node.id === 'b1')).toMatchObject({ undated: true })
-    expect(result.bars.has('b1')).toBe(false)
+    expect(result.bars.get('b1')).toMatchObject({ ghost: true })
+    expect(result.bars.get('a1')).toMatchObject({ ghost: false })
+  })
+
+  it('leaves an undated parent bar-less, because its child span already answers "when"', () => {
+    const result = layout(
+      chart([
+        node('prd'),
+        node('feature', { parentId: 'prd', start: '2026-10-01', end: '2026-10-10' }),
+      ]),
+      opts(),
+    )
+
+    expect(result.bars.has('prd')).toBe(false)
+    expect(result.childSpans.has('prd')).toBe(true)
   })
 
   it('places a bar as a fraction of the axis, end date inclusive', () => {
-    // Axis: October, 31 days. `a1` is the 1st to the 10th — ten days from zero.
+    // Axis: September through November, 91 days — October padded by a month each
+    // side so there is calendar to scroll into. `a1` is the 1st to the 10th of
+    // October, so it starts 30 days in and runs for ten.
     const result = layout(
       chart([node('a1', { start: '2026-10-01', end: '2026-10-10' })]),
       opts({ zoom: 'month' }),
     )
 
-    expect(result.bars.get('a1')).toMatchObject({ x: 0, width: 10 / 31, column: 'TO DO' })
+    expect(result.bars.get('a1')).toMatchObject({ x: 30 / 91, width: 10 / 91, column: 'TO DO' })
+  })
+
+  it('sizes the axis in pixels, so zoom changes density rather than only labels', () => {
+    // Stated as the width of one *bar* rather than of the whole axis, because the
+    // axis is not monotonic across zooms: coarser zooms pad by a coarser unit, so
+    // a one-week plan at quarter zoom spans three quarters. What is monotonic —
+    // and what the reader actually experiences — is how many pixels ten days of
+    // work gets, which is the whole fix for one long lane crushing thirty others.
+    const nodes = [node('a1', { start: '2026-10-01', end: '2026-10-10' })]
+    const pixelsOfA1 = (zoom: GanttLayoutOptions['zoom']) => {
+      const result = layout(chart(nodes), opts({ zoom }))
+      return (result.bars.get('a1')?.width ?? 0) * result.axisWidth
+    }
+
+    expect(pixelsOfA1('week')).toBeGreaterThan(pixelsOfA1('month'))
+    expect(pixelsOfA1('month')).toBeGreaterThan(pixelsOfA1('quarter'))
   })
 
   it('carries the derived blocked state onto the bar', () => {
@@ -163,10 +199,11 @@ describe('layout open-ended bars', () => {
       opts({ zoom: 'month', today: '2026-10-07' }),
     )
 
-    // October, 31 days: the 5th to the 7th inclusive is three days from the 4th.
+    // Axis: September through November, 91 days. The 5th to the 7th of October
+    // inclusive is three days, starting 34 days in.
     expect(result.bars.get('running')).toMatchObject({
-      x: 4 / 31,
-      width: 3 / 31,
+      x: 34 / 91,
+      width: 3 / 91,
       openEnded: true,
     })
   })
@@ -177,7 +214,7 @@ describe('layout open-ended bars', () => {
     expect(result.bars.get('a1')).toMatchObject({ openEnded: false })
   })
 
-  it('is not an undated row, and an undated row is still bar-less', () => {
+  it('is not an undated row, and an undated row gets a ghost rather than an open bar', () => {
     const result = layout(
       chart([node('running', { start: '2026-10-05' }), node('nothing')]),
       opts(),
@@ -185,29 +222,34 @@ describe('layout open-ended bars', () => {
 
     expect(result.rows.find((row) => row.node.id === 'running')).toMatchObject({ undated: false })
     expect(result.rows.find((row) => row.node.id === 'nothing')).toMatchObject({ undated: true })
-    expect(result.bars.has('nothing')).toBe(false)
+    // The two are drawn differently and mean different things: one has a real
+    // start and no forecast end, the other has nothing at all.
+    expect(result.bars.get('running')).toMatchObject({ openEnded: true, ghost: false })
+    expect(result.bars.get('nothing')).toMatchObject({ openEnded: false, ghost: true })
   })
 
   it('reads an end with no start as undated rather than open-ended', () => {
-    // Half-dated the other way round: there is nothing to draw from.
+    // Half-dated the other way round: there is no start to draw from, so the
+    // declared end buys nothing and the lane is ghosted like any other undated one.
     const result = layout(chart([node('backwards', { end: '2026-10-31' })]), opts())
 
     expect(result.rows[0]).toMatchObject({ undated: true })
-    expect(result.bars.size).toBe(0)
+    expect(result.bars.get('backwards')).toMatchObject({ ghost: true, openEnded: false })
   })
 
   it('builds the axis from an open-ended start, and runs the bar to the axis end', () => {
     // A chart of nothing but in-flight work: without the start in the extent
-    // there is no domain at all. 2026-09-14 is a Monday, so the padded week
-    // zoom axis is exactly that week — which today is well past.
+    // there is no domain at all. 2026-09-14 is a Monday, so the week-zoom axis is
+    // that week plus one either side — which today is still well past, and the
+    // bar therefore runs to the last day there is.
     const result = layout(
       chart([node('running', { start: '2026-09-14' })]),
       opts({ zoom: 'week', today: '2026-10-07' }),
     )
 
-    expect(result.ticks[0]?.key).toBe('2026-09-14')
+    expect(result.ticks[0]?.key).toBe('2026-09-07')
     expect(result.todayX).toBeNull()
-    expect(result.bars.get('running')).toMatchObject({ x: 0, width: 1, openEnded: true })
+    expect(result.bars.get('running')).toMatchObject({ x: 7 / 21, width: 14 / 21, openEnded: true })
   })
 
   it('is one day wide when today has not reached the start yet', () => {
@@ -216,7 +258,7 @@ describe('layout open-ended bars', () => {
       opts({ zoom: 'month', today: '2026-10-07' }),
     )
 
-    expect(result.bars.get('future')).toMatchObject({ x: 19 / 31, width: 1 / 31 })
+    expect(result.bars.get('future')).toMatchObject({ x: 49 / 91, width: 1 / 91 })
   })
 
   it('carries the column tone and the blocked state like any other bar', () => {
@@ -310,12 +352,25 @@ describe('layout windowing', () => {
 })
 
 describe('layout arrows', () => {
-  it('draws a plain arrow when both endpoints are visible', () => {
+  it('computes a plain arrow when both endpoints are visible, and hides it', () => {
+    // The pair is still worked out — collapse, merging and re-anchoring all run
+    // whether or not anything is drawn — but `focus` is what the view filters on,
+    // and with nothing selected the answer is `hidden`: 54 edges over 30 lanes is
+    // a thicket rather than a dependency graph (ADR-0012 §10's amendment).
     const result = layout(chart(TWO_PRDS, ['a1>b1']), opts())
 
     expect(result.arrows).toEqual([
-      { id: 'a1→b1', from: 'a1', to: 'b1', count: 1, edgeIds: ['a1-b1'], inCycle: false },
+      {
+        id: 'a1→b1',
+        from: 'a1',
+        to: 'b1',
+        count: 1,
+        edgeIds: ['a1-b1'],
+        inCycle: false,
+        focus: 'hidden',
+      },
     ])
+    expect(result.selection).toBeNull()
   })
 
   it('re-anchors a collapsed endpoint to its nearest visible ancestor', () => {
@@ -358,6 +413,7 @@ describe('layout arrows', () => {
         count: 3,
         edgeIds: ['b1-a1', 'b2-a1', 'b3-a1'],
         inCycle: false,
+        focus: 'hidden',
       },
     ])
   })
@@ -393,37 +449,184 @@ describe('layout arrows', () => {
   })
 })
 
+// Arrows are hidden until a lane is selected, and selecting one lights its whole
+// dependency waterfall — everything upstream and everything downstream,
+// transitively. The assertion worth reading twice is the last: the closure is
+// **directed**, so a lane that merely shares a blocker with the chain stays dark.
+describe('layout selection waterfall', () => {
+  /** `a` blocks `b` blocks `c`; `d` also blocks `b`; `e` is unconnected. */
+  const CHAIN: readonly GanttNode[] = [
+    node('a', { order: 0, start: '2026-10-01', end: '2026-10-05' }),
+    node('b', { order: 1, start: '2026-10-06', end: '2026-10-10' }),
+    node('c', { order: 2, start: '2026-10-11', end: '2026-10-15' }),
+    node('d', { order: 3, start: '2026-10-01', end: '2026-10-04' }),
+    node('e', { order: 4, start: '2026-10-01', end: '2026-10-20' }),
+  ]
+  const EDGES = ['a>b', 'b>c', 'd>b']
+
+  function focusOf(result: ReturnType<typeof layout>): Record<string, string> {
+    return Object.fromEntries(result.arrows.map((arrow) => [arrow.id, arrow.focus]))
+  }
+
+  it('hides every arrow while nothing is selected', () => {
+    const result = layout(chart(CHAIN, EDGES), opts())
+
+    expect(Object.values(focusOf(result))).toEqual(['hidden', 'hidden', 'hidden'])
+    expect(result.rows.every((row) => !row.inWaterfall && !row.selected)).toBe(true)
+  })
+
+  it('lights everything upstream and downstream of the selected lane', () => {
+    const result = layout(chart(CHAIN, EDGES), opts({ selected: 'b' }))
+
+    expect(focusOf(result)).toEqual({ 'a→b': 'waterfall', 'b→c': 'waterfall', 'd→b': 'waterfall' })
+    expect(result.rows.filter((row) => row.inWaterfall).map((row) => row.node.id)).toEqual([
+      'a',
+      'b',
+      'c',
+      'd',
+    ])
+    expect(result.rows.filter((row) => row.selected).map((row) => row.node.id)).toEqual(['b'])
+    expect(result.selection).toBe('b')
+  })
+
+  it('follows the chain transitively, not just one hop', () => {
+    const result = layout(chart(CHAIN, EDGES), opts({ selected: 'c' }))
+
+    // `a` is two hops upstream of `c`, through `b`.
+    expect(result.rows.filter((row) => row.inWaterfall).map((row) => row.node.id)).toEqual([
+      'a',
+      'b',
+      'c',
+      'd',
+    ])
+  })
+
+  it('leaves a lane that only shares a blocker with the chain dark', () => {
+    // Selecting `a` must not pull in `d`: `d` blocks something `a` also blocks,
+    // which is not a dependency of `a` in either direction. Following edges
+    // undirected would light the whole chart on a graph of any density.
+    const result = layout(chart(CHAIN, EDGES), opts({ selected: 'a' }))
+
+    expect(result.rows.filter((row) => row.inWaterfall).map((row) => row.node.id)).toEqual([
+      'a',
+      'b',
+      'c',
+    ])
+    expect(focusOf(result)['d→b']).toBe('hidden')
+  })
+
+  it('leaves an unconnected lane out of every waterfall', () => {
+    const result = layout(chart(CHAIN, EDGES), opts({ selected: 'e' }))
+
+    expect(result.rows.filter((row) => row.inWaterfall).map((row) => row.node.id)).toEqual(['e'])
+  })
+
+  it('draws a cycle arrow even with nothing selected — an impossible plan must look it', () => {
+    const result = layout(chart(CHAIN, [...EDGES, 'c>a']), opts())
+
+    expect(focusOf(result)).toMatchObject({ 'a→b': 'cycle', 'b→c': 'cycle', 'c→a': 'cycle' })
+    expect(focusOf(result)['d→b']).toBe('hidden')
+  })
+
+  it('re-anchors the selection onto the lane that is actually on screen', () => {
+    const result = layout(
+      chart(TWO_PRDS, ['a1>b1']),
+      opts({ selected: 'b1', collapsed: new Set(['p2']) }),
+    )
+
+    expect(result.selection).toBe('p2')
+    expect(result.arrows.map((arrow) => [arrow.id, arrow.focus])).toEqual([['a1→p2', 'waterfall']])
+  })
+
+  it('treats a selection the chart does not have as no selection', () => {
+    const result = layout(chart(CHAIN, EDGES), opts({ selected: 'gone' }))
+
+    expect(result.selection).toBeNull()
+    expect(result.arrows.every((arrow) => arrow.focus === 'hidden')).toBe(true)
+  })
+})
+
+// A ghost is an invented week for a lane nobody dated (ADR-0012 §4's amendment).
+// It exists because the blank rendering it replaces made the chart useless for
+// the one question it is opened for — "what do I work on next" — and the three
+// assertions here are the three things that keep the invention honest.
+describe('layout ghost bars', () => {
+  it('queues a ghost behind its blocker rather than stacking it on today', () => {
+    const result = layout(
+      chart(
+        [node('blocker', { start: '2026-10-20', end: '2026-10-31' }), node('waiting')],
+        ['blocker>waiting'],
+      ),
+      opts({ today: '2026-10-07' }),
+    )
+
+    const blocker = result.bars.get('blocker')
+    const waiting = result.bars.get('waiting')
+
+    expect(waiting).toMatchObject({ ghost: true, afterBlocker: 'blocker' })
+    // Strictly to the right of the thing holding it up — the whole reason the
+    // placement consults the edges rather than parking every ghost on today.
+    expect(waiting?.x).toBeGreaterThan((blocker?.x ?? 0) + (blocker?.width ?? 0) - 1e-9)
+    // And wholly inside the axis: the ghost runs a week past the plan's own
+    // extent, so the domain has to have been widened to hold it.
+    expect((waiting?.x ?? 0) + (waiting?.width ?? 0)).toBeLessThanOrEqual(1)
+  })
+
+  it('never lets an invented span cover a date somebody set', () => {
+    const result = layout(
+      chart([node('dated', { start: '2026-10-01', end: '2026-10-05' })]),
+      opts(),
+    )
+
+    expect(result.bars.get('dated')).toMatchObject({ ghost: false, afterBlocker: null })
+  })
+
+  it('still counts a ghosted lane as needing attention', () => {
+    // The ghost draws the lane; it does not pretend the lane has dates. The one
+    // instruction that fixes it is still "date these".
+    const result = layout(chart(TWO_PRDS), opts())
+
+    expect(result.needsAttention.undated).toEqual(['b1', 'b2', 'b3'])
+  })
+})
+
 describe('layout ticks', () => {
   const OCTOBER_WEEK = [node('a', { start: '2026-10-05', end: '2026-10-09' })]
 
+  // One tick per day, per ISO week, per month — three vocabularies rather than
+  // one algorithm that picks a density. The axis each runs over is the plan's
+  // week padded out to whole units of the zoom and then by one unit either side,
+  // so the counts below are what "a week, with room to scroll" comes to.
   it('labels days at week zoom, over whole weeks', () => {
-    // 2026-10-05 is a Monday, so the padded axis is exactly that week.
     const { ticks } = layout(chart(OCTOBER_WEEK), opts({ zoom: 'week' }))
 
-    expect(ticks.map((tick) => tick.label)).toEqual([
-      'Mon 5',
-      'Tue 6',
-      'Wed 7',
-      'Thu 8',
-      'Fri 9',
-      'Sat 10',
-      'Sun 11',
-    ])
-    expect(ticks[0]?.key).toBe('2026-10-05')
+    expect(ticks).toHaveLength(21)
+    expect(ticks[0]?.key).toBe('2026-09-28')
+    expect([ticks[0]?.label, ticks.at(-1)?.label]).toEqual(['Mon 28', 'Sun 18'])
   })
 
   it('labels week numbers at month zoom, over whole months', () => {
     const { ticks } = layout(chart(OCTOBER_WEEK), opts({ zoom: 'month' }))
 
-    expect(ticks[0]?.key).toBe('2026-10-01')
-    expect(ticks.map((tick) => tick.label)).toEqual(['W40', 'W41', 'W42', 'W43', 'W44'])
+    expect(ticks[0]?.key).toBe('2026-09-01')
+    expect([ticks[0]?.label, ticks.at(-1)?.label]).toEqual(['W36', 'W49'])
   })
 
   it('labels month names at quarter zoom, over whole quarters', () => {
     const { ticks } = layout(chart(OCTOBER_WEEK), opts({ zoom: 'quarter' }))
 
-    expect(ticks.map((tick) => tick.label)).toEqual(['Oct', 'Nov', 'Dec'])
-    expect(ticks[0]?.key).toBe('2026-10-01')
+    expect(ticks.map((tick) => tick.label)).toEqual([
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+      'Jan',
+      'Feb',
+      'Mar',
+    ])
+    expect(ticks[0]?.key).toBe('2026-07-01')
   })
 
   it.each(['week', 'month', 'quarter'] as const)('tiles the whole axis at %s zoom', (zoom) => {
@@ -448,12 +651,14 @@ describe('layout ticks', () => {
   })
 
   it('still draws an axis for a chart where nothing is dated', () => {
-    // Import leaves a chart exactly like this, and the rows are still worth reading.
-    const { ticks, todayX } = layout(chart([node('a')]), opts({ zoom: 'week' }))
+    // Import leaves a chart exactly like this, and the rows are still worth
+    // reading. The axis now covers the ghost week as well as today, which is the
+    // point: the lane is drawn rather than left blank.
+    const { ticks, todayX, nothingDated } = layout(chart([node('a')]), opts({ zoom: 'week' }))
 
-    expect(ticks).toHaveLength(7)
-    expect(ticks[0]?.key).toBe('2026-10-05')
+    expect(ticks[0]?.key).toBe('2026-09-28')
     expect(todayX).not.toBeNull()
+    expect(nothingDated).toBe(true)
   })
 })
 

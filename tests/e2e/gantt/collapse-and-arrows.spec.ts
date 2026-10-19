@@ -2,6 +2,7 @@ import { expect, test } from '../fixtures/test'
 import {
   arrow,
   arrows,
+  bar,
   openDemoChart,
   row,
   rows,
@@ -15,11 +16,17 @@ import {
 //
 // An arrow whose endpoint is collapsed out of view **re-anchors** to the nearest
 // visible ancestor, and arrows landing on the same pair **merge with a count**
-// (ADR-0012 §10). Hiding the arrow was rejected: collapsing a lane would then
-// silently destroy information, so the chart could only be trusted fully
-// expanded, which defeats collapse. The fully collapsed chart is therefore a
-// PRD-level dependency graph — arguably the most useful view of all — and these
+// (ADR-0012 §10). Hiding the arrow *on collapse* was rejected: collapsing a lane
+// would then silently destroy information, so the chart could only be trusted
+// fully expanded, which defeats collapse. The fully collapsed chart is therefore
+// a PRD-level dependency graph — arguably the most useful view of all — and these
 // assertions are that claim, drawn.
+//
+// Every assertion below selects a lane first, because the chart draws **no**
+// arrows until one is selected (ADR-0012 §10's amendment). That is a different
+// rule from the rejected one and the two do not conflict: collapse never removes
+// a dependency from the graph, it restates it at a coarser altitude, and what a
+// selection changes is only which part of that graph is on screen right now.
 
 test.beforeEach(async ({ local, world }) => {
   // Both halves of the world this surface reads: the chart on disk, and the
@@ -32,6 +39,10 @@ test.beforeEach(async ({ local, world }) => {
 
 test('collapsing a lane hides its descendants and re-anchors their arrows', async ({ page }) => {
   await openDemoChart(page)
+  // Selected at the downstream end, so the re-anchoring happens to a lane the
+  // selection is not sitting on — the selection itself re-anchoring is its own
+  // test below.
+  await bar(page, 'invoice-rewrite').click()
   await expect(arrow(page, 'geo-142', 'invoice-rewrite')).toHaveCount(1)
 
   await row(page, 'pricing-api').getByRole('button', { name: 'Collapse Pricing API v2' }).click()
@@ -59,7 +70,8 @@ test('a fully collapsed chart is a PRD-level dependency graph, with merged arrow
   page,
 }) => {
   await openDemoChart(page)
-  await expect(arrows(page)).toHaveCount(6)
+  // Two: the cycle, which is never hidden. The other four wait to be asked for.
+  await expect(arrows(page)).toHaveCount(2)
 
   // One press folds every lane that has children, which from a fully expanded
   // chart is the whole decomposition at once.
@@ -72,6 +84,11 @@ test('a fully collapsed chart is a PRD-level dependency graph, with merged arrow
     'geo-200',
   ])
   await expect(rows(page)).toHaveCount(4)
+
+  // The PRD whose whole downstream the reader wants: `tier-migration` blocks
+  // `billing-cutover`, which is in a cycle with `legacy-sunset`, so one click
+  // lights the entire programme-level graph.
+  await bar(page, 'tier-migration').click()
 
   // Three dependencies from the tier-migration subtree into the billing-cutover
   // subtree — `geo-142 → invoice-rewrite`, `pricing-ui → dunning` and
@@ -101,7 +118,12 @@ test('a fully collapsed chart is a PRD-level dependency graph, with merged arrow
 
   await page.getByRole('button', { name: 'Expand all lanes' }).click()
   await expect(rows(page)).toHaveCount(16)
-  await expect(arrows(page)).toHaveCount(6)
+  // Back to two: the cycle, and nothing else. `tier-migration` is still the
+  // selected lane, but expanded it owns no dependency of its own — the three it
+  // summarised belong to `geo-142`, `pricing-ui` and `pricing-api`. That is
+  // "collapse summarises" read backwards, and it is why the PRD-level view is
+  // the useful one for a question about PRDs.
+  await expect(arrows(page)).toHaveCount(2)
 })
 
 test("collapse is the reader's own state, kept per chart across a reload", async ({ page }) => {

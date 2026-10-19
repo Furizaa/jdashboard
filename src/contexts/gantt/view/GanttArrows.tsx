@@ -7,8 +7,14 @@ import { ROW_HEIGHT } from './GanttRow'
 // The dependency arrows: one absolutely-positioned SVG over the bar region,
 // consuming `layout().arrows` and drawing nothing it did not compute.
 //
-// The re-anchoring, the merging and the self-loop drop all happened in the
-// view-model (ADR-0012 §10). What is left here is two decisions:
+// The re-anchoring, the merging, the self-loop drop and — since the first real
+// chart arrived with 54 edges over 30 lanes — **which arrows are drawn at all**
+// happened in the view-model (ADR-0012 §10). An arrow whose `focus` is `hidden`
+// is not rendered: the default chart draws none of them, selecting a lane draws
+// its whole waterfall, and a cycle edge is drawn either way because a plan that
+// cannot execute has to look impossible (§6).
+//
+// What is left here is two decisions:
 //
 //   - **Percentages for x, pixels for y.** Every segment is axis-aligned, and
 //     SVG resolves a percentage on `x1`/`x2` against the viewport — so an elbow
@@ -25,6 +31,7 @@ const BACKTRACK_GAP = 0.012
 
 const MARKER_ID = 'gantt-arrowhead'
 const CYCLE_MARKER_ID = 'gantt-arrowhead-cycle'
+const WATERFALL_MARKER_ID = 'gantt-arrowhead-waterfall'
 
 /**
  * The merge badge: a filled pill the size of the surface's other chips, held
@@ -57,10 +64,13 @@ export function GanttArrows({
       <defs>
         <Arrowhead id={MARKER_ID} className="fill-ink-tertiary" />
         <Arrowhead id={CYCLE_MARKER_ID} className="fill-destructive" />
+        <Arrowhead id={WATERFALL_MARKER_ID} className="fill-primary" />
       </defs>
-      {arrows.map((arrow) => (
-        <Arrow key={arrow.id} arrow={arrow} bars={bars} rowTops={rowTops} />
-      ))}
+      {arrows
+        .filter((arrow) => arrow.focus !== 'hidden')
+        .map((arrow) => (
+          <Arrow key={arrow.id} arrow={arrow} bars={bars} rowTops={rowTops} />
+        ))}
     </svg>
   )
 }
@@ -108,8 +118,20 @@ function Arrow({
   const startY = fromTop + ROW_HEIGHT / 2
   const endY = toTop + ROW_HEIGHT / 2
 
-  const stroke = arrow.inCycle ? 'stroke-destructive' : 'stroke-ink-tertiary'
-  const marker = arrow.inCycle ? CYCLE_MARKER_ID : MARKER_ID
+  // A waterfall arrow is the one the reader just asked for, so it gets the
+  // accent and a heavier stroke; a cycle arrow drawn without a selection is a
+  // standing warning rather than an answer, so it stays destructive-red.
+  const stroke = arrow.inCycle
+    ? 'stroke-destructive'
+    : arrow.focus === 'waterfall'
+      ? 'stroke-primary'
+      : 'stroke-ink-tertiary'
+  const marker = arrow.inCycle
+    ? CYCLE_MARKER_ID
+    : arrow.focus === 'waterfall'
+      ? WATERFALL_MARKER_ID
+      : MARKER_ID
+  const weight = arrow.focus === 'waterfall' ? 'stroke-[1.75]' : 'stroke-[1.25]'
 
   return (
     <g
@@ -118,6 +140,7 @@ function Arrow({
       data-to={arrow.to}
       data-count={arrow.count}
       data-cycle={arrow.inCycle}
+      data-focus={arrow.focus}
       style={{ pointerEvents: 'stroke' }}
     >
       <title>{describe(arrow)}</title>
@@ -126,7 +149,7 @@ function Arrow({
         y1={startY}
         x2={pct(elbowX)}
         y2={startY}
-        className={cn(stroke, 'stroke-[1.25]')}
+        className={cn(stroke, weight)}
         strokeDasharray={arrow.inCycle ? '3 3' : undefined}
       />
       <line
@@ -134,7 +157,7 @@ function Arrow({
         y1={startY}
         x2={pct(elbowX)}
         y2={endY}
-        className={cn(stroke, 'stroke-[1.25]')}
+        className={cn(stroke, weight)}
         strokeDasharray={arrow.inCycle ? '3 3' : undefined}
       />
       <line
@@ -142,7 +165,7 @@ function Arrow({
         y1={endY}
         x2={pct(endX)}
         y2={endY}
-        className={cn(stroke, 'stroke-[1.25]')}
+        className={cn(stroke, weight)}
         strokeDasharray={arrow.inCycle ? '3 3' : undefined}
         markerEnd={`url(#${marker})`}
       />
@@ -170,7 +193,13 @@ function MergeCount({ arrow, x, y }: { arrow: GanttArrow; x: number; y: number }
         width={width}
         height={BADGE_HEIGHT}
         rx={BADGE_HEIGHT / 2}
-        className={arrow.inCycle ? 'fill-destructive' : 'fill-ink-subtle'}
+        className={
+          arrow.inCycle
+            ? 'fill-destructive'
+            : arrow.focus === 'waterfall'
+              ? 'fill-primary'
+              : 'fill-ink-subtle'
+        }
       />
       {/* `dx` centres the text over the pill: the rect starts at `x`, so the
           anchor has to move half a pill's width to the right of it. */}

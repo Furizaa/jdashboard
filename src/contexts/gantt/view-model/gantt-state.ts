@@ -34,6 +34,17 @@ export type GanttState = {
    * has already been shown.
    */
   readonly revealed: string | null
+  /**
+   * The lane whose dependency waterfall the arrows are showing, or `null` for
+   * none — which is the default, and which draws **no** arrows at all bar the
+   * cycles (ADR-0012 §10's amendment).
+   *
+   * Not a preference, for the same reason `revealed` is not: `gantt-preference.ts`
+   * does not persist it. A selection is an answer to one question the reader
+   * asked a moment ago, and a chart that reopens with last week's waterfall lit
+   * up is asserting a focus nobody currently has.
+   */
+  readonly selected: string | null
 }
 
 export type GanttEvent =
@@ -59,6 +70,17 @@ export type GanttEvent =
       readonly nodeId: string
       readonly ancestorIds: readonly string[]
     }
+  /**
+   * Show this lane's waterfall, or clear it when it is already the selected one.
+   *
+   * Toggling rather than a separate clear verb: the control is the bar itself, so
+   * clicking the lit lane again is the gesture a reader reaches for, and a
+   * `selectionCleared` nothing on screen maps onto would be a second way to do
+   * the same thing.
+   */
+  | { readonly type: 'selectionToggled'; readonly nodeId: string }
+  /** Drop the waterfall without naming a lane — Escape, and the zoom buttons' reset. */
+  | { readonly type: 'selectionCleared' }
   /** A previous session's state, handed back by the presenter from `localStorage`. */
   | { readonly type: 'restored'; readonly state: GanttState }
 
@@ -101,6 +123,7 @@ export function initialGanttState(chart: GanttChart): GanttState {
     collapsed: new Set(),
     expandedInfo: new Set(),
     revealed: null,
+    selected: null,
   }
 }
 
@@ -150,6 +173,13 @@ export function reduce(state: GanttState, event: GanttEvent): GanttState {
         collapsed: without(state.collapsed, ancestorIds),
         revealed: nodeId,
       }))
+
+      .with({ type: 'selectionToggled' }, ({ nodeId }) => ({
+        ...state,
+        selected: state.selected === nodeId ? null : nodeId,
+      }))
+
+      .with({ type: 'selectionCleared' }, () => ({ ...state, selected: null }))
 
       .with({ type: 'restored' }, ({ state: restored }) => restored)
 

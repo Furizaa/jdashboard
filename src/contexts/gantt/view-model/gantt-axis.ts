@@ -1,4 +1,4 @@
-import type { GanttOpenSpan, GanttSpan } from '../domain'
+import { fromDay, toDay, type GanttOpenSpan, type GanttSpan } from '../domain'
 
 // The time dimension: the axis domain the chart's dated extent is padded out to,
 // the ticks along it, and where a span sits on it.
@@ -14,10 +14,21 @@ import type { GanttOpenSpan, GanttSpan } from '../domain'
 // as an argument — would make every layout fact depend on a ResizeObserver, so
 // the tests would need one and a resize would recompute the tree.
 //
+// The one pixel number here is `axisWidthOf`, and it is the *other* direction:
+// not a measurement taken from the DOM but a width handed **to** it, so the bar
+// region can be wider than the viewport and scroll. Fractions then resolve
+// against that element instead of against the window, and every position above
+// stays exactly as true as it was.
+//
 // Pure. No I/O, no clock, no framework: `today` is an argument everywhere it
 // appears.
 
 export type GanttZoom = 'week' | 'month' | 'quarter'
+
+// Re-exported rather than re-implemented: the axis is still where the rest of
+// the view-model reaches for a day number, and `domain/day.ts` is where it is
+// defined once.
+export { toDay } from '../domain'
 
 export type GanttTick = {
   /** The `YYYY-MM-DD` the tick starts at; stable across re-renders. */
@@ -33,9 +44,12 @@ export type GanttTick = {
 // ---------------------------------------------------------------------------
 //
 // Everything on the axis is day arithmetic, so a date becomes a number once and
-// a string again only for a tick key or a label. `Date` appears here and nowhere
-// else, UTC throughout: a chart date is a calendar day, and letting a local
-// timezone shift it would move a bar by a day for half the world.
+// a string again only for a tick key or a label. `toDay` / `fromDay` are
+// `domain/day.ts` — they moved there when ghost spans needed to *add* days, and
+// two copies of an epoch conversion is the one duplication that cannot be
+// allowed to drift. UTC throughout, here and there: a chart date is a calendar
+// day, and letting a local timezone shift it would move a bar by a day for half
+// the world. What is left below is axis-specific calendar maths.
 
 const MS_PER_DAY = 86_400_000
 const DAYS_PER_WEEK = 7
@@ -57,17 +71,6 @@ const MONTHS = [
   'Nov',
   'Dec',
 ] as const
-
-export function toDay(date: string): number {
-  const year = Number(date.slice(0, 4))
-  const month = Number(date.slice(5, 7))
-  const day = Number(date.slice(8, 10))
-  return Date.UTC(year, month - 1, day) / MS_PER_DAY
-}
-
-function fromDay(day: number): string {
-  return new Date(day * MS_PER_DAY).toISOString().slice(0, 10)
-}
 
 /** 0 = Sunday. Epoch day 0 was a Thursday, hence the `+ 4`. */
 function weekdayOf(day: number): number {
@@ -119,23 +122,80 @@ export type GanttAxis = {
 }
 
 /**
- * The chart's dated extent, **padded to whole units of the zoom**: whole weeks
- * at week zoom, whole months at month, whole quarters at quarter. A bar that
- * ends mid-week would otherwise leave the axis ending mid-label.
+ * How many pixels one day is worth at each zoom — and therefore how wide the bar
+ * region is, which is what makes zoom change *density* rather than only tick
+ * labels.
  *
- * A chart with nothing dated still gets an axis — the one unit containing today
- * — because the rows exist and the reader is going to look at them.
+ * Before this, the axis was always exactly as wide as the container: a chart
+ * holding one fourteen-week lane squeezed its other thirty lanes into a few
+ * pixels each and all three zooms drew the same unreadable picture. Fixing that
+ * means the axis has an intrinsic width and the chart scrolls horizontally.
+ *
+ * The three numbers are the narrowest at which each zoom's own tick stays
+ * legible: a `Mon 13` daily label, a `W42` over seven days, a month name over
+ * thirty. Picking them from the labels rather than from a target total width is
+ * the same discipline as the three fixed zooms themselves (ADR-0012 §10) — a
+ * number per level that can be read and argued with, not a density heuristic.
+ */
+export const DAY_WIDTH: Readonly<Record<GanttZoom, number>> = {
+  week: 36,
+  month: 12,
+  quarter: 4,
+}
+
+/**
+ * How much empty calendar to leave on each side of the plan, in **whole units of
+ * the zoom**.
+ *
+ * A chart that ends exactly where its last bar ends reads as a chart that has
+ * run out of room, and there is nowhere to scroll to look at the week after the
+ * programme finishes. One unit of padding is the smallest amount that says "time
+ * carries on past here" and the largest that does not make a short chart mostly
+ * empty.
+ */
+const PAD_UNITS = 1
+
+/**
+ * The chart's dated extent, **padded to whole units of the zoom** and then by
+ * one further unit on each side: whole weeks at week zoom, whole months at
+ * month, whole quarters at quarter. A bar that ends mid-week would otherwise
+ * leave the axis ending mid-label, and a plan ending at the axis edge leaves the
+ * reader nothing to scroll into.
+ *
+ * A chart with nothing dated still gets an axis — the unit containing today,
+ * padded the same way — because the rows exist and the reader is going to look
+ * at them.
  */
 export function axisFor(extent: GanttSpan | null, zoom: GanttZoom, anchor: number): GanttAxis {
   const from = extent === null ? anchor : toDay(extent.start)
   const to = extent === null ? anchor : toDay(extent.end)
   const [start, end] =
     zoom === 'week'
-      ? [from - mondayOffset(from), to - mondayOffset(to) + DAYS_PER_WEEK - 1]
+      ? [
+          from - mondayOffset(from) - PAD_UNITS * DAYS_PER_WEEK,
+          to - mondayOffset(to) + (PAD_UNITS + 1) * DAYS_PER_WEEK - 1,
+        ]
       : zoom === 'month'
-        ? [startOfMonth(from), startOfNextMonth(to) - 1]
-        : [startOfQuarter(from), startOfNextMonth(startOfQuarter(to), MONTHS_PER_QUARTER) - 1]
+        ? [
+            startOfNextMonth(startOfMonth(from), -PAD_UNITS),
+            startOfNextMonth(to, PAD_UNITS + 1) - 1,
+          ]
+        : [
+            startOfNextMonth(startOfQuarter(from), -PAD_UNITS * MONTHS_PER_QUARTER),
+            startOfNextMonth(startOfQuarter(to), (PAD_UNITS + 1) * MONTHS_PER_QUARTER) - 1,
+          ]
   return { start, end, days: end - start + 1 }
+}
+
+/**
+ * The bar region's width in pixels — the one number the view is *given* rather
+ * than measures, and the thing the horizontal scroll is sized by.
+ *
+ * Every other position on the chart stays a fraction, so this element is the
+ * only place pixels and days meet.
+ */
+export function axisWidthOf(axis: GanttAxis, zoom: GanttZoom): number {
+  return Math.round(axis.days * DAY_WIDTH[zoom])
 }
 
 /** The last day of the tick that starts on `day`, clipped to the axis. */

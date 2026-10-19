@@ -6,10 +6,11 @@ import { ArchiveChartDialog } from './ArchiveChartDialog'
 import { ChangelogPopover } from './ChangelogPopover'
 import { CopySkillButton } from './CopySkillButton'
 import { NeedsAttention } from './NeedsAttention'
+import { SelectionBanner } from './SelectionBanner'
 import { ZoomControls } from './ZoomControls'
 
-// The chart's own header strip: where it is, what needs attention, and the six
-// controls a reader has over it.
+// The chart's own header strip: where it is, what needs attention, whose
+// dependency waterfall is lit, and the six controls a reader has over it.
 //
 // Its own file because `GanttChartView.tsx` sits at the repo's fifteen-import
 // ceiling, and the header is the half of it that pulls in the other components.
@@ -40,6 +41,12 @@ export function ChartHeader({ api, onBack }: { api: ReadyApi; onBack: () => void
         {api.chart.title}
       </span>
       <NeedsAttention needs={api.layout.needsAttention} />
+      <SelectionBanner
+        nodeId={api.layout.selection}
+        title={api.titleOf(api.layout.selection ?? '')}
+        depth={api.layout.rows.filter((row) => row.inWaterfall).length}
+        onClear={api.clearSelection}
+      />
       <div className="ml-auto flex items-center gap-2">
         <CopySkillButton chartId={api.chartId} />
         <RefreshButton api={api} />

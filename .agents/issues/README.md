@@ -58,6 +58,7 @@ Tracer-bullet vertical slices derived from [the clashboard PRD](../prds/clashboa
 
 98 ─→ 100
 99
+101 ─→ 102
 ```
 
 ## Index
@@ -189,3 +190,5 @@ Tracer-bullet vertical slices derived from [the clashboard PRD](../prds/clashboa
 | 98  | [Dates from status history](./98-gantt-dates-from-status-history.md)                                   | AFK  | —          |
 | 99  | [Open-ended bars, and a chart that admits it has no dates](./99-gantt-open-ended-and-undated-chart.md) | AFK  | —          |
 | 100 | [The SKILL teaches an agent how to date a lane](./100-gantt-skill-teaches-dating.md)                   | AFK  | 98         |
+| 101 | [Three contract holes a blind agent run exposed](./101-gantt-contract-holes-from-the-blind-run.md)     | AFK  | —          |
+| 102 | [Eight SKILL gaps the blind run reported](./102-gantt-skill-gaps-from-the-blind-run.md)                | AFK  | 101        |

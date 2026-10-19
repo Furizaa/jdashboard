@@ -83,6 +83,7 @@ export const testIds = Object.freeze({
   navBoard: 'nav-board',
   navWatchlist: 'nav-watchlist',
   navExplain: 'nav-explain',
+  navGantt: 'nav-gantt',
   explainMrButton: 'explain-mr-button',
   explainSurface: 'explain-surface',
   explainTabStrip: 'explain-tab-strip',
@@ -143,6 +144,19 @@ export const testIds = Object.freeze({
   commandPaletteHelpKey: 'command-palette-help-key',
   boardFilterChip: 'board-filter-chip',
   boardFilterClear: 'board-filter-clear',
+  ganttSurface: 'gantt-surface',
+  ganttChartList: 'gantt-chart-list',
+  ganttChartRow: 'gantt-chart-row',
+  ganttRow: 'gantt-row',
+  ganttBar: 'gantt-bar',
+  ganttChildSpan: 'gantt-child-span',
+  ganttArrow: 'gantt-arrow',
+  ganttInfoToggle: 'gantt-info-toggle',
+  ganttInfoBand: 'gantt-info-band',
+  ganttNeedsAttention: 'gantt-needs-attention',
+  ganttCycleWarning: 'gantt-cycle-warning',
+  ganttZoom: 'gantt-zoom',
+  ganttChangelog: 'gantt-changelog',
 } as const)
 
 /** `data-card-kind` discriminator on `ticketCard`. */

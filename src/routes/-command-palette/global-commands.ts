@@ -101,10 +101,11 @@ export function globalCommands(context: GlobalCommandContext): readonly GlobalCo
   // then filter the board instead of switching to it. It is the fallback — "none
   // of the above, narrow the board instead" — so it belongs at the bottom.
   //
-  // Both are board-only: Explain has no card grid to narrow, so offering to
-  // filter it would be offering to do nothing.
+  // Both are board-only: Explain has no card grid to narrow and a Gantt chart is
+  // a tree of lanes, not a card grid, so offering to filter either would be
+  // offering to do nothing.
   const trimmed = context.query.trim()
-  if (context.variant === 'explain') return commands
+  if (context.variant === 'explain' || context.variant === 'gantt') return commands
   if (trimmed !== '' && trimmed !== context.filter) {
     commands.push({
       id: 'filter-board',

@@ -24,3 +24,23 @@ export type { GanttChangelogActor, GanttChangelogEntry } from '~/server/lib/gant
 // is also **read-only by design** (ADR-0012 §8), so a client module that could
 // reach a body schema would be holding a tool for a job it is not allowed to do.
 // The agent is the only writer, and it writes over HTTP.
+
+/**
+ * The read-time view of a chart: every node as stored, plus `hasBody` derived
+ * from the presence of `bodies/<id>.md` (ADR-0012 §11). The layout function
+ * takes a `GanttChart`, so a view is what the presenter holds and a chart is
+ * what it hands down.
+ */
+export type {
+  GanttBodyView,
+  GanttChartView,
+  GanttNodeView,
+} from '~/server/contexts/gantt/application/load-chart'
+
+/** The server-function result types, per the kernel rule. */
+export type {
+  GetGanttBodyResult,
+  GetGanttChangelogResult,
+  GetGanttChartResult,
+  ListGanttChartsResult,
+} from '~/server/server-functions/gantt'

@@ -25,6 +25,7 @@ export {
   type BrowserActions,
 } from './hooks'
 export { useExplainDiffs, useExplainRuns, useStartExplain, useCloseExplain } from './explain-hooks'
+export { useGanttBody, useGanttChangelog, useGanttChart, useGanttCharts } from './gantt-hooks'
 export type { CreateIssueSnapshot } from './coordinator'
 export { CreateIssueRejected, CreateIssueTimeout, type CreateIssueError } from './errors'
 export { useReviewCards } from '~/contexts/review'

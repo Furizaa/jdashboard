@@ -1,16 +1,18 @@
 import { Link } from '@tanstack/react-router'
-import { Eye, LayoutGrid, ScanSearch } from 'lucide-react'
+import { ChartGantt, Eye, LayoutGrid, ScanSearch } from 'lucide-react'
 import { cn } from '~/lib/cn'
 import { testIds } from '~/lib/testids'
 
 // The app shell's left-hand navigation between **surfaces**. Two of them are
-// boards and the third is not (ADR-0009 §1), which is why the rail is labelled
-// "Surfaces" rather than "Boards". Routes are the only place multiple contexts
-// are wired together, so the switcher lives here rather than inside any context.
+// boards and the other two are not (ADR-0009 §1, ADR-0012 §2), which is why the
+// rail is labelled "Surfaces" rather than "Boards". Routes are the only place
+// multiple contexts are wired together, so the switcher lives here rather than
+// inside any context.
 const ITEMS = [
   { to: '/', label: 'Board', icon: LayoutGrid, testId: testIds.navBoard },
   { to: '/watchlist', label: 'Watchlist', icon: Eye, testId: testIds.navWatchlist },
   { to: '/explain', label: 'Explain', icon: ScanSearch, testId: testIds.navExplain },
+  { to: '/gantt', label: 'Gantt', icon: ChartGantt, testId: testIds.navGantt },
 ] as const
 
 export function NavRail() {

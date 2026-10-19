@@ -36,10 +36,12 @@ export function Header({
 }) {
   // The watchlist board drops "New" (you don't create tickets you only advise on)
   // and "Only Workspace" (workspace focus is a main-board concern), and adds the
-  // lane-config control instead. Explain keeps only the global tools: refresh,
-  // the tag manager, and the two cross-cutting modals.
+  // lane-config control instead. Explain and Gantt — the two surfaces that are
+  // not boards — keep only the global tools: refresh, the tag manager, and the
+  // two cross-cutting modals. Gantt adds nothing of its own here: a chart is
+  // read-only and the agent is its only writer (ADR-0012 §8).
   const isWatchlist = variant === 'watchlist'
-  const isBoard = variant !== 'explain'
+  const isBoard = variant !== 'explain' && variant !== 'gantt'
   const refresh = useRefreshAll()
   const query = useBoardData()
 

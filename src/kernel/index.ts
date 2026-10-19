@@ -112,12 +112,19 @@ export {
   type ActionKind,
 } from './commands'
 export type {
+  GanttBodyView,
   GanttChangelogActor,
   GanttChangelogEntry,
   GanttChart,
   GanttChartSummary,
+  GanttChartView,
   GanttEdge,
   GanttEdgeSource,
   GanttNode,
   GanttNodeSource,
+  GanttNodeView,
+  GetGanttBodyResult,
+  GetGanttChangelogResult,
+  GetGanttChartResult,
+  ListGanttChartsResult,
 } from './gantt'

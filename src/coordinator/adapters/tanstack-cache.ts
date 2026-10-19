@@ -31,6 +31,15 @@ const KEY_EXPLAIN_TABS = ['explain-tabs'] as const
 // (ADR-0010 §6). Keyed per MR and shared by every move in that report, since the
 // moves are slices of the same file list.
 const KEY_EXPLAIN_DIFFS = (iid: number) => ['explain-diffs', iid] as const
+// The Gantt charts on disk. Four keys rather than one: a chart's skeleton, a
+// lane's markdown body and the chart's audit trail are read at different times
+// by different parts of the surface, and a body is only ever fetched once its
+// info band is opened (ADR-0012 §11).
+const KEY_GANTT_CHARTS = ['gantt', 'charts'] as const
+const KEY_GANTT_CHART = (chartId: string) => ['gantt', 'chart', chartId] as const
+const KEY_GANTT_BODY = (chartId: string, nodeId: string) =>
+  ['gantt', 'body', chartId, nodeId] as const
+const KEY_GANTT_CHANGELOG = (chartId: string) => ['gantt', 'changelog', chartId] as const
 
 export const DASHBOARD_QUERY_KEYS = {
   board: KEY_BOARD,
@@ -47,6 +56,10 @@ export const DASHBOARD_QUERY_KEYS = {
   changelog: KEY_CHANGELOG,
   explainTabs: KEY_EXPLAIN_TABS,
   explainDiffs: KEY_EXPLAIN_DIFFS,
+  ganttCharts: KEY_GANTT_CHARTS,
+  ganttChart: KEY_GANTT_CHART,
+  ganttBody: KEY_GANTT_BODY,
+  ganttChangelog: KEY_GANTT_CHANGELOG,
 } as const
 
 export const DASHBOARD_STALE_TIMES = {
@@ -71,6 +84,15 @@ export const DASHBOARD_STALE_TIMES = {
   // expander names the commit it is showing — so a stale read is visible rather
   // than misleading. The fetch is also only ever triggered by a click.
   explainDiffs: 120_000,
+  // The app's ordinary stale-while-revalidate figure, and **no interval** on any
+  // of the four. A chart changes when an agent writes to it, which is a few
+  // times an hour at most; polling local JSON on a timer would be a disk read
+  // per open chart per tick for data the Refresh button already covers
+  // (ADR-0012 §5, which rejects interval polling for sync on the same grounds).
+  ganttCharts: 30_000,
+  ganttChart: 30_000,
+  ganttBody: 30_000,
+  ganttChangelog: 30_000,
 } as const
 
 export function createTanstackCacheAdapter(queryClient: QueryClient): Cache {

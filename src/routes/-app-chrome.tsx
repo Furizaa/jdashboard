@@ -13,8 +13,14 @@ import { NavRail } from './-nav/NavRail'
  * `'explain'` is not a board: no columns, no card grid, no detail panel, no text
  * filter. So the header shows only the global tools, and every board-only
  * control falls away rather than growing a dead `explain` arm.
+ *
+ * `'gantt'` is the fourth surface and takes exactly the shape `'explain'` takes
+ * — ADR-0012 §2 declines the pathless layout route for the second time, and the
+ * price of that is one more arm here and **no new props** (ADR-0012, "Surfaces
+ * and routing"). A chart is read-only, so there is nothing to filter and nothing
+ * to create.
  */
-export type ShellVariant = 'main' | 'watchlist' | 'explain'
+export type ShellVariant = 'main' | 'watchlist' | 'explain' | 'gantt'
 
 /**
  * The four board controls the chrome passes through to the header and the

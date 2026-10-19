@@ -1,6 +1,6 @@
 # clashboard issues
 
-Tracer-bullet vertical slices derived from [the clashboard PRD](../prds/clashboard.md), [the GitLab MR status PRD](../prds/gitlab-mr-status.md), [the misc improvements PRD](../prds/misc-improvements.md), [the Quick Create PRD](../prds/quick-create.md), [the GitLab MR review cards PRD](../prds/gitlab-mr-review-cards.md), [the e2e harness PRD](../prds/e2e-harness.md), [the clean architecture refactor PRD](../prds/clean-architecture-refactor.md), [the Effect server refactor PRD](../prds/effect-server-refactor.md), [the ADF rendering extensions PRD](../prds/adf-rendering-extensions.md), and [the Command Palette PRD](../prds/command-palette.md). Each slice cuts through all layers (server function → query hook → UI → tests where applicable) and is demoable on its own.
+Tracer-bullet vertical slices derived from [the clashboard PRD](../prds/clashboard.md), [the GitLab MR status PRD](../prds/gitlab-mr-status.md), [the misc improvements PRD](../prds/misc-improvements.md), [the Quick Create PRD](../prds/quick-create.md), [the GitLab MR review cards PRD](../prds/gitlab-mr-review-cards.md), [the e2e harness PRD](../prds/e2e-harness.md), [the clean architecture refactor PRD](../prds/clean-architecture-refactor.md), [the Effect server refactor PRD](../prds/effect-server-refactor.md), [the ADF rendering extensions PRD](../prds/adf-rendering-extensions.md), [the Command Palette PRD](../prds/command-palette.md), and [the Gantt View PRD](../prds/gantt-view.md). Each slice cuts through all layers (server function → query hook → UI → tests where applicable) and is demoable on its own.
 
 ## Order & dependencies
 
@@ -51,6 +51,10 @@ Tracer-bullet vertical slices derived from [the clashboard PRD](../prds/clashboa
 
 84 → 85 → 86 ─┬─→ 87 ─┬─→ 89
               └─→ 88 ─┘
+
+90 ─┬─→ 91 ─→ 92 ─→ 96 ─┐
+    └─→ 93 ─┬─→ 94      ├─→ 97
+            └─→ 95 ─────┘
 ```
 
 ## Index
@@ -166,3 +170,16 @@ Tracer-bullet vertical slices derived from [the clashboard PRD](../prds/clashboa
 | 87  | [Sub-lists: status transitions and tags](./87-palette-nested-sublists.md)         | AFK  | 86         |
 | 88  | [Hand-offs and global commands](./88-palette-handoffs-global-commands.md)         | AFK  | 86         |
 | 89  | [Documentation refresh and e2e coverage](./89-palette-docs-and-e2e.md)            | HITL | 87, 88     |
+
+### The Gantt View (PRD: [gantt-view.md](../prds/gantt-view.md))
+
+| #   | File                                                                 | Type | Blocked by |
+| --- | -------------------------------------------------------------------- | ---- | ---------- |
+| 90  | [The chart contract and its store](./90-gantt-contract-and-store.md) | AFK  | —          |
+| 91  | [The layout function](./91-gantt-layout-function.md)                 | AFK  | 90         |
+| 92  | [The surface, read-only](./92-gantt-surface-read-only.md)            | HITL | 91         |
+| 93  | [The write surface](./93-gantt-write-surface.md)                     | AFK  | 90         |
+| 94  | [The SKILL and the copy button](./94-gantt-skill-and-copy-button.md) | AFK  | 93         |
+| 95  | [Jira bootstrap and sync](./95-gantt-jira-bootstrap-and-sync.md)     | AFK  | 93         |
+| 96  | [Hand-offs and archive](./96-gantt-handoffs-and-archive.md)          | AFK  | 92, 95     |
+| 97  | [Documentation and e2e](./97-gantt-docs-and-e2e.md)                  | HITL | 94, 96     |

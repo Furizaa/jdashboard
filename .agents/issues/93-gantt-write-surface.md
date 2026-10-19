@@ -1,0 +1,45 @@
+# 93 — The write surface
+
+**Type:** AFK
+
+## Parent
+
+[The Gantt View PRD](../prds/gantt-view.md) · [ADR-0012 §7, §8, §9, §11](../../docs/adr/0012-gantt-charts-as-a-system-of-record.md)
+
+## What to build
+
+The REST API agents drive, the serialised write queue behind it, and the application service both this layer and the UI's server functions call.
+
+- **`src/server/lib/gantt-writes.ts`** — new. Plain dependency-injected module. A **per-chart promise chain** so every read-modify-write of one chart is atomic, with the changelog entry appended inside the critical section. `withChartLock(chartId, fn)` is the whole mechanism; it must serialise concurrent calls for the same chart and must **not** serialise calls for different charts. Unit-tested by interleaving two slow writes and asserting neither loses the other's change.
+- **`src/server/contexts/gantt/errors.ts`** — `ChartNotFound`, `NodeNotFound`, `EdgeNotFound`, `DuplicateNodeId`, `InvalidChartPayload` (carrying `issues`), `MirroredFieldPatch`, following the `Schema.TaggedError` shape in `server/contexts/watchlist/errors.ts`.
+- **`src/server/contexts/gantt/application/mutate-chart.ts`** — the use-cases: `createChart`, `patchChart` (title and `jiraSources` only), `createNode`, `patchNode`, `deleteNode`, `putBody`, `createEdge`, `deleteEdge`. Each one runs inside `withChartLock` and appends one changelog entry describing what it did.
+  - `createNode` rejects a duplicate id with `DuplicateNodeId`, and rejects a `parentId` naming a node that does not exist with `NodeNotFound`.
+  - `patchNode` rejects a patch touching a **mirrored field** (`title`, `column`, `status`, `assignee`) on a node whose `source.kind` is `'jira'` with `MirroredFieldPatch` — this is the source-dependent half slice 90 left as `TODO(93)`.
+  - `deleteNode` **reparents** its children to its own parent rather than orphaning or cascading, and removes every edge touching it. Deleting a node deletes its body and its `.prev`.
+  - `createEdge` accepts an edge that creates a cycle (ADR-0012 §6 — the API never refuses to record a declared dependency) and rejects an edge naming a node that does not exist.
+  - `putBody` goes through `writeBody`, so the `.prev` snapshot happens.
+- **`src/server/contexts/gantt/application/load-chart.ts`** — the read use-case shared with slice 92's server functions. If slice 92 inlined the read into its server function, move it here and have the server function call it; both call sites import from `application/` per ADR-0006's own rule.
+- **`src/routes/api/-gantt-http.ts`** — new, non-route (the `-` prefix excludes it from route discovery). The shared plumbing: JSON body decode, schema decode producing `{ error, message, issues }`, the tagged-error → status map, and the `Response` constructors. **Must not import `src/server/wire/` or `src/server/server-functions/`** — the ADR-0006 rules forbid it and `pnpm depcruise` will say so.
+- **The nine route files** listed in the PRD's REST table, under `src/routes/api/`. Each is thin: read params, decode the body, call the application service through `appRuntime.runPromise`, map the result. Read `src/routes/api/jira-media.$id.ts` and `src/routes/api/explain.$runId.stream.ts` first and match their shape.
+- **Status mapping**, asserted per code: `400` charset or schema (body carries `issues[]`), `404` unknown chart / node / edge, `409` duplicate node id, `422` mirrored-field patch, `500` defect. `503` is reserved for slice 95's sync.
+- **`.dependency-cruiser.cjs`** — extend the existing `routes/api` rules to cover the new files; add nothing that weakens them.
+
+## Acceptance criteria
+
+- [ ] `withChartLock` serialises two concurrent writes to one chart (neither change is lost) and runs two writes to different charts concurrently — both asserted by test.
+- [ ] Every mutation appends exactly one changelog entry, inside the lock, naming the actor and what changed.
+- [ ] `POST /charts` with a duplicate chart id returns `409`; with a bad id returns `400` carrying `issues[]`.
+- [ ] `POST /nodes` with a duplicate node id returns `409`; with an unknown `parentId` returns `404`; with `start: "next week"` returns `400` whose body names `start` with its `expected` and `received`.
+- [ ] `PATCH /nodes/:id` setting `title` on a `jira`-sourced node returns `422`; setting `start` on the same node succeeds.
+- [ ] `DELETE /nodes/:id` reparents the node's children to its parent, removes every edge touching it, and deletes its body and `.prev`.
+- [ ] `PUT /body` writes the markdown and snapshots the predecessor to `.md.prev`.
+- [ ] `POST /edges` creating a cycle **succeeds** (`201`), and `POST /edges` naming a missing node returns `404`.
+- [ ] **A test asserts there is no route handling `DELETE /api/gantt/charts/:chartId`** — an endpoint never written is indistinguishable from one deleted by accident.
+- [ ] Route-handler unit tests cover one case per status code, following the ADR-0006 precedent in `src/routes/api/-explain-stream.test.ts`.
+- [ ] Error bodies are JSON on every failure path — no plain-text body on a gantt route.
+- [ ] `pnpm depcruise` passes; `routes/api/-gantt-http.ts` imports neither `server/wire` nor `server/server-functions`.
+- [ ] `pnpm typecheck`, `pnpm lint`, `pnpm test` pass.
+
+## Blocked by
+
+- [90 — The chart contract and its store](./90-gantt-contract-and-store.md)

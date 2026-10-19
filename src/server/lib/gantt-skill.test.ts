@@ -403,3 +403,102 @@ describe('the gantt skill', () => {
     expect(skill).toMatch(/\ndescription: .+\n/u)
   })
 })
+
+// ---------------------------------------------------------------------------
+// The eight gaps a blind run reported
+// ---------------------------------------------------------------------------
+//
+// An agent handed nothing but this document and an epic key built a real chart
+// and then reported, item by item, what it had to guess at. Not one of the eight
+// was a field the schema names, so every test above passed throughout — which is
+// exactly why these claims are pinned literally. A claim that lives only in prose
+// is a claim a later rewrite can drop with nothing going red.
+//
+// Several are pinned **to their section** rather than to the file, because the
+// gap was never that the fact was unsayable. It was that the fact was not where
+// the agent was reading at the moment it needed it: an agent that trusts "one
+// mirrored node per discovered ticket" reaches "declare the arrows" believing the
+// chart has none, and then declares fifty-three of them.
+
+/** One `##`/`###` section, heading included, up to the next heading of either level. */
+function section(heading: string): string {
+  const from = skill.indexOf(heading)
+  expect(from, `the skill has no "${heading}" section`).toBeGreaterThan(-1)
+  const rest = skill.slice(from + heading.length)
+  const next = rest.search(/\n#{2,3} /u)
+  return next === -1 ? rest : rest.slice(0, next)
+}
+
+describe('the gantt skill, after the blind run', () => {
+  it('says where a chart is created that bootstrap mirrors the Jira links as edges', () => {
+    const create = section('### Create a chart')
+    expect(create).toContain('`jira` edge for every `blocks` link')
+    expect(create).toContain('**53 edges already on it**')
+    expect(create).toContain('**So the chart has arrows before you write one.**')
+    // And that Jira's parent, on the single-epic case this document describes,
+    // suggests nothing: the parent is the epic and the epic is not a lane.
+    expect(create).toContain('**every lane arrives at the root**')
+  })
+
+  it('says what sync then does to those mirrored edges, and what it will not touch', () => {
+    const sync = section('### Refresh the mirrored half')
+    expect(sync).toContain('**promoted**')
+    expect(sync).toContain("both of its endpoints' keys came back in that same search")
+    expect(sync).toContain('**A `local` edge is never removed by sync**')
+  })
+
+  it('scopes the blocker rule to forward scheduling and says the observed date wins', () => {
+    // Six arrows on the finished chart violate the rule, all between history-dated
+    // Done lanes and all correct. Read as an invariant it licenses an agent to
+    // overwrite a measurement, which on a system of record is the worst outcome
+    // available — so the scope and the precedence are both asserted.
+    const dating = section('### 4. Dating work that has not started')
+    expect(dating).toContain(
+      'It is not an invariant of the chart, and you must not apply it backwards.',
+    )
+    expect(dating).toContain(
+      '**Where an observed date and an arrow disagree, the observed date wins.**',
+    )
+  })
+
+  it('gives a rule for a forecast end that lands in the past, and names what it cannot see', () => {
+    // `/dates` reads first-out-of-TO-DO and first-into-Done and nothing else, so
+    // for a ticket in review the remaining effort is unobservable from the only
+    // source this document endorses — which is where three of the run's four
+    // forecasts came from.
+    const forecast = section('### 3. Forecasting an end for work in flight')
+    expect(forecast).toContain('**unobservable**')
+    expect(forecast).toContain(
+      '**And when `start` plus the effort lands before today, do not write it.**',
+    )
+    expect(forecast).toContain('from today forward')
+  })
+
+  it('replaces the stale worked example with the cross-epic blocker it should have had', () => {
+    // The old example told the agent to declare `hdr-20933 → hdr-20945`, which
+    // bootstrap has already created — so following it literally now earns the
+    // `409` the edges section describes.
+    expect(skill).not.toContain('HDR-20945')
+    const gate = section('### A blocker that lives in another epic')
+    expect(gate).toContain('{ "kind": "jira", "key": "HDR-19244" }')
+    expect(gate).toContain('**this lane is never orphaned**')
+    expect(gate).toContain('hand-copied')
+  })
+
+  it('says where the estimates were and that acli hands back ADF rather than text', () => {
+    const duration = section('### 5. Duration, and where the estimates actually are')
+    expect(duration).toContain(
+      "**Read the epic's own description before you reach for a ticket field.**",
+    )
+    expect(duration).toContain('**ADF**')
+  })
+
+  it('closes the three smaller gaps the run also found', () => {
+    // A parent's own `column` is not rendered (`GanttBar` tones only leaves); a
+    // parent window with no baseline at all has only one honest value; and
+    // `snapshotted: false` was documented nowhere, only `true`.
+    expect(skill).toContain('**a lane with children does not render its own**')
+    expect(skill).toContain('**When there is no baseline at all**')
+    expect(skill).toContain('`snapshotted: false` means there was no previous body to keep')
+  })
+})

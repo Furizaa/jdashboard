@@ -85,10 +85,10 @@ Nodes arrive flat and you build the tree yourself from `parentId`. Depth is unbo
 - **`title`** — one line, 1–300 characters, and it is **trimmed**, so a title of only whitespace is rejected.
 - **`source`** — `{ "kind": "local" }` for a lane you author, or `{ "kind": "jira", "key": "GEO-134" }` for one that mirrors a ticket. It decides which half of the node you own; see "Mirrored fields" below. You cannot change it after the node exists: a different source is a different node.
 - **`start`** / **`end`** — `YYYY-MM-DD` or `null`. Chart-owned on every node, whatever its source. clashboard reads no dates from Jira and writes none back. Where each one comes from is **"How to date a lane"** below; the format is the easy half.
-- **`column`** — the progress column, one of `"TO DO"`, `"In Implementation"`, `"In Code Review"`, `"Done"`. Note the casing: `"TO DO"` is upper-case and the other three are not. For a jira node it is derived from the ticket's status; for a local one you declare it.
+- **`column`** — the progress column, one of `"TO DO"`, `"In Implementation"`, `"In Code Review"`, `"Done"`. Note the casing: `"TO DO"` is upper-case and the other three are not. For a jira node it is derived from the ticket's status; for a local one you declare it. It is not nullable — `POST /nodes` defaults it to `"TO DO"` — so every lane carries one whether or not you thought about it, and **a lane with children does not render its own**. The chart tones only leaves; a parent draws the distribution of its leaf descendants instead ("7 of 11 done"). So the `column` on a PRD lane is stored, is never drawn, and is not worth agonising over: declare the one that reads best beside the others and spend the minute on a date instead.
 - **`status`** — the real status name behind the column (`"In STG"`, `"Reviewed"`), or `null`. Mirrored on a jira node; usually `null` on a local one.
 - **`assignee`** — a display name, or `null`. Mirrored on a jira node.
-- **`discovered`** — `true` once a discovery search over the chart's `jiraSources` has returned this node's key. Set by sync, never by you, and absent from every request body. It is **not** "is in the epic" — that is what `orphaned` answers — it is "was this key ever in scope at all", and it is sticky: once true it stays true. A jira node you create yourself with `POST /nodes` starts `false`, which is how you model **a blocker that lives in a different epic**: sync still mirrors its title, status and assignee, because it is a real ticket, and it is never marked `orphaned`, because no search it was absent from ever had it in scope. Create the real jira node; do not hand-copy a ticket's status into a local lane, which goes stale the moment it is written.
+- **`discovered`** — `true` once a discovery search over the chart's `jiraSources` has returned this node's key. Set by sync, never by you, and absent from every request body. It is **not** "is in the epic" — that is what `orphaned` answers — it is "was this key ever in scope at all", and it is sticky: once true it stays true. A jira node you create yourself with `POST /nodes` starts `false`, and that is what makes **"A blocker that lives in another epic"** below possible at all.
 - **`orphaned`** — `true` when sync found that this node's Jira key has left the epic. Set by sync, never by you, and absent from every request body. Only a node whose `discovered` is `true` can ever be marked: a key that was never in a search cannot be reported as having departed. A departed ticket is **marked, not removed**, because it may carry local children, a body, arrows and dates.
 
 There is no `blocked` field and no percent. Blocked is derived from the arrows at read time, so it cannot go stale when the blocker ships, and a parent lane summarises its descendants as a distribution ("7 of 11 done") rather than as one averaged state.
@@ -165,17 +165,27 @@ On that chart it was 4, 4 and 5. All three are judgement, which is precisely why
 
 Take the `start` the seed gave you, add the remaining effort you can justify, and **say in the lane's body where the number came from**.
 
+**Be straight about what you cannot see.** `POST …/dates` reads two transitions and only two: the first one out of the `TO DO` column and the first one into `Done`. Nothing in it — and nothing in any source this document endorses — measures how long a ticket has sat in code review or how much of it is left. For a lane in `"In Code Review"` the remaining effort is therefore **unobservable**, and that is precisely where an agent fabricates: three of the four forecasts on the first real chart rested on a number nobody had. Put the assumption in the body as an assumption — "in review since the 12th; remaining effort not observable, assumed two days" — rather than converting it into a date and letting the bar assert it as a fact.
+
+**And when `start` plus the effort lands before today, do not write it.** An `end` in the past on a lane that is not `Done` is a bar claiming the work finished, contradicted by the column beside it; it is also the arithmetic telling you the estimate has already been spent, which is a result and not a rounding error. There are two honest moves and no third: leave `end` null, or forecast **from today forward** — today plus whatever you can justify is left — and say in the body that the original estimate was exceeded. Prefer the first whenever nothing bounds the remainder, which for a lane in review is most of the time.
+
 If you cannot justify one, **leave `end` null**. A lane with a start and no end draws as an **open-ended bar** that fades out instead of stopping, and what it says is true: this began on a known day and nobody has forecast a finish. That is a legitimate outcome and not a gap in your work. An invented end is a confident wrong date a reader has no way to tell from a real one, and it is the one mistake here that cannot be spotted from the chart.
 
 ### 4. Dating work that has not started
 
-Schedule it from the dependency graph **the chart already holds**. A lane starts no earlier than the latest `end` of everything with a `blocks` edge into it, so: `GET` the chart, read its `edges`, and work forward from the lanes history has already dated. Do not go back to Jira for this — the arrows are on the chart, and the read is cheap because no bodies travel with it.
+Schedule it from the dependency graph **the chart already holds**. A lane you are placing starts no earlier than the latest `end` of everything with a `blocks` edge into it, so: `GET` the chart, read its `edges`, and work forward from the lanes history has already dated. Do not go back to Jira for this — the arrows are on the chart, and the read is cheap because no bodies travel with it.
 
-Where a ticket states its own sequencing in prose, that is a dependency too and it belongs on the chart as an arrow. HDR-20945 says "Start this ticket after the full PRD of HDR-20708 is implemented and released" — declare that edge, so the next reader sees an arrow rather than having to re-read the ticket to work out why the bar sits where it does.
+**That is a rule for scheduling forward. It is not an invariant of the chart, and you must not apply it backwards.** A date that came from history is a _measurement_, and real work overlaps its blockers constantly: on the chart this section was written from, six arrows run out of a lane that ended later into a lane that started earlier — every one of them between two finished lanes, and every one of them correct, because the epic itself says the component tickets could start on the foundation ticket's branch as soon as the types were stable and before it merged. **Where an observed date and an arrow disagree, the observed date wins.** The arrow is still right too; the dependency was real. Leave both alone. An agent that "tidied" those dates to satisfy the arrows would have replaced the record of a project with an idealisation of it, in the one place the record is kept.
 
-### 5. Duration
+Where a ticket states its own sequencing in prose, that is a dependency too and it belongs on the chart as an arrow — and the ones worth hunting are the ones Jira has no link for. On the epic this document keeps citing, all 53 mirrored links reconciled exactly with the blocked-by column of the epic's own table, so re-reading the child tickets for dependencies _between_ them found nothing at all. The dependency that genuinely was missing pointed **out of the epic**: the epic's sources-of-truth table names `HDR-19244`, the backend API contract, as the thing its release waits on, and no issue link anywhere says so. That is the arrow worth your time, and **"A blocker that lives in another epic"** below is how to put it on the chart.
 
-Use the estimate the ticket carries, if it carries one. If it does not, pick a default, **apply it consistently, and record it in the body of every lane you applied it to** — "no estimate on this ticket; assumed two weeks" is one line.
+### 5. Duration, and where the estimates actually are
+
+**Read the epic's own description before you reach for a ticket field.** On the chart this document was written from, not one of the 29 tickets carried an estimate of any kind — and the epic's description carried all of them, as a markdown table with a day figure per ticket, beside the grouping the lanes ended up using and the entire blocked-by matrix. The epic key is sitting in the chart's `jiraSources` and nothing else here tells you to open it. Open it first: it is frequently the only place the plan is written down at all.
+
+Two things about reading it. `acli jira workitem view HDR-20708 --json` returns the description as **ADF** — a nested `{ type, content }` document, not text — so you have to walk that tree to get the table out, and writing the walker comes before reading the one document that mattered. And that call hands back a handful of fields only (summary, status, assignee, issuetype, description): no estimate field comes back at all, and asking a search for one is refused outright. So "this ticket carries no estimate" is not something `acli` can tell you; it is something you find out by reading the epic.
+
+Use the estimate you found, wherever you found it. If there is none anywhere, pick a default, **apply it consistently, and record it in the body of every lane you applied it to** — "no estimate on this ticket; assumed two weeks" is one line.
 
 A stated assumption is something a human can correct in a sentence. An unstated one is something they have to reverse-engineer from the bar widths, and mostly they will not try.
 
@@ -184,6 +194,8 @@ A stated assumption is something a human can correct in a sentence. An unstated 
 The lanes you authored need dates as much as the mirrored ones, and on the real chart they were the five that got missed: dated nowhere while their Jira children were dated from history, so each parent drew the thin derived underlay and no bar of its own.
 
 A parent carries its **own declared span** on purpose. That is what lets "this PRD is Q4" exist before the PRD has been decomposed, and it is what makes the child-span underlay mean anything at all — an overrun is only visible when there is a declared window to overrun. So declare the window you actually mean, and let the underlay disagree with it if the children have slipped. The disagreement is the chart doing its job.
+
+**When there is no baseline at all** — no sprint, no due date, nothing anybody committed to — the only window you can honestly declare is the span your dated children already imply, so declare that, and say in the body that it is derived rather than agreed. The underlay then matches the bar exactly and tells a reader nothing on the day you write it, which is the correct amount: it starts meaning something the moment a child runs past it, and a parent with no bar at all would never mean anything. What you must not do is invent a rounder window — "Q4" over children that end in mid-November — because an overrun measured against a window nobody agreed to is a false negative that looks like reassurance.
 
 ### 7. Never leave a chart silently undated
 
@@ -241,7 +253,13 @@ curl -s -X POST {{BASE_URL}}/api/gantt/charts \
   -d '{"id":"tier-migration-plan","title":"Tier migration","jiraSources":["GEO-120"]}'
 ```
 
-`201` with the whole new chart. `jiraSources` may be omitted and defaults to `[]`; naming epics there makes the server **bootstrap** the chart — one mirrored node per discovered ticket, flat and undated, placed by Jira's parent as a one-time suggestion. That is deliberate: forty round-trips to create forty nodes you did not read is worse than one call, and what is left for you is the part that needs judgement — grouping, dating, the arrows Jira does not have, the bodies. `409 DuplicateChartId` if the id is taken.
+`201` with the whole new chart, in the shape a chart read has, `hasBody` included. `jiraSources` may be omitted and defaults to `[]`; naming epics there makes the server **bootstrap** the chart, and bootstrap fills in **two** things rather than one: one mirrored node per discovered ticket, flat and undated — and **one `jira` edge for every `blocks` link between two of those tickets**.
+
+That second half is the one an agent reading the node count never notices. The first real chart came back with 29 lanes and **53 edges already on it**, every one mirrored from `issuelinks`, before anybody had declared a thing. A whole epic's links arrive in the same search as its tickets, so mirroring them costs nothing, and leaving them out would make you re-declare by hand a graph Jira already has. **So the chart has arrows before you write one.** Read its `edges` before you declare a dependency and expect most of what the epic's blocked-by column states to be there already; a pair that is there answers `409` naming the incumbent, which means "already declared", not "retry under another id".
+
+What bootstrap does **not** do is group. Jira's parent is read once, as a suggestion, and on the single-epic case this document is written for it suggests nothing at all: every discovered ticket's parent is the epic, the epic is not a lane, and so **every lane arrives at the root** — all 29 of them. (It places a child only where that child's Jira parent is itself a discovered ticket: a sub-task under a discovered story, or a second `jiraSources` entry that is a child of the first.) Grouping is yours and it is step 4 of "How to work".
+
+Creating the nodes yourself instead was rejected deliberately: forty round-trips to create forty nodes you did not read is worse than one call, and what is left for you is the part that needs judgement — grouping, dating, the arrows Jira does not have, the bodies. `409 DuplicateChartId` if the id is taken.
 
 ### Rename a chart, or change its epics
 
@@ -262,6 +280,8 @@ curl -s -X POST {{BASE_URL}}/api/gantt/charts/{{CHART_ID}}/sync
 `200` with the whole synced chart. No request body: the epic keys are already on the chart. Call this before reading if you want current Jira state — a `GET` never syncs, so a cheap id lookup never costs a Jira round-trip.
 
 Sync **refreshes** mirrored fields, **adds** newly discovered keys as flat undated nodes, and **marks** departures `orphaned`. It never moves a node, never deletes one, and never touches a date. `503 JiraUnreachable` means Jira did not answer and the chart was left byte-identical; try later.
+
+It reconciles the **mirrored** arrows too, and only those. A `blocks` link that has appeared since the last sync arrives as a new `jira` edge. A `local` edge whose pair Jira now reports as a real link is **promoted** to `jira` rather than drawn a second time. And a `jira` edge whose link has gone is removed **only when both of its endpoints' keys came back in that same search** — a link that vanished between a ticket in the epic and one outside it is absence of evidence rather than evidence of absence. **A `local` edge is never removed by sync**, which is what makes the dependency you declared yours rather than Jira's to withdraw.
 
 ### Add a lane
 
@@ -285,6 +305,14 @@ curl -s -X POST {{BASE_URL}}/api/gantt/charts/{{CHART_ID}}/nodes \
 `201` with the created node. Only `id` and `title` are required; everything else defaults to the values shown (`parentId: null`, `order: 0`, a `local` source, no dates, `"TO DO"`, no status, no assignee). `orphaned` is not accepted — it is a fact sync observes, not a claim you make.
 
 `409 DuplicateNodeId` if the id is taken. `404 NodeNotFound` if `parentId` names a lane that is not in the chart.
+
+### A blocker that lives in another epic
+
+A front-end epic usually waits on a gate that is not in it: a backend contract, a platform upgrade, another team's release. Model it as **the real ticket** — a node whose `source` is `{ "kind": "jira", "key": "HDR-19244" }`, id `hdr-19244`, parented wherever the waiting happens — and then declare the edge from it into whatever it gates, exactly as you would between two lanes inside the epic.
+
+What makes that safe is `discovered`. The node starts `false`, because no discovery search over this chart's `jiraSources` ever returned its key, and sync marks a node `orphaned` only on the strength of a search it was absent from — so **this lane is never orphaned**, however often you sync. It is still a real ticket, so sync keeps its `title`, `column`, `status` and `assignee` current by reading it **by key**; that read is not a search, so it adds no lanes, carries no links and never flips `discovered`. If a real Jira link to it turns up later, the next sync mirrors it and promotes your local edge over the same pair rather than doubling it.
+
+The substitute an agent reaches for when it does not know this — a `local` lane with the key in its title and the ticket's status hand-copied into `status` — is wrong in the way nobody notices: correct on the day it is written and stale forever after, with no sync that will ever fix it or say that it needs fixing.
 
 ### Move, date or retitle a lane
 
@@ -310,7 +338,7 @@ curl -s -X PUT {{BASE_URL}}/api/gantt/charts/{{CHART_ID}}/nodes/tier-migration/b
 
 **Error bodies on this route are still JSON**, like everywhere else. Only the success payloads are markdown.
 
-`snapshotted: true` means a previous body was kept as `bodies/<nodeId>.md.prev`. That is **one** level of undo, and it is the user's safety net for the only content in the chart that is genuinely irreplaceable. Read before you overwrite:
+`snapshotted: true` means a previous body was kept as `bodies/<nodeId>.md.prev`. That is **one** level of undo, and it is the user's safety net for the only content in the chart that is genuinely irreplaceable. `snapshotted: false` means there was no previous body to keep, so nothing was displaced — the ordinary answer for the first `PUT` to a lane, and not a warning about anything. Read before you overwrite:
 
 ```bash
 curl -s {{BASE_URL}}/api/gantt/charts/{{CHART_ID}}/nodes/tier-migration/body
@@ -390,8 +418,8 @@ A chart is built in a handful of passes, and they are cheap because the chart re
 2. **Seed the dates from history** — one `POST …/dates`, immediately after a chart is created from epics and before you date anything by hand. It only fills blanks and is safe to re-run, so there is no version of this plan in which deferring it helps.
 3. **Create the lanes you are adding**, parents before children, so `parentId` always names something that exists.
 4. **Arrange** — `PATCH` `parentId` and `order` to group mirrored tickets under your own PRD lanes. This is the work the server cannot do for you.
-5. **Date what the seed left** — the unstarted lanes, the forecast ends, and your own PRD lanes. "How to date a lane" above is how, and leaving an `end` null is one of the answers.
-6. **Declare the arrows**, then read the chart back and look at whether a cycle appeared.
+5. **Date what the seed left** — the unstarted lanes, the forecast ends, and your own PRD lanes — with the epic's own description open, because that is usually where the estimates are. "How to date a lane" above is how, and leaving an `end` null is one of the answers.
+6. **Declare the arrows Jira does not have.** Bootstrap already mirrored the ones it does, so read `edges` first and add only what is missing — then read the chart back and look at whether a cycle appeared.
 7. **Write the bodies** last, one `PUT` per lane, as raw markdown.
 
 Each write is one changelog entry the user will read. Make them mean something: a hundred single-field patches that end where three would have is a legible audit trail of you flailing.

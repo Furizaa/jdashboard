@@ -55,6 +55,9 @@ Tracer-bullet vertical slices derived from [the clashboard PRD](../prds/clashboa
 90 ─┬─→ 91 ─→ 92 ─→ 96 ─┐
     └─→ 93 ─┬─→ 94      ├─→ 97
             └─→ 95 ─────┘
+
+98 ─→ 100
+99
 ```
 
 ## Index
@@ -173,13 +176,16 @@ Tracer-bullet vertical slices derived from [the clashboard PRD](../prds/clashboa
 
 ### The Gantt View (PRD: [gantt-view.md](../prds/gantt-view.md))
 
-| #   | File                                                                 | Type | Blocked by |
-| --- | -------------------------------------------------------------------- | ---- | ---------- |
-| 90  | [The chart contract and its store](./90-gantt-contract-and-store.md) | AFK  | —          |
-| 91  | [The layout function](./91-gantt-layout-function.md)                 | AFK  | 90         |
-| 92  | [The surface, read-only](./92-gantt-surface-read-only.md)            | HITL | 91         |
-| 93  | [The write surface](./93-gantt-write-surface.md)                     | AFK  | 90         |
-| 94  | [The SKILL and the copy button](./94-gantt-skill-and-copy-button.md) | AFK  | 93         |
-| 95  | [Jira bootstrap and sync](./95-gantt-jira-bootstrap-and-sync.md)     | AFK  | 93         |
-| 96  | [Hand-offs and archive](./96-gantt-handoffs-and-archive.md)          | AFK  | 92, 95     |
-| 97  | [Documentation and e2e](./97-gantt-docs-and-e2e.md)                  | HITL | 94, 96     |
+| #   | File                                                                                                   | Type | Blocked by |
+| --- | ------------------------------------------------------------------------------------------------------ | ---- | ---------- |
+| 90  | [The chart contract and its store](./90-gantt-contract-and-store.md)                                   | AFK  | —          |
+| 91  | [The layout function](./91-gantt-layout-function.md)                                                   | AFK  | 90         |
+| 92  | [The surface, read-only](./92-gantt-surface-read-only.md)                                              | HITL | 91         |
+| 93  | [The write surface](./93-gantt-write-surface.md)                                                       | AFK  | 90         |
+| 94  | [The SKILL and the copy button](./94-gantt-skill-and-copy-button.md)                                   | AFK  | 93         |
+| 95  | [Jira bootstrap and sync](./95-gantt-jira-bootstrap-and-sync.md)                                       | AFK  | 93         |
+| 96  | [Hand-offs and archive](./96-gantt-handoffs-and-archive.md)                                            | AFK  | 92, 95     |
+| 97  | [Documentation and e2e](./97-gantt-docs-and-e2e.md)                                                    | HITL | 94, 96     |
+| 98  | [Dates from status history](./98-gantt-dates-from-status-history.md)                                   | AFK  | —          |
+| 99  | [Open-ended bars, and a chart that admits it has no dates](./99-gantt-open-ended-and-undated-chart.md) | AFK  | —          |
+| 100 | [The SKILL teaches an agent how to date a lane](./100-gantt-skill-teaches-dating.md)                   | AFK  | 98         |

@@ -18,6 +18,7 @@ export type CommandId =
   | 'go-to-board'
   | 'go-to-watchlist'
   | 'go-to-explain'
+  | 'go-to-gantt'
   | 'refresh'
   | 'toggle-only-workspace'
 
@@ -96,6 +97,17 @@ export function globalCommands(context: GlobalCommandContext): readonly GlobalCo
       id: 'go-to-explain',
       label: 'Go to Explain',
       synonyms: ['review', 'mr', 'merge request', 'switch'],
+    })
+  }
+  // Ungated, unlike `Open Gantt chart…` beside it: that one needs a chart to
+  // list and is hidden without one, which would otherwise leave the surface the
+  // nav rail offers unreachable from the palette for anyone who has no charts
+  // yet — i.e. everyone, on the day they go looking for it.
+  if (context.variant !== 'gantt') {
+    commands.push({
+      id: 'go-to-gantt',
+      label: 'Go to Gantt',
+      synonyms: ['chart', 'charts', 'plan', 'timeline', 'roadmap', 'switch'],
     })
   }
 

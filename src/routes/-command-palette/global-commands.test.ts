@@ -106,6 +106,20 @@ describe('route-scoped legality', () => {
     expect(ids(context({ variant: 'watchlist' }))).not.toContain('go-to-watchlist')
   })
 
+  // `Open Gantt chart…` is hidden without a chart to list, so if the switch were
+  // gated the same way the surface would be unreachable from the palette for
+  // anyone who has no charts — which is everyone, on the day they go looking.
+  it('offers Go to Gantt even when there is no chart to open', () => {
+    const offered = ids(context({ variant: 'main', chartCount: 0 }))
+    expect(offered).toContain('go-to-gantt')
+    expect(offered).not.toContain('open-gantt-chart')
+  })
+
+  it('leaves out Go to Gantt on the Gantt surface itself', () => {
+    expect(ids(context({ variant: 'gantt' }))).not.toContain('go-to-gantt')
+    expect(ids(context({ variant: 'gantt' }))).toContain('go-to-board')
+  })
+
   it('always offers Refresh — neither board can fail to honour it', () => {
     expect(ids(context({ variant: 'main' }))).toContain('refresh')
     expect(ids(context({ variant: 'watchlist' }))).toContain('refresh')

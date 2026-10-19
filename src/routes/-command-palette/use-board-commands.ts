@@ -60,6 +60,7 @@ export function useBoardCommands(state: BoardCommandsState): PaletteCommandSourc
         .with('go-to-board', () => run(() => navigate({ to: '/' })))
         .with('go-to-watchlist', () => run(() => navigate({ to: '/watchlist' })))
         .with('go-to-explain', () => run(() => navigate({ to: '/explain' })))
+        .with('go-to-gantt', () => run(() => navigate({ to: '/gantt' })))
         .with('refresh', () => run(refresh))
         .with('toggle-only-workspace', () => run(onToggleOnlyWorkspace))
         // The only command that opens a nested list. Which chart is a pick, and

@@ -111,3 +111,13 @@ export {
   type ActionGroup,
   type ActionKind,
 } from './commands'
+export type {
+  GanttChangelogActor,
+  GanttChangelogEntry,
+  GanttChart,
+  GanttChartSummary,
+  GanttEdge,
+  GanttEdgeSource,
+  GanttNode,
+  GanttNodeSource,
+} from './gantt'

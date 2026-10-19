@@ -178,6 +178,7 @@ The SKILL's **first instruction** is to probe `GET /api/gantt/charts` and, on co
 - **A new `Column` consumer.** Board, Review and now Gantt share it; `blocked` being derived rather than a fifth column is what keeps the vocabulary one thing.
 - **The first feature where the UI cannot write what the API can.** The asymmetry is deliberate and stated on both sides: the SKILL says the agent is the only writer, and the surface offers no control that would contradict it.
 - **One-level undo is a known ceiling.** "The agent rewrote my PRD" is recoverable; "it did that three times" is not. §11 names the trigger for taking git.
+- **A new dependency edge, bounded on arrival: `server/` may import a kernel _leaf_.** `gantt-schema.ts` takes `COLUMNS` from `kernel/columns` rather than keeping a second copy of the column vocabulary — the first `src/server` → `~/kernel` import in the repository. The edge is safe only in that form: the kernel **barrel** re-exports types _from_ `server/lib` (`kernel/explain.ts`, `kernel/gantt.ts`), so an import of `~/kernel` from inside `server/` closes a real cycle. A `server-cant-import-the-kernel-barrel` dependency-cruiser rule makes the distinction enforceable rather than remembered — leaf in, barrel out.
 - **Row windowing is designed for and not implemented.** `layout` takes a visible range from inception; the windowing that would use it is not in the slice plan.
 
 ## Deliberately out of scope

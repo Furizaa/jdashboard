@@ -52,6 +52,14 @@ module.exports = {
       },
     },
     {
+      name: 'server-cant-import-the-kernel-barrel',
+      comment:
+        'server/ may import a kernel *leaf* it needs a shared vocabulary from (gantt-schema takes COLUMNS from kernel/columns, rather than keeping a second column union) — but never the barrel. The barrel re-exports types *from* server/lib (kernel/explain.ts, kernel/gantt.ts), so an import of ~/kernel from inside server/ closes a real cycle. Leaf in, barrel out (ADR-0012).',
+      severity: 'error',
+      from: { path: '^src/server/' },
+      to: { path: '^src/kernel/index\\.ts$' },
+    },
+    {
       name: 'production-cant-import-fixtures',
       comment:
         '__fixtures__/ folders contain test-only fakes — production (non-test) code must not import from them',

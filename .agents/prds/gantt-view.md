@@ -95,7 +95,7 @@ type GanttEdge = {
 ### Surfaces and routing
 
 - `routes/-app-chrome.tsx` — **changed.** `ShellVariant` gains `'gantt'`. `isBoard` already excludes non-boards; `'gantt'` joins `'explain'` in showing only the global tools. No new props.
-- `routes/-nav/NavRail.tsx` — a fourth item, `/gantt`, icon `GanttChartSquare`, testid `nav-gantt`.
+- `routes/-nav/NavRail.tsx` — a fourth item, `/gantt`, icon `ChartGantt`, testid `nav-gantt`.
 - `routes/gantt.tsx` — **new** file route. Search schema `{ chart?: string; issue?: string; node?: string }`, validated in `routes/-gantt/gantt-search.ts` the way `explain-search.ts` validates `mr`. Renders `GanttShell`.
 - `routes/-gantt/GanttShell.tsx` — **new.** `AppChrome variant="gantt"` with `contexts/gantt`'s `ChartList` or `GanttChartView` in `children`, and `IssueDetailPanel` in `overlay` — the ADR-0009 slot, filled for the first time outside `AppShell`. `?node=` reveals and scrolls to a node (the palette's `g` hand-off); consumed on arrival with `replace`, exactly as `AppShell` consumes `?ai=`.
 

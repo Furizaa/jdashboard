@@ -12,7 +12,7 @@ The fourth surface, rendering a chart that already exists on disk. Read-only thr
 
 - **`src/routes/-app-chrome.tsx`** — `ShellVariant` gains `'gantt'`. `'gantt'` behaves as `'explain'` does: `isBoard` excludes it, so no New, no filter chip, no Only Workspace, no Configure lanes. **No new props** — if a prop is needed, the design is wrong.
 - **`src/routes/-header/Header.tsx`** — only the comment above `isBoard` needs to learn there is a fourth surface. No behavioural change.
-- **`src/routes/-nav/NavRail.tsx`** — a fourth `ITEMS` entry: `/gantt`, label `Gantt`, icon `GanttChartSquare` from lucide, testid `testIds.navGantt`.
+- **`src/routes/-nav/NavRail.tsx`** — a fourth `ITEMS` entry: `/gantt`, label `Gantt`, icon `ChartGantt` from lucide (verified present in lucide-react 1.14.0; `GanttChartSquare` is a deprecated alias there), testid `testIds.navGantt`.
 - **`src/routes/-gantt/gantt-search.ts`** — `validateGanttSearch` over `{ chart?: string; issue?: string; node?: string }`, written the way `routes/-explain/explain-search.ts` is written, with its test. `node` is meaningless without `chart` and is dropped when absent, exactly as `validateBoardSearch` drops `notes` without `issue`.
 - **`src/routes/gantt.tsx`** — the file route. `createFileRoute('/gantt')` with `validateSearch: validateGanttSearch`, rendering `GanttShell`.
 - **`src/routes/-gantt/GanttShell.tsx`** — `AppChrome variant="gantt"` with `ChartList` (no `?chart=`) or `GanttChartView` (with one) in `children`. **The `overlay` slot is left empty in this slice** — the detail panel arrives in slice 96 — but the shell is written so filling it is one line.

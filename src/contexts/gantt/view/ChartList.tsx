@@ -4,6 +4,7 @@ import { formatDistanceToNow } from 'date-fns'
 import type { GanttChartSummary } from '~/kernel'
 import { testIds } from '~/lib/testids'
 import { useChartList } from '../presenter'
+import { CopySkillButton } from './CopySkillButton'
 
 // `/gantt` with no `?chart=`: every chart on disk, as rows.
 //
@@ -23,20 +24,35 @@ export function ChartList({ onSelect }: { onSelect: (chartId: string) => void })
         .with({ phase: 'error' }, ({ message }) => (
           <ListMessage tone="destructive">{message}</ListMessage>
         ))
+        // The empty state carries the copy control, because the SKILL is what
+        // teaches an agent to create the first chart: telling someone an agent
+        // makes these and then offering no way to brief one is the one place
+        // this surface could strand a reader.
         .with({ phase: 'empty' }, () => (
           <ListMessage>
             <ChartGantt size={22} className="mb-2.5 opacity-70" aria-hidden />
             No charts yet. An agent creates one through the Gantt API; this surface reads them.
+            <span className="mt-3.5 inline-flex">
+              <CopySkillButton labelled />
+            </span>
           </ListMessage>
         ))
         .with({ phase: 'ready' }, ({ charts }) => (
-          <ul className="mx-auto flex max-w-3xl flex-col gap-2">
-            {charts.map((chart) => (
-              <li key={chart.id}>
-                <ChartRow chart={chart} onSelect={() => onSelect(chart.id)} />
-              </li>
-            ))}
-          </ul>
+          <div className="mx-auto flex max-w-3xl flex-col gap-2">
+            {/* Also here, not only in a chart's header: handing an agent the
+                brief is how you add the *next* chart too, and the header's copy
+                is scoped to the chart you already have open. */}
+            <div className="flex justify-end">
+              <CopySkillButton labelled />
+            </div>
+            <ul className="flex flex-col gap-2">
+              {charts.map((chart) => (
+                <li key={chart.id}>
+                  <ChartRow chart={chart} onSelect={() => onSelect(chart.id)} />
+                </li>
+              ))}
+            </ul>
+          </div>
         ))
         .exhaustive()}
     </div>

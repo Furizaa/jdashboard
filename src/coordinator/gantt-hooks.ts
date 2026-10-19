@@ -180,14 +180,14 @@ export function useArchiveGanttChart(): {
  * writes nothing.
  */
 export function useGanttSkill(): {
-  readSkill: (chartId: string) => Promise<GetGanttSkillResult>
+  readSkill: (chartId?: string | null) => Promise<GetGanttSkillResult>
   isPending: boolean
 } {
-  const mutation = useMutation<GetGanttSkillResult, Error, { chartId: string }>({
+  const mutation = useMutation<GetGanttSkillResult, Error, { chartId: string | null }>({
     mutationFn: (data) => getGanttSkill({ data }),
   })
   return {
-    readSkill: (chartId) => mutation.mutateAsync({ chartId }),
+    readSkill: (chartId) => mutation.mutateAsync({ chartId: chartId ?? null }),
     isPending: mutation.isPending,
   }
 }

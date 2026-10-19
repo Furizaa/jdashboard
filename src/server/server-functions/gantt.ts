@@ -244,9 +244,18 @@ export const archiveGanttChart = createServerFn({ method: 'POST' })
  * defensively: outside a request context there is nothing to read, and a
  * documented localhost fallback is better than a failed copy.
  */
+// `chartId` is **optional**, and that is the whole point of this signature: the
+// SKILL is what teaches an agent to create a chart, so requiring one to read it
+// would mean needing a chart before you could get the document that tells you how
+// to make one. Absent, `renderGanttSkill` substitutes its documented placeholder
+// — a valid slug, so a copy that is pasted unedited fails with a readable
+// `404 ChartNotFound` rather than a `400` about the id's shape.
 export const getGanttSkill = createServerFn({ method: 'GET' })
-  .inputValidator((data: { chartId: string }) => ({
-    chartId: requireChartId('getGanttSkill', data?.chartId),
+  .inputValidator((data?: { chartId?: string | null }) => ({
+    chartId:
+      typeof data?.chartId === 'string' && data.chartId !== ''
+        ? requireChartId('getGanttSkill', data.chartId)
+        : null,
   }))
   .handler(
     async ({ data }): Promise<GetGanttSkillResult> => ({

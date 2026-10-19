@@ -16,6 +16,8 @@ ADR-0007 chose a plain shared `AppShell` over a pathless layout route and left t
 
 - **(b) A pathless layout route owning the chrome.** _Rejected, again and for the same reason:_ still more router indirection than the problem needs. The upgrade path stays open, and a fourth surface is the trigger to take it.
 
+  _The trigger fired, was examined, and was declined with reasons in [ADR-0012](0012-gantt-charts-as-a-system-of-record.md) §2 — the chrome extraction below already took the win a layout route would deliver, and what is left per-surface is board state that `/explain` and `/gantt` would then carry for boards they do not have. It is re-aimed rather than removed: the trigger is now **a surface needing chrome state another surface also needs**._
+
 - **(c) Extract the chrome; give Explain its own shell.** _Selected._ The chrome — the logo corner, the header slot, `NavRail`, and the palette host — moves out of `AppShell` into `routes/-app-chrome.tsx`. `AppShell` composes it with the board + detail panel; a new `ExplainShell` composes it with the tab strip + report pane. `BoardVariant` stays `'main' | 'watchlist'`.
 
 Consequence: the rail's `aria-label` changes from `"Boards"` to `"Surfaces"`, and the header on `/explain` carries only the global tools (refresh, tag manager) — not New, not the filter chip, not Only Workspace, not Configure lanes.

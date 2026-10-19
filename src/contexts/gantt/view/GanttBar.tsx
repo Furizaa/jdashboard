@@ -24,8 +24,10 @@ import { pct } from './GanttAxis'
 // own palette, read rather than re-picked: a bar and the chip on the same
 // ticket's card disagreeing about what colour `IN UAT` is would be two answers to
 // one question. It is also the finer vocabulary — `Column` folds `In STG`,
-// `In QA`, `In UAT` and `Done` into one green and `Blocked` into `TO DO`'s grey,
-// which is exactly the distinction a reader scanning a release wants back.
+// `In QA`, `In UAT` and `Done` into one tone and `Blocked` into `TO DO`'s grey,
+// which is exactly the distinction a reader scanning a release wants back. The
+// four it gives back are steps of **one green** rather than four hues; the
+// palette says why.
 
 /**
  * The bar's fill, as a translucent wash of the status chip's colour.

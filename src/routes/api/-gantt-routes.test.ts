@@ -1,0 +1,414 @@
+import { beforeAll, describe, expect, it, vi } from 'vitest'
+import { bodyFilePath, bodyPrevFilePath } from '~/server/lib/gantt-store'
+import { createGanttWrites, type GanttWrites } from '~/server/lib/gantt-writes'
+import {
+  aChart,
+  anEdge,
+  aNode,
+  FAKE_HOME,
+  fakeGanttStore,
+  seedChart,
+} from '~/server/contexts/gantt/application/__fixtures__/fake-gantt-store'
+import { ganttChartHandlers } from './gantt.charts.$chartId'
+import { ganttChartsHandlers } from './gantt.charts'
+import { ganttEdgeHandlers } from './gantt.charts.$chartId.edges.$edgeId'
+import { ganttEdgesHandlers } from './gantt.charts.$chartId.edges'
+import { ganttNodeBodyHandlers } from './gantt.charts.$chartId.nodes.$nodeId.body'
+import { ganttNodeHandlers } from './gantt.charts.$chartId.nodes.$nodeId'
+import { ganttNodesHandlers } from './gantt.charts.$chartId.nodes'
+
+// Named with the `-` prefix so TanStack's route generator does not look for a
+// `Route` export in it — the convention `-explain-stream.test.ts` established,
+// which is also the route-handler unit-test precedent ADR-0006 names.
+//
+// The handlers are driven directly, as functions over a fake disk, rather than
+// through a server. One case per status code, plus the two assertions that are
+// about absence rather than behaviour: that **no route handles
+// `DELETE /api/gantt/charts/:chartId`**, and that **no failure path returns a
+// plain-text body**.
+
+// `ganttRespond` runs its program on `appRuntime`, which builds the whole
+// application layer on first use — including `ServerEnvLive`, which throws on a
+// missing variable. Nothing under test needs any of it, so the values are
+// placeholders; what matters is that the layer can be built at all.
+beforeAll(() => {
+  for (const [key, value] of Object.entries({
+    JIRA_BASE_URL: 'https://example.atlassian.net',
+    JIRA_EMAIL: 'someone@example.com',
+    JIRA_API_TOKEN: 'token',
+    JIRA_PROJECT_KEY: 'GEO',
+    JIRA_LABEL_FILTER: 'team',
+    JIRA_DONE_WINDOW_DAYS: '14',
+    GITLAB_BASE_URL: 'https://gitlab.example.com',
+    GITLAB_TOKEN: 'token',
+    GITLAB_PROJECT_PATH: 'group/project',
+  })) {
+    vi.stubEnv(key, value)
+  }
+})
+
+const json = (body: unknown): Request =>
+  new Request('http://localhost/api/gantt', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+
+const text = (body: string): Request =>
+  new Request('http://localhost/api/gantt', { method: 'PUT', body })
+
+type ErrorBody = {
+  error: string
+  message: string
+  issues: { path: string; expected: string; received: string }[]
+}
+
+async function errorBodyOf(response: Response): Promise<ErrorBody> {
+  expect(response.headers.get('Content-Type')).toBe('application/json')
+  return (await response.json()) as ErrorBody
+}
+
+const NODE = {
+  id: 'api',
+  title: 'The API',
+}
+
+// A chart with one mirrored node, one local node, and an arrow between them.
+const seeded = aChart({
+  nodes: [
+    aNode('prd'),
+    aNode('api', { parentId: 'prd' }),
+    aNode('geo-120', { source: { kind: 'jira', key: 'GEO-120' }, title: 'Mirrored' }),
+  ],
+  edges: [anEdge('api-blocks-geo', 'api', 'geo-120')],
+})
+
+function withSeed(extra?: Record<string, string>) {
+  return fakeGanttStore({ ...seedChart(seeded), ...extra })
+}
+
+describe('GET /api/gantt/charts', () => {
+  it('is a 200 carrying the summaries', async () => {
+    const { writes } = withSeed()
+    const response = await ganttChartsHandlers(writes).GET()
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({
+      charts: [
+        {
+          id: 'plan',
+          title: 'The plan',
+          jiraSources: [],
+          lastSyncedAt: null,
+          nodeCount: 3,
+          doneCount: 0,
+        },
+      ],
+    })
+  })
+})
+
+describe('POST /api/gantt/charts', () => {
+  it('is a 201 carrying the created chart', async () => {
+    const { writes } = fakeGanttStore()
+    const response = await ganttChartsHandlers(writes).POST({
+      request: json({ id: 'plan', title: 'The plan' }),
+    })
+    expect(response.status).toBe(201)
+    expect(await response.json()).toMatchObject({ id: 'plan', version: 1, nodes: [], edges: [] })
+  })
+
+  it('is a 409 for a chart id that is already taken', async () => {
+    const { writes } = withSeed()
+    const response = await ganttChartsHandlers(writes).POST({
+      request: json({ id: 'plan', title: 'Again' }),
+    })
+    expect(response.status).toBe(409)
+    expect((await errorBodyOf(response)).error).toBe('DuplicateChartId')
+  })
+
+  it('is a 400 carrying issues[] for an id that is not a slug', async () => {
+    const { writes } = fakeGanttStore()
+    const response = await ganttChartsHandlers(writes).POST({
+      request: json({ id: 'Not A Slug', title: 'The plan' }),
+    })
+    expect(response.status).toBe(400)
+    const body = await errorBodyOf(response)
+    expect(body.issues.map((issue) => issue.path)).toEqual(['id'])
+    expect(body.issues[0]?.received).toBe('"Not A Slug"')
+  })
+
+  it('is a 400 when the body is not JSON at all', async () => {
+    const { writes } = fakeGanttStore()
+    const response = await ganttChartsHandlers(writes).POST({
+      request: new Request('http://localhost/api/gantt', { method: 'POST', body: 'not json' }),
+    })
+    expect(response.status).toBe(400)
+    expect((await errorBodyOf(response)).message).toContain('not valid JSON')
+  })
+})
+
+describe('/api/gantt/charts/:chartId', () => {
+  it('GET is a 200 with hasBody derived per node', async () => {
+    const { writes } = withSeed({ [bodyFilePath(FAKE_HOME, 'plan', 'api')]: '# the API' })
+    const response = await ganttChartHandlers(writes).GET({ params: { chartId: 'plan' } })
+    expect(response.status).toBe(200)
+    const chart = (await response.json()) as { nodes: { id: string; hasBody: boolean }[] }
+    expect(chart.nodes.map((node) => [node.id, node.hasBody])).toEqual([
+      ['prd', false],
+      ['api', true],
+      ['geo-120', false],
+    ])
+  })
+
+  it('GET is a 404 for a chart that is not there', async () => {
+    const { writes } = withSeed()
+    const response = await ganttChartHandlers(writes).GET({ params: { chartId: 'ghost' } })
+    expect(response.status).toBe(404)
+    expect((await errorBodyOf(response)).error).toBe('ChartNotFound')
+  })
+
+  it('GET is a 400 for a chart id outside the slug charset', async () => {
+    const { writes } = withSeed()
+    const response = await ganttChartHandlers(writes).GET({ params: { chartId: '../escape' } })
+    expect(response.status).toBe(400)
+    const body = await errorBodyOf(response)
+    expect(body.issues[0]?.path).toBe('chartId')
+    expect(body.issues[0]?.received).toBe('"../escape"')
+  })
+
+  it('PATCH is a 200 with the new title', async () => {
+    const { writes } = withSeed()
+    const response = await ganttChartHandlers(writes).PATCH({
+      params: { chartId: 'plan' },
+      request: json({ title: 'Renamed' }),
+    })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ title: 'Renamed' })
+  })
+
+  // An endpoint that was never written is indistinguishable from one that was
+  // deleted by accident, so the absence is asserted rather than assumed
+  // (ADR-0012 §8). Archiving is a confirmed UI action, not an API verb.
+  it('has no DELETE — chart lifecycle belongs with the human, not the agent', () => {
+    const { writes } = withSeed()
+    const handlers: Record<string, unknown> = ganttChartHandlers(writes)
+    expect(Object.keys(handlers).toSorted()).toEqual(['GET', 'PATCH'])
+    expect(handlers['DELETE']).toBeUndefined()
+  })
+})
+
+describe('POST /api/gantt/charts/:chartId/nodes', () => {
+  const post = (writes: GanttWrites, body: unknown) =>
+    ganttNodesHandlers(writes).POST({ params: { chartId: 'plan' }, request: json(body) })
+
+  it('is a 201 carrying the created node', async () => {
+    const { writes } = withSeed()
+    const response = await post(writes, { ...NODE, id: 'ui' })
+    expect(response.status).toBe(201)
+    expect(await response.json()).toMatchObject({ id: 'ui', parentId: null, orphaned: false })
+  })
+
+  it('is a 409 for a duplicate node id', async () => {
+    const { writes } = withSeed()
+    const response = await post(writes, NODE)
+    expect(response.status).toBe(409)
+    expect((await errorBodyOf(response)).error).toBe('DuplicateNodeId')
+  })
+
+  it('is a 404 for an unknown parentId', async () => {
+    const { writes } = withSeed()
+    const response = await post(writes, { ...NODE, id: 'ui', parentId: 'ghost' })
+    expect(response.status).toBe(404)
+    expect((await errorBodyOf(response)).error).toBe('NodeNotFound')
+  })
+
+  // The assertion `{ reportInput: true }` exists for: without it every `received`
+  // reads `unknown`, and an agent cannot see what it sent.
+  it('is a 400 naming start with its expected and its received', async () => {
+    const { writes } = withSeed()
+    const response = await post(writes, { ...NODE, id: 'ui', start: 'next week' })
+    expect(response.status).toBe(400)
+    const body = await errorBodyOf(response)
+    const issue = body.issues.find((candidate) => candidate.path === 'start')
+    expect(issue?.received).toBe('"next week"')
+    expect(issue?.expected).toContain('string matching')
+  })
+})
+
+describe('/api/gantt/charts/:chartId/nodes/:nodeId', () => {
+  const patch = (writes: GanttWrites, nodeId: string, body: unknown) =>
+    ganttNodeHandlers(writes).PATCH({ params: { chartId: 'plan', nodeId }, request: json(body) })
+
+  it('PATCH is a 422 for a mirrored field on a jira-sourced node', async () => {
+    const { writes } = withSeed()
+    const response = await patch(writes, 'geo-120', { title: 'Mine now' })
+    expect(response.status).toBe(422)
+    const body = await errorBodyOf(response)
+    expect(body.error).toBe('MirroredFieldPatch')
+    expect(body.issues.map((issue) => issue.path)).toEqual(['title'])
+  })
+
+  it('PATCH is a 200 for a chart-owned field on that same node', async () => {
+    const { writes } = withSeed()
+    const response = await patch(writes, 'geo-120', { start: '2026-11-02' })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ start: '2026-11-02', title: 'Mirrored' })
+  })
+
+  it('PATCH is a 404 for a node that is not there', async () => {
+    const { writes } = withSeed()
+    const response = await patch(writes, 'ghost', { order: 3 })
+    expect(response.status).toBe(404)
+  })
+
+  it('DELETE reparents the children, removes the edges, and erases the body and its .prev', async () => {
+    const body = bodyFilePath(FAKE_HOME, 'plan', 'api')
+    const prev = bodyPrevFilePath(FAKE_HOME, 'plan', 'api')
+    const { writes, files } = withSeed({ [body]: '# now', [prev]: '# before' })
+    const grandchild = await ganttNodesHandlers(writes).POST({
+      params: { chartId: 'plan' },
+      request: json({ id: 'ui', title: 'UI', parentId: 'api' }),
+    })
+    expect(grandchild.status).toBe(201)
+
+    const response = await ganttNodeHandlers(writes).DELETE({
+      params: { chartId: 'plan', nodeId: 'api' },
+    })
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({
+      chartId: 'plan',
+      nodeId: 'api',
+      reparentedTo: 'prd',
+      reparentedChildIds: ['ui'],
+      removedEdgeIds: ['api-blocks-geo'],
+    })
+    expect(files.has(body)).toBe(false)
+    expect(files.has(prev)).toBe(false)
+  })
+})
+
+describe('/api/gantt/charts/:chartId/nodes/:nodeId/body', () => {
+  const params = { chartId: 'plan', nodeId: 'api' }
+
+  it('PUT writes the markdown and snapshots the predecessor', async () => {
+    const { writes, files } = withSeed()
+    const handlers = ganttNodeBodyHandlers(writes)
+
+    const first = await handlers.PUT({ params, request: text('# first') })
+    expect(first.status).toBe(200)
+    expect(await first.json()).toEqual({ chartId: 'plan', nodeId: 'api', snapshotted: false })
+
+    const second = await handlers.PUT({ params, request: text('# second') })
+    expect(await second.json()).toMatchObject({ snapshotted: true })
+    expect(files.get(bodyFilePath(FAKE_HOME, 'plan', 'api'))).toBe('# second')
+    expect(files.get(bodyPrevFilePath(FAKE_HOME, 'plan', 'api'))).toBe('# first')
+  })
+
+  it('GET answers the markdown as markdown', async () => {
+    const { writes } = withSeed({ [bodyFilePath(FAKE_HOME, 'plan', 'api')]: '# the API' })
+    const response = await ganttNodeBodyHandlers(writes).GET({ params })
+    expect(response.status).toBe(200)
+    expect(response.headers.get('Content-Type')).toBe('text/markdown; charset=utf-8')
+    expect(await response.text()).toBe('# the API')
+  })
+
+  it('GET is a 404 for a node the chart does not have', async () => {
+    const { writes } = withSeed()
+    const response = await ganttNodeBodyHandlers(writes).GET({
+      params: { chartId: 'plan', nodeId: 'ghost' },
+    })
+    expect(response.status).toBe(404)
+    expect((await errorBodyOf(response)).error).toBe('NodeNotFound')
+  })
+})
+
+describe('/api/gantt/charts/:chartId/edges', () => {
+  const post = (writes: GanttWrites, body: unknown) =>
+    ganttEdgesHandlers(writes).POST({ params: { chartId: 'plan' }, request: json(body) })
+
+  // ADR-0012 §6: the API never refuses to record a declared dependency. A plan
+  // that is impossible should look impossible, not be impossible to write down.
+  it('POST is a 201 even when the edge closes a cycle', async () => {
+    const { writes } = withSeed()
+    const response = await post(writes, { id: 'geo-blocks-api', from: 'geo-120', to: 'api' })
+    expect(response.status).toBe(201)
+    expect(await response.json()).toMatchObject({ from: 'geo-120', to: 'api' })
+  })
+
+  it('POST is a 404 when an endpoint names a node that does not exist', async () => {
+    const { writes } = withSeed()
+    const response = await post(writes, { id: 'ghostly', from: 'api', to: 'ghost' })
+    expect(response.status).toBe(404)
+    expect((await errorBodyOf(response)).error).toBe('NodeNotFound')
+  })
+
+  it('POST is a 409 for a duplicate edge id', async () => {
+    const { writes } = withSeed()
+    const response = await post(writes, { id: 'api-blocks-geo', from: 'geo-120', to: 'api' })
+    expect(response.status).toBe(409)
+    expect((await errorBodyOf(response)).error).toBe('DuplicateEdgeId')
+  })
+
+  it('DELETE is a 200 carrying the withdrawn edge, and a 404 for an unknown one', async () => {
+    const { writes } = withSeed()
+    const handlers = ganttEdgeHandlers(writes)
+    const removed = await handlers.DELETE({ params: { chartId: 'plan', edgeId: 'api-blocks-geo' } })
+    expect(removed.status).toBe(200)
+    expect(await removed.json()).toMatchObject({ id: 'api-blocks-geo' })
+
+    const missing = await handlers.DELETE({ params: { chartId: 'plan', edgeId: 'api-blocks-geo' } })
+    expect(missing.status).toBe(404)
+    expect((await errorBodyOf(missing)).error).toBe('EdgeNotFound')
+  })
+})
+
+describe('a defect', () => {
+  it('is a logged 500 with a JSON body, not a leaked stack', async () => {
+    const seed = withSeed()
+    const writes = createGanttWrites({
+      ...seed.deps,
+      writeFile: () => Promise.reject(new Error('disk full')),
+    })
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const response = await ganttNodesHandlers(writes).POST({
+      params: { chartId: 'plan' },
+      request: json({ ...NODE, id: 'ui' }),
+    })
+
+    expect(response.status).toBe(500)
+    expect((await errorBodyOf(response)).error).toBe('InternalError')
+    expect(logged).toHaveBeenCalled()
+    logged.mockRestore()
+  })
+})
+
+describe('every failure path', () => {
+  // ADR-0006 mandates plain-text bodies for its own consumer; this consumer has
+  // to self-correct from the error, so the body shape follows the consumer
+  // (ADR-0012 §9). One assertion over every status this surface can produce.
+  it('answers JSON, never plain text', async () => {
+    const { writes } = withSeed()
+    const responses = await Promise.all([
+      ganttChartsHandlers(writes).POST({ request: json({ id: 'Bad Id', title: 'x' }) }),
+      ganttChartHandlers(writes).GET({ params: { chartId: 'ghost' } }),
+      ganttChartsHandlers(writes).POST({ request: json({ id: 'plan', title: 'x' }) }),
+      ganttNodeHandlers(writes).PATCH({
+        params: { chartId: 'plan', nodeId: 'geo-120' },
+        request: json({ status: 'In Progress' }),
+      }),
+    ])
+
+    expect(responses.map((response) => response.status)).toEqual([400, 404, 409, 422])
+    for (const response of responses) {
+      expect(response.headers.get('Content-Type')).toBe('application/json')
+      // oxlint-disable-next-line no-await-in-loop -- four small bodies
+      expect(Object.keys((await response.json()) as object).toSorted()).toEqual([
+        'error',
+        'issues',
+        'message',
+      ])
+    }
+  })
+})

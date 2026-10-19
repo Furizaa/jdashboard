@@ -312,13 +312,14 @@ export function toIssues(error: z.ZodError): ReadonlyArray<GanttIssue> {
  * depends on the **target node's** source, which the body does not carry and the
  * schema cannot look up.
  *
- * TODO(93): the application service in `server/contexts/gantt/application/`
- * loads the node, and rejects a patch where `source.kind === 'jira'` and
- * `patchTouchesMirroredFields(body)` is true.
+ * That other half is `mutateChart`'s: `patchNode` in
+ * `server/contexts/gantt/application/mutate-chart.ts` loads the node and refuses
+ * a patch where `source.kind === 'jira'` and `patchTouchesMirroredFields(body)`
+ * is true, with `MirroredFieldPatch` — a `422`.
  */
 export const MIRRORED_NODE_FIELDS = ['title', 'column', 'status', 'assignee'] as const
 
-/** Whether a decoded node patch names any field sync owns. See the TODO above. */
+/** Whether a decoded node patch names any field sync owns. See the note above. */
 export function patchTouchesMirroredFields(body: PatchNodeBody): boolean {
   return MIRRORED_NODE_FIELDS.some((field) => body[field] !== undefined)
 }
